@@ -215,10 +215,11 @@ internal sealed partial class PreferencesForm : Form
         var area = Screen.FromControl(this).WorkingArea;
         ClientSize = new Size(Math.Min(Px(WinW), area.Width - Px(32)), Math.Min(Px(WinH), area.Height - Px(64)));
 
-        // Resize limits are outer sizes, so add the current non-client frame.
+        // Resize limits are outer sizes, so add the current non-client frame. The
+        // window may grow freely but never shrink below its default size.
         var frame = new Size(Width - ClientSize.Width, Height - ClientSize.Height);
         MinimumSize = new Size(ClientSize.Width + frame.Width, ClientSize.Height + frame.Height);
-        MaximumSize = new Size(Px(1100) + frame.Width, Px(900) + frame.Height);
+        MaximumSize = Size.Empty;
 
         PlaceChrome();
 
