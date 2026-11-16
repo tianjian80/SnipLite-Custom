@@ -38,7 +38,67 @@ internal sealed partial class PreferencesForm : Form
     private readonly AppSettings _s;
     private sealed class BufferedPage : Panel
     {
-        public BufferedPage() { DoubleBuffered = true; ResizeRedraw = true; }
+        private const int WmHScroll = 0x0114;
+        private const int WmSize = 0x0005;
+        private const int SbHorz = 0;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowScrollBar(IntPtr hWnd, int wBar, bool show);
+
+        public BufferedPage()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+            AutoScroll = true;
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            // Clamp before the base layout: the owner rebuilds the page one message
+            // loop later, and until then the stale cards must not create a
+            // horizontal scroll extent.
+            ClampChildrenToWidth();
+            base.OnLayout(e);
+            HideHorizontalBar();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WmHScroll) return;
+
+            base.WndProc(ref m);
+
+            if (m.Msg == WmSize) HideHorizontalBar();
+        }
+
+        private void ClampChildrenToWidth()
+        {
+            var maxRight = ClientSize.Width;
+
+            foreach (Control child in Controls)
+            {
+                if (child.Width <= 0) continue;
+
+                var available = maxRight - child.Left;
+                if (available > 0 && child.Width > available) child.Width = available;
+            }
+        }
+
+        private bool _hiding;
+
+        private void HideHorizontalBar()
+        {
+            if (!IsHandleCreated || IsDisposed || _hiding) return;
+
+            _hiding = true;
+            try
+            {
+                if (HorizontalScroll.Maximum != 0) HorizontalScroll.Maximum = 0;
+                if (HorizontalScroll.Value != 0) HorizontalScroll.Value = 0;
+                ShowScrollBar(Handle, SbHorz, false);
+            }
+            finally { _hiding = false; }
+        }
     }
     private readonly Panel _page = new BufferedPage();
     private readonly Button _reset = new FluentButton();
@@ -55,6 +115,8 @@ internal sealed partial class PreferencesForm : Form
     private int _controlX;   // x of the first control
 
     private bool _ready;
+    private bool _relayoutQueued;
+    private int _laidOutWidth = -1;
 
     /// <summary>Raised after an option changed, so the tray can re-apply hotkeys etc.</summary>
     public event Action? Applied;
@@ -67,7 +129,7 @@ internal sealed partial class PreferencesForm : Form
 
         Text = "SnipLite 首选项";
         Icon = AppIcon.Window;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
@@ -112,6 +174,7 @@ internal sealed partial class PreferencesForm : Form
     {
         if (IsDisposed) return;
         AppTheme.Apply(this);
+        if (_ready) PrepareTree(_page);   // labels back to opaque card colour
         AppTheme.ApplyWindow(this);
     }
 
@@ -151,6 +214,12 @@ internal sealed partial class PreferencesForm : Form
 
         var area = Screen.FromControl(this).WorkingArea;
         ClientSize = new Size(Math.Min(Px(WinW), area.Width - Px(32)), Math.Min(Px(WinH), area.Height - Px(64)));
+
+        // Resize limits are outer sizes, so add the current non-client frame.
+        var frame = new Size(Width - ClientSize.Width, Height - ClientSize.Height);
+        MinimumSize = new Size(ClientSize.Width + frame.Width, ClientSize.Height + frame.Height);
+        MaximumSize = new Size(Px(1100) + frame.Width, Px(900) + frame.Height);
+
         PlaceChrome();
 
         _ready = true;
@@ -236,6 +305,64 @@ internal sealed partial class PreferencesForm : Form
         PlaceChrome();
         _tabRects.Clear();
         Invalidate();
+
+        // Card widths are derived from the client width, so a width change needs
+        // the current page rebuilt. Coalesced to one rebuild per message loop.
+        if (_laidOutWidth != ClientSize.Width) QueueContentRelayout();
+    }
+
+    /// <summary>Opaque erase: transparent child backgrounds rely on the parent
+    /// paint, an unpainted strip would otherwise show up black while resizing.</summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        using var brush = new SolidBrush(Chrome);
+        e.Graphics.FillRectangle(brush, ClientRectangle);
+    }
+
+    private void QueueContentRelayout()
+    {
+        if (_relayoutQueued) return;
+        _relayoutQueued = true;
+        BeginInvoke(() =>
+        {
+            _relayoutQueued = false;
+            if (IsDisposed || Disposing || !_ready) return;
+            if (_laidOutWidth == ClientSize.Width) return;
+            ShowTab(_selected);
+        });
+    }
+
+    private static readonly System.Reflection.PropertyInfo? DoubleBufferedProperty =
+        typeof(Control).GetProperty("DoubleBuffered",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    private static readonly System.Reflection.PropertyInfo? ResizeRedrawProperty =
+        typeof(Control).GetProperty("ResizeRedraw",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    /// <summary>
+    /// Double-buffers and fully repaints every nested container of the page, and
+    /// gives labels an opaque background matching their card instead of
+    /// Color.Transparent. Native editors keep their own painting.
+    /// </summary>
+    private static void PrepareTree(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            if (child is not (TextBoxBase or ComboBox or NumericUpDown or UpDownBase))
+            {
+                try { DoubleBufferedProperty?.SetValue(child, true); }
+                catch { /* control does not support the style */ }
+            }
+
+            try { ResizeRedrawProperty?.SetValue(child, true); }
+            catch { /* control does not support the style */ }
+
+            if (child is Label)
+                child.BackColor = child.Parent?.BackColor ?? SystemColors.Control;
+
+            PrepareTree(child);
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -437,6 +564,8 @@ internal sealed partial class PreferencesForm : Form
         _page.ResumeLayout();
         UiText.Apply(_page, _s.DisplayLanguage);
         AppTheme.Apply(_page);
+        PrepareTree(_page);
+        _laidOutWidth = ClientSize.Width;
         _reset.Visible = index <= 5;
         ActiveControl = null;
         Invalidate();
@@ -541,7 +670,9 @@ internal sealed partial class PreferencesForm : Form
     // ------------------------------------------------------------- sections
 
     /// <summary>Width of the page's content column.</summary>
-    private int ContentWidth() => PageRect().Width - Px(PagePad * 2) - SystemInformation.VerticalScrollBarWidth;
+    // Reserved width must scale with the UI, otherwise a high-DPI scrollbar makes
+    // the cards wider than the viewport and a horizontal bar appears.
+    private int ContentWidth() => PageRect().Width - Px(PagePad * 2) - Px(SystemInformation.VerticalScrollBarWidth);
 
     /// <summary>Width left for a field that starts in the control column.</summary>
     private int FillWidth() => ContentWidth() - Px(LabelW + ControlGap + 16);
