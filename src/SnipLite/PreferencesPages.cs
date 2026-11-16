@@ -464,16 +464,48 @@ internal sealed partial class PreferencesForm
             };
             if (name == nameof(AppSettings.CustomCaptureHotkey))
             {
+                // Custom row: the toggle is pinned to the card's right edge so its
+                // Right matches the "启用全局快捷键" toggle exactly, and the caption
+                // sits immediately to its left without ever being ellipsized.
+                var height = Math.Max(Px(RowH), Px(ControlH) + Px(22));
+                var card = NewSettingRow(height);
+                AddRowIcon(card, label);
+                card.Controls.Add(new Label
+                {
+                    Text = label, AutoSize = false, AutoEllipsis = true,
+                    Bounds = new Rectangle(Px(48), Px(6), Px(LabelW - 52), height - Px(12)),
+                    TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+                });
+
+                var x = Px(LabelW + ControlGap);
+                foreach (var control in new Control[] { change, current })
+                {
+                    control.Location = new Point(x, Math.Max(0, (height - control.Height) / 2));
+                    if (control.Width > card.Width - x - Px(14)) control.Width = Math.Max(Px(40), card.Width - x - Px(14));
+                    card.Controls.Add(control);
+                    x += control.Width + Px(ControlGap);
+                }
+
                 var smart = new FluentToggle
                 {
-                    Text = UiText.T("智能排除任务栏"),
-                    AutoSize = false,
-                    Width = Px(180),
-                    Height = Px(ControlH),
+                    AutoSize = false, Width = Px(39), Height = Px(38),
+                    AccessibleName = UiText.T("智能排除任务栏"),
                     Checked = (bool)Value(nameof(AppSettings.SmartFullScreenCapture))
                 };
+                smart.Bounds = new Rectangle(card.Width - Px(14) - smart.Width, (height - smart.Height) / 2, smart.Width, smart.Height);
+                smart.Anchor = AnchorStyles.Right;
                 smart.CheckedChanged += (_, _) => Set(nameof(AppSettings.SmartFullScreenCapture), smart.Checked);
-                Row(label, change, current, smart);
+                card.Controls.Add(smart);
+
+                var caption = new Label
+                {
+                    Text = UiText.T("智能排除任务栏"), AutoSize = true, Font = Font,
+                    ForeColor = Ink, BackColor = Color.Transparent
+                };
+                caption.Location = new Point(smart.Left - Px(8) - caption.Width, (height - caption.Height) / 2);
+                caption.Anchor = AnchorStyles.Right;
+                card.Controls.Add(caption);
+                _y += height + Px(6);
                 continue;
             }
             Row(label, change, current);
