@@ -319,10 +319,18 @@ internal sealed class PinForm : Form
     }
     private void SaveAs()
     {
+        var extension = _settings.RememberImageExtension ? _settings.LastImageExtension : ".png";
+        var folder = new[] { _settings.QuickSaveDirectory, _settings.SaveDirectory }.FirstOrDefault(Directory.Exists);
+        var fileName = Services.ImageFileName(_settings, extension);
+        // 预填时避开默认目录里的同名文件；用户自己在弹窗里确认覆盖的路径不再二次改名。
+        if (folder is not null) fileName = Path.GetFileName(Services.UniqueFilePath(folder, fileName, extension));
+
         using var dialog = new SaveFileDialog
         {
-            Filter = UiText.T("PNG 图片|*.png|JPEG 图片|*.jpg"), FileName = Services.ImageFileName(_settings, _settings.RememberImageExtension ? _settings.LastImageExtension : ".png"),
-            FilterIndex = _settings.RememberImageExtension && _settings.LastImageExtension != ".png" ? 2 : 1
+            Filter = UiText.T("PNG 图片|*.png|JPEG 图片|*.jpg"), FileName = fileName,
+            InitialDirectory = folder ?? "",
+            FilterIndex = _settings.RememberImageExtension && _settings.LastImageExtension != ".png" ? 2 : 1,
+            OverwritePrompt = true
         };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         try

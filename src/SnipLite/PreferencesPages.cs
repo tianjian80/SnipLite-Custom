@@ -288,11 +288,28 @@ internal sealed partial class PreferencesForm
         Flag("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy)); Flag("保存截图时播放音效", nameof(_s.SoundOnSave));
     }
     private void ActionRow(string label, string action, string exit)
+        => ActionRowCore(label, action, exit,
+            new[] { "复制到剪贴板", "贴到屏幕", "快速保存", "无操作" },
+            new object[] { CaptureAction.Copy, CaptureAction.Pin, CaptureAction.QuickSave, CaptureAction.None },
+            value => value is CaptureAction.Copy or CaptureAction.Pin or CaptureAction.QuickSave);
+
+    private void RightClickRow()
+        => ActionRowCore("鼠标右键", nameof(_s.RightClickAction), nameof(_s.RightClickExit),
+            new[] { "快速保存", "保存文件", "弹出菜单", "退出截图", "无操作" },
+            new object[] { RightClickBehavior.QuickSave, RightClickBehavior.SaveFile, RightClickBehavior.ShowMenu, RightClickBehavior.ExitCapture, RightClickBehavior.None },
+            value => value is RightClickBehavior.QuickSave or RightClickBehavior.SaveFile);
+
+    /// <summary>Action chooser plus a "then exit capture" toggle; the toggle is disabled for actions that never save.</summary>
+    private void ActionRowCore(string label, string action, string exit, string[] labels, object[] values, Func<object, bool> exitEnabled)
     {
-        var values = new object[] { CaptureAction.Copy, CaptureAction.Pin, CaptureAction.QuickSave, CaptureAction.None };
-        var chooser = MakeChooser(new[] { "复制到剪贴板", "贴到屏幕", "快速保存", "无操作" }, Array.IndexOf(values, Value(action)), i => Set(action, values[i]));
         var check = new FluentToggle { Text = UiText.T("然后退出截屏"), AutoSize = false, Width = Px(180), Height = Px(ControlH), Checked = (bool)Value(exit) };
         check.CheckedChanged += (_, _) => Set(exit, check.Checked);
+        var chooser = MakeChooser(labels, Math.Max(0, Array.IndexOf(values, Value(action))), i =>
+        {
+            Set(action, values[i]);
+            check.Enabled = exitEnabled(values[i]);
+        });
+        check.Enabled = exitEnabled(Value(action));
         Row(label, chooser, check);
     }
     private void CaptureKeysPage()
@@ -303,7 +320,8 @@ internal sealed partial class PreferencesForm
         ActionRow("左键双击", nameof(_s.DoubleClickAction), nameof(_s.DoubleClickExit));
         ActionRow("中键单击", nameof(_s.MiddleClickAction), nameof(_s.MiddleClickExit));
         ActionRow("回车键", nameof(_s.EnterAction), nameof(_s.EnterExit));
-        HintText("鼠标右键直接取消截图；Esc 按当前选项决定是否确认。");
+        RightClickRow();
+        HintText("Esc 按当前选项决定是否确认。鼠标右键的默认行为可在上方配置。");
     }
     private void PinDisplayPage()
     {
@@ -349,7 +367,7 @@ internal sealed partial class PreferencesForm
         Flag("记住上一次使用的图片扩展名", nameof(_s.RememberImageExtension));
         Flag("快速保存时显示通知", nameof(_s.QuickSaveToast)); FolderRow("快速保存路径", nameof(_s.QuickSaveDirectory));
         Flag("自动保存", nameof(_s.AutoSave)); FolderRow("自动保存路径", nameof(_s.SaveDirectory));
-        HintText("命名支持 $yyyy$ $MM$ $dd$ $HH$ $mm$ $ss$ 和 $yyyy-MM-dd_HH-mm-ss$。");
+        HintText("命名支持 年 月 日 时 分");
     }
     private void OutputClipboardPage()
     {

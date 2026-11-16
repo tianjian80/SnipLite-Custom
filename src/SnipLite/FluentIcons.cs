@@ -65,7 +65,7 @@ internal static class FluentIcons
         if (label.Contains("重新启动") || label.Contains("恢复")) return "update";
         if (label.Contains("二维码")) return "qr";
         if (label.Contains("首选项")) return "settings";
-        if (label.Contains("帮助") || label.Contains("许可证")) return "about";
+        if (label.Contains("帮助") || label.Contains("关于") || label.Contains("许可证")) return "about";
         if (label.Contains("翻译")) return "translate";
         if (label.Contains("识别") || label.Contains("语言")) return "ocr";
         if (label.Contains("字体") || label.Contains("文字") || label.Contains("文件名")) return "text";

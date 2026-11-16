@@ -76,7 +76,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.Items.Add(SnipMenu.Item("二维码识别", () => StartCapture(CaptureMode.Qr), HotkeyDefinitions.Format(_settings.QrHotkey)));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(SnipMenu.Item("首选项…", () => ShowPreferences(0)));
-        menu.Items.Add(SnipMenu.Item("帮助", () => ShowPreferences(7)));
+        menu.Items.Add(SnipMenu.Item("关于", () => ShowPreferences(7)));
         menu.Items.Add(SnipMenu.Item("重新启动", Restart));
         menu.Items.Add(SnipMenu.Item("退出", Exit));
         UiText.Apply(menu, _settings.DisplayLanguage);

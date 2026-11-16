@@ -31,12 +31,18 @@ internal static partial class Services
         return new[] { ".png", ".jpg", ".jpeg" }.Contains(Path.GetExtension(stem).ToLowerInvariant())
             ? Path.ChangeExtension(stem, extension) : stem + extension;
     }
+    /// <summary>Returns a file path in <paramref name="folder"/> that does not exist yet, appending (1), (2) … to the stem.</summary>
+    public static string UniqueFilePath(string folder, string fileName, string extension)
+    {
+        var path = Path.Combine(folder, fileName);
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        for (var i = 1; File.Exists(path); i++) path = Path.Combine(folder, $"{stem} ({i}){extension}");
+        return path;
+    }
     public static string SaveCaptureFile(Bitmap image, AppSettings settings, string folder, string extension = ".png")
     {
         Directory.CreateDirectory(folder);
-        var filename = ImageFileName(settings, extension);
-        var path = Path.Combine(folder, filename);
-        for (var i = 2; File.Exists(path); i++) path = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(filename)} ({i}){extension}");
+        var path = UniqueFilePath(folder, ImageFileName(settings, extension), extension);
         SaveImage(image, path, extension is ".jpg" or ".jpeg", settings.JpegQuality);
         if (settings.SoundOnSave) _ = PlaySoundAsync(settings.CaptureSound);
         return path;

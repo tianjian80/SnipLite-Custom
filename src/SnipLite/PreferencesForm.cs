@@ -71,7 +71,7 @@ internal sealed partial class PreferencesForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        StartPosition = FormStartPosition.CenterScreen;
+        StartPosition = FormStartPosition.Manual;
         BackColor = Chrome;
         Font = settings.CreateInterfaceFont();
         AutoScaleMode = AutoScaleMode.None;
@@ -156,6 +156,54 @@ internal sealed partial class PreferencesForm : Form
         _ready = true;
         ShowTab(Math.Clamp(_startTab, 0, _tabs.Length - 1));
         ApplyTheme();
+
+        if (!TryRestoreSavedLocation()) CenterToScreen();
+    }
+
+    /// <summary>
+    /// Restore the window to its last saved screen position if that rectangle
+    /// still intersects an available working area (handles docked monitors being
+    /// unplugged). Returns true when a saved coordinate was honoured.
+    /// </summary>
+    private bool TryRestoreSavedLocation()
+    {
+        if (_s.PreferencesWindowX == int.MinValue || _s.PreferencesWindowY == int.MinValue) return false;
+
+        int x = _s.PreferencesWindowX, y = _s.PreferencesWindowY;
+        var rect = new Rectangle(x, y, Width, Height);
+
+        foreach (var screen in Screen.AllScreens)
+        {
+            var wa = screen.WorkingArea;
+            if (rect.IntersectsWith(wa))
+            {
+                Location = new Point(x, y);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected override void OnLocationChanged(EventArgs e)
+    {
+        base.OnLocationChanged(e);
+        if (_ready && WindowState == FormWindowState.Normal)
+        {
+            _s.PreferencesWindowX = Location.X;
+            _s.PreferencesWindowY = Location.Y;
+            _s.Save();
+        }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (WindowState == FormWindowState.Normal)
+        {
+            _s.PreferencesWindowX = Location.X;
+            _s.PreferencesWindowY = Location.Y;
+            _s.Save();
+        }
+        base.OnFormClosing(e);
     }
 
     protected override void OnShown(EventArgs e)
@@ -252,7 +300,9 @@ internal sealed partial class PreferencesForm : Form
                 new Rectangle(rect.X + Px(43), rect.Y, rect.Width - Px(47), rect.Height), Ink,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
-        TextRenderer.DrawText(g, AppInfo.Version, Font, new Rectangle(Px(24), ClientSize.Height - Px(34), Px(130), Px(20)), Hint);
+        TextRenderer.DrawText(g, $"{AppInfo.ProductName} {AppInfo.Version}", Font,
+            new Rectangle(Px(24), ClientSize.Height - Px(34), Px(SidebarW - 32), Px(20)), Hint,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
         var themeText = palette.HighContrast ? "跟随 Windows · 高对比度" : palette.Dark ? "跟随 Windows · 深色" : "跟随 Windows · 浅色";
@@ -394,7 +444,7 @@ internal sealed partial class PreferencesForm : Form
     private void BuildControl() => SubPages(new[] { "全局快捷键", "鼠标" }, HotkeysPage, MousePage);
     private void BuildUpdate()
     {
-        Row("当前版本", MakeStatic(AppInfo.Version));
+        Row("当前版本", MakeStatic($"{AppInfo.ProductName} {AppInfo.Version}"));
         Row("发布版本", MakeWebLink(AppInfo.ReleasesUrl));
         var status = MakeStatic("");
         var check = new FluentButton();
@@ -453,11 +503,11 @@ internal sealed partial class PreferencesForm : Form
     }
     private void BuildAbout()
     {
-        Row("程序", MakeStatic("SnipLite " + AppInfo.Version));
+        Row("程序", MakeStatic($"{AppInfo.ProductName} {AppInfo.Version}"));
         var executable = MakeText(Application.ExecutablePath, FillWidth()); executable.ReadOnly = true; Row("程序文件", executable);
         Row("运行环境", MakeStatic(".NET 10 · WinForms")); Row("识别引擎", MakeStatic("SimdPaddleOCR · Windows OCR · ZXing.Net"));
         Row("GitHub 项目", MakeWebLink(AppInfo.RepositoryUrl));
-        Row("问题反馈", MakeWebLink(AppInfo.IssuesUrl));
+        Row("问题反馈", MakeWebLink(AppInfo.IssuesUrl, AppInfo.IssuesText));
         var license = new LinkLabel { Text = "MIT License / Third-party notices", AutoSize = true,
             LinkColor = _s.Accent, BackColor = Page, Cursor = Cursors.Hand, TabStop = true };
         license.LinkClicked += (_, _) => LicenseNotices.Show(this);
@@ -465,11 +515,11 @@ internal sealed partial class PreferencesForm : Form
         HintText("截图、贴图、标注、文字与二维码识别均在本机处理。");
     }
 
-    private LinkLabel MakeWebLink(string url)
+    private LinkLabel MakeWebLink(string url, string? text = null)
     {
         var link = new LinkLabel
         {
-            Text = url, AutoSize = false, AutoEllipsis = true,
+            Text = text ?? url, AutoSize = false, AutoEllipsis = true,
             Size = new Size(FillWidth(), Px(24)), TextAlign = ContentAlignment.MiddleLeft,
             BackColor = Page, LinkColor = _s.Accent, ActiveLinkColor = _s.Accent,
             VisitedLinkColor = _s.Accent, LinkBehavior = LinkBehavior.HoverUnderline,

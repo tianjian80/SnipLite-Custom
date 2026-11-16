@@ -147,7 +147,7 @@ internal sealed partial class CaptureForm : Form
         TopMost = true;
         DoubleBuffered = true;
         BackColor = Color.Black;
-        Cursor = Cursors.Cross;
+        Cursor = Cursors.Default;
         KeyPreview = true;
         Text = "SnipLite";
 
@@ -232,7 +232,7 @@ internal sealed partial class CaptureForm : Form
         _screenshot.Dispose();
         _annotationLayer?.Dispose();
         _badgeFont.Dispose();
-        Cursor = Cursors.Cross;
+        Cursor = Cursors.Default;
         _textCursor?.Dispose(); _textCursor = null;
 
         // the 4K screenshot and its buffers are gone; hand the pages back
@@ -327,7 +327,7 @@ internal sealed partial class CaptureForm : Form
             }
             if (_settings.CaptureShortcutHints)
             {
-                var hint = UiText.T("拖动框选 / 单击窗口 · 右键取消 · Alt 放大镜");
+                var hint = UiText.T("拖动框选 / 单击窗口 · Esc 退出 · Alt 放大镜");
                 var box = new Rectangle((int)(20 * Ui), _virtual.Height - (int)(42 * Ui), (int)(600 * Ui), (int)(28 * Ui));
                 using var back = new SolidBrush(AppTheme.Current.Card);
                 using var hintPath = FluentDrawing.Rounded(box, 6 * Ui); g.FillPath(back, hintPath);
@@ -500,8 +500,7 @@ internal sealed partial class CaptureForm : Form
         _crosshair?.Hide();
         if (e.Button == MouseButtons.Right)
         {
-            Capture = false;
-            Cancel();
+            HandleRightClick(e.Location);
             return;
         }
         if (e.Button == MouseButtons.Middle && _hasSelection) { ExecuteAction(_settings.MiddleClickAction, _settings.MiddleClickExit); return; }
@@ -1311,6 +1310,68 @@ internal sealed partial class CaptureForm : Form
         });
     }
 
+    private void HandleRightClick(Point local)
+    {
+        _crosshair?.Hide();
+        switch (_settings.RightClickAction)
+        {
+            case RightClickBehavior.ExitCapture:
+                Capture = false;
+                Cancel();
+                return;
+
+            case RightClickBehavior.ShowMenu:
+                ShowCaptureContextMenu(PointToScreen(local));
+                return;
+
+            case RightClickBehavior.None:
+                // 无操作：已框选时保持截图不动；未框选时仍允许退出，避免误触后无法退出
+                if (_hasSelection && !_finished) return;
+                Capture = false;
+                Cancel();
+                return;
+
+            case RightClickBehavior.SaveFile:
+                // 保存文件：弹出 Ctrl+S 同款另存为对话框，按开关决定保存成功后是否退出
+                if (_hasSelection && !_finished)
+                {
+                    if (SaveAs() && _settings.RightClickExit) { Capture = false; Cancel(); }
+                    return;
+                }
+                Capture = false;
+                Cancel();
+                return;
+
+            case RightClickBehavior.QuickSave:
+            default:
+                // 快速保存：已框选 → 静默保存到快速保存目录；未框选 → 直接取消
+                if (_hasSelection && !_finished)
+                {
+                    ExecuteAction(CaptureAction.QuickSave, exit: _settings.RightClickExit);
+                    return;
+                }
+                Capture = false;
+                Cancel();
+                return;
+        }
+    }
+
+    private void ShowCaptureContextMenu(Point screen)
+    {
+        var menu = SnipMenu.Create();
+        _optionMenus.Add(menu);
+        if (_hasSelection)
+        {
+            menu.Items.Add(SnipMenu.Item("复制到剪贴板", () => ExecuteAction(CaptureAction.Copy, exit: true), "Ctrl+C"));
+            menu.Items.Add(SnipMenu.Item("贴到屏幕", () => ExecuteAction(CaptureAction.Pin, exit: true), "Ctrl+T"));
+            menu.Items.Add(SnipMenu.Item("快速保存", () => ExecuteAction(CaptureAction.QuickSave, exit: true), "Ctrl+Shift+S"));
+            menu.Items.Add(SnipMenu.Item("另存为…", () => { if (SaveAs()) { Capture = false; Cancel(); } }, "Ctrl+S"));
+            menu.Items.Add(new ToolStripSeparator());
+        }
+        menu.Items.Add(SnipMenu.Item("退出截图", () => { Capture = false; Cancel(); }, "Esc"));
+        menu.Show(screen);
+    }
+
     private void RestoreEditorFocus()
     {
         if (_ime is not null) _ime.Focus();
@@ -1605,23 +1666,31 @@ internal sealed partial class CaptureForm : Form
         });
     }
 
-    private void SaveAs()
+    private bool SaveAs()
     {
-        if (!_hasSelection) return;
+        if (!_hasSelection) return false;
         CommitText();
 
         var crop = Crop;
-        if (crop.Width < 1 || crop.Height < 1) return;
+        if (crop.Width < 1 || crop.Height < 1) return false;
+
+        var extension = _settings.RememberImageExtension ? _settings.LastImageExtension : ".png";
+        var folder = new[] { _settings.QuickSaveDirectory, _settings.SaveDirectory }.FirstOrDefault(Directory.Exists);
+        var fileName = Services.ImageFileName(_settings, extension);
+        // 预填时避开默认目录里的同名文件；用户自己在弹窗里确认覆盖的路径不再二次改名。
+        if (folder is not null) fileName = Path.GetFileName(Services.UniqueFilePath(folder, fileName, extension));
 
         using var dialog = new SaveFileDialog
         {
             Filter = UiText.T("PNG 图片|*.png|JPEG 图片|*.jpg"),
-            FileName = Services.ImageFileName(_settings, _settings.RememberImageExtension ? _settings.LastImageExtension : ".png"),
-            FilterIndex = _settings.RememberImageExtension && _settings.LastImageExtension != ".png" ? 2 : 1
+            FileName = fileName,
+            InitialDirectory = folder ?? "",
+            FilterIndex = _settings.RememberImageExtension && _settings.LastImageExtension != ".png" ? 2 : 1,
+            OverwritePrompt = true
         };
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
-            return;
+            return false;
 
         try
         {
@@ -1631,10 +1700,12 @@ internal sealed partial class CaptureForm : Form
             if (_settings.SoundOnSave) _ = Services.PlaySoundAsync(_settings.CaptureSound);
             if (_settings.RememberImageExtension) { _settings.LastImageExtension = jpeg ? ".jpg" : ".png"; _settings.Save(); }
             Toast.Show(UiText.T("已保存：") + Path.GetFileName(dialog.FileName));
+            return true;
         }
         catch (Exception ex)
         {
             Toast.Show(UiText.T("保存失败：") + ex.Message);
+            return false;
         }
     }
 
@@ -2169,7 +2240,7 @@ internal sealed partial class CaptureForm : Form
             }
             if (_bar.Tool != ToolKind.None && _selection.Contains(_cursor))
             {
-                Cursor = Cursors.Cross;
+                Cursor = Cursors.Default;
                 return;
             }
 
@@ -2195,7 +2266,7 @@ internal sealed partial class CaptureForm : Form
             }
         }
 
-        Cursor = Cursors.Cross;
+        Cursor = Cursors.Default;
     }
 
     private Rectangle TextResizeHandle(Graphics graphics, TextShape text)

@@ -4,8 +4,7 @@ namespace SnipLite;
 
 internal sealed partial class AppSettings
 {
-    public string SaveDirectory { get; set; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "SnipLite");
+    public string SaveDirectory { get; set; } = @"E:\";
 
     public string OcrLanguage { get; set; } = "zh-Hans";
     public OcrEngineKind OcrEngine { get; set; } = OcrEngineKind.SimdPaddle;
@@ -33,10 +32,14 @@ internal sealed partial class AppSettings
 
     public bool HotkeysEnabled { get; set; } = true;
 
-    /// <summary>Snipaste's file name pattern: $yyyy$, $MM$ … or a plain timestamp.</summary>
-    public string FileNamePattern { get; set; } = "SnipLite_$yyyy-MM-dd_HH-mm-ss$";
+    /// <summary>Snipaste's file name pattern: Chinese date/time tokens such as 年月-日 时.分.</summary>
+    public string FileNamePattern { get; set; } = "SnipLite_年月-日 时.分";
 
     public int JpegQuality { get; set; } = 92;
+
+    /// <summary>Saved screen coordinates of the Preferences window, or MinValue if never positioned.</summary>
+    public int PreferencesWindowX { get; set; } = int.MinValue;
+    public int PreferencesWindowY { get; set; } = int.MinValue;
 
     /// <summary>Theme colour for the annotation bar: active band, border, selection ring.</summary>
     public int AccentArgb { get; set; } = AnnotationBar.DefaultAccent.ToArgb();
@@ -125,13 +128,12 @@ internal sealed partial class AppSettings
     /// <summary>File name for a capture, expanded from <see cref="FileNamePattern"/>.</summary>
     public string ExpandFileName(DateTime now)
     {
-        var name = FileNamePattern.Replace("$yyyy-MM-dd_HH-mm-ss$", now.ToString("yyyy-MM-dd_HH-mm-ss"));
-        name = name.Replace("$yyyy$", now.ToString("yyyy"))
-                   .Replace("$MM$", now.ToString("MM"))
-                   .Replace("$dd$", now.ToString("dd"))
-                   .Replace("$HH$", now.ToString("HH"))
-                   .Replace("$mm$", now.ToString("mm"))
-                   .Replace("$ss$", now.ToString("ss"));
+        var name = FileNamePattern.Replace("年", now.ToString("yyyy"))
+                   .Replace("月", now.ToString("MM"))
+                   .Replace("日", now.ToString("dd"))
+                   .Replace("时", now.ToString("HH"))
+                   .Replace("分", now.ToString("mm"))
+                   .Replace("秒", now.ToString("ss"));
 
         foreach (var bad in Path.GetInvalidFileNameChars())
             name = name.Replace(bad, '_');

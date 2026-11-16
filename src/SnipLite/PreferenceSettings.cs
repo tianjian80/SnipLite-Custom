@@ -4,6 +4,7 @@ namespace SnipLite;
 
 internal enum CaptureAction { Copy, Pin, QuickSave, None }
 internal enum PointerGesture { None, LeftDoubleClick, MiddleClick, RightClick, LeftClick }
+internal enum RightClickBehavior { QuickSave, ExitCapture, ShowMenu, SaveFile, None }
 internal sealed record MouseBinding(Keys Modifiers, PointerGesture Gesture);
 
 internal sealed partial class AppSettings
@@ -52,6 +53,8 @@ internal sealed partial class AppSettings
     public bool MiddleClickExit { get; set; } = true;
     public CaptureAction EnterAction { get; set; } = CaptureAction.Copy;
     public bool EnterExit { get; set; } = true;
+    public RightClickBehavior RightClickAction { get; set; } = RightClickBehavior.QuickSave;
+    public bool RightClickExit { get; set; } = true;
     public bool PinShadow { get; set; } = true;
     public int PinShadowColor { get; set; } = Color.Black.ToArgb();
     public bool PinMenuShortcuts { get; set; } = true;
@@ -79,7 +82,7 @@ internal sealed partial class AppSettings
     public int TextImageForeground { get; set; } = Color.Black.ToArgb();
     public bool RememberImageExtension { get; set; } = true;
     public string LastImageExtension { get; set; } = ".png";
-    public string QuickSaveDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SnipLite");
+    public string QuickSaveDirectory { get; set; } = @"E:\";
     public bool QuickSaveToast { get; set; } = true;
     public bool CaptureBitmapClipboard { get; set; } = true;
     public bool PinBitmapClipboard { get; set; }
@@ -128,5 +131,6 @@ internal sealed partial class AppSettings
         if (string.IsNullOrWhiteSpace(QuickSaveDirectory)) QuickSaveDirectory = new AppSettings().QuickSaveDirectory;
         if (string.IsNullOrWhiteSpace(InterfaceFont)) InterfaceFont = "Microsoft YaHei UI";
         if (string.IsNullOrWhiteSpace(TextImageFont)) TextImageFont = "Microsoft YaHei UI";
+        if (!Enum.IsDefined(RightClickAction)) RightClickAction = RightClickBehavior.QuickSave;
     }
 }
