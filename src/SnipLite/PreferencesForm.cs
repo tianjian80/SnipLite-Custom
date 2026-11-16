@@ -300,9 +300,9 @@ internal sealed partial class PreferencesForm : Form
                 new Rectangle(rect.X + Px(43), rect.Y, rect.Width - Px(47), rect.Height), Ink,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
-        TextRenderer.DrawText(g, $"{AppInfo.ProductName} {AppInfo.Version}", Font,
-            new Rectangle(Px(24), ClientSize.Height - Px(34), Px(SidebarW - 32), Px(20)), Hint,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g, $"{AppInfo.ProductName}\r\n{AppInfo.Version}", Font,
+            new Rectangle(Px(4), ClientSize.Height - Px(62), Px(SidebarW - 8), Px(44)), Hint,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
         var themeText = palette.HighContrast ? "跟随 Windows · 高对比度" : palette.Dark ? "跟随 Windows · 深色" : "跟随 Windows · 浅色";
