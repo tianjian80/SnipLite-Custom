@@ -83,12 +83,16 @@ internal sealed class Toast : Form
 
     public static void Show(string text, int milliseconds = 2200)
     {
-        if (!Notifications) return;
-        ShowCore(text, milliseconds);
+        // Silent operation: never raise the bottom-right notification banner.
+        return;
     }
 
-    /// <summary>Failures are reported even when the user turned notifications off.</summary>
-    public static void Error(string text) => ShowCore(text, 4000);
+    /// <summary>Failures are logged only; no banner is shown either.</summary>
+    public static void Error(string text)
+    {
+        // Silent operation: errors go to the log instead of a toast.
+        return;
+    }
 
     private static void ShowCore(string text, int milliseconds)
     {
