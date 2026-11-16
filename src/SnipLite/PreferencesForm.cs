@@ -194,23 +194,10 @@ internal sealed partial class PreferencesForm : Form
         AppTheme.ApplyWindow(this);
     }
 
-    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         AppTheme.ApplyWindow(this);
-
-        // A composited window (WS_EX_COMPOSITED) is snapshotted by DWM for the
-        // maximise/restore animation; without WM_PRINTCLIENT support that frame
-        // is black. Disabling the transition removes those black blocks.
-        try
-        {
-            var disabled = 1;
-            DwmSetWindowAttribute(Handle, 3 /* DWMWA_TRANSITIONS_FORCEDISABLED */, ref disabled, sizeof(int));
-        }
-        catch { /* older Windows builds simply ignore the attribute */ }
     }
 
     protected override void Dispose(bool disposing)
@@ -383,16 +370,16 @@ internal sealed partial class PreferencesForm : Form
 
     private const int WmSysCommand = 0x0112;
     private const int ScMaximize = 0xF030;
-    private const int WsExComposited = 0x02000000;
 
-    protected override CreateParams CreateParams
+    /// <summary>
+    /// Erase the whole exposed area with an opaque colour. Transparent child
+    /// backgrounds rely on the parent's paint, so an unpainted region would be
+    /// rendered as black while the window is being resized/maximised.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
     {
-        get
-        {
-            var cp = base.CreateParams;
-            cp.ExStyle |= WsExComposited;   // composite the whole window, no half-painted areas
-            return cp;
-        }
+        using var brush = new SolidBrush(Chrome);
+        e.Graphics.FillRectangle(brush, ClientRectangle);
     }
 
     protected override void WndProc(ref Message m)

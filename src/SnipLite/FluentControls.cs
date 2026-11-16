@@ -33,6 +33,7 @@ internal sealed class FluentInputFrame : UserControl
         _number = editor as NumericUpDown;
         AutoScaleMode = AutoScaleMode.None;
         DoubleBuffered = true;
+        ResizeRedraw = true;
         TabStop = false;
         AccessibleName = editor.AccessibleName;
         Size = new Size(editorWidth, (int)Math.Round(32 * editor.DeviceDpi / 96f));
@@ -142,6 +143,7 @@ internal sealed class FluentButton : Button
     public FluentButton()
     {
         FlatStyle = FlatStyle.Flat; UseVisualStyleBackColor = false;
+        ResizeRedraw = true;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
     }
     protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -168,6 +170,7 @@ internal sealed class FluentToggle : CheckBox
 {
     public FluentToggle()
     {
+        ResizeRedraw = true;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         AccessibleRole = AccessibleRole.CheckButton;
     }
@@ -190,7 +193,7 @@ internal sealed class FluentToggle : CheckBox
 
 internal sealed class FluentSettingRow : Panel
 {
-    public FluentSettingRow() { DoubleBuffered = true; BackColor = AppTheme.Current.Card; }
+    public FluentSettingRow() { DoubleBuffered = true; ResizeRedraw = true; BackColor = AppTheme.Current.Card; }
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         var s = DeviceDpi / 96f; var p = AppTheme.Current;
