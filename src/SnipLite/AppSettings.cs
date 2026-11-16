@@ -41,6 +41,10 @@ internal sealed partial class AppSettings
     public int PreferencesWindowX { get; set; } = int.MinValue;
     public int PreferencesWindowY { get; set; } = int.MinValue;
 
+    /// <summary>Saved outer size of the Preferences window, or 0 when never resized.</summary>
+    public int PreferencesWindowWidth { get; set; }
+    public int PreferencesWindowHeight { get; set; }
+
     /// <summary>Theme colour for the annotation bar: active band, border, selection ring.</summary>
     public int AccentArgb { get; set; } = AnnotationBar.DefaultAccent.ToArgb();
 

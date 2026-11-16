@@ -221,58 +221,67 @@ internal sealed partial class PreferencesForm : Form
         MinimumSize = new Size(ClientSize.Width + frame.Width, ClientSize.Height + frame.Height);
         MaximumSize = Size.Empty;
 
+        RestoreSavedBounds();
+
         PlaceChrome();
 
         _ready = true;
         ShowTab(Math.Clamp(_startTab, 0, _tabs.Length - 1));
         ApplyTheme();
-
-        if (!TryRestoreSavedLocation()) CenterToScreen();
     }
 
     /// <summary>
-    /// Restore the window to its last saved screen position if that rectangle
-    /// still intersects an available working area (handles docked monitors being
-    /// unplugged). Returns true when a saved coordinate was honoured.
+    /// Restores the last saved size (when it is at least the minimum size) and the
+    /// last saved position when that rectangle still intersects an available
+    /// working area (handles docked monitors being unplugged). Falls back to a
+    /// centred window otherwise.
     /// </summary>
-    private bool TryRestoreSavedLocation()
+    private void RestoreSavedBounds()
     {
-        if (_s.PreferencesWindowX == int.MinValue || _s.PreferencesWindowY == int.MinValue) return false;
+        var w = _s.PreferencesWindowWidth;
+        var h = _s.PreferencesWindowHeight;
+        if (w >= MinimumSize.Width && h >= MinimumSize.Height) Size = new Size(w, h);
 
         int x = _s.PreferencesWindowX, y = _s.PreferencesWindowY;
-        var rect = new Rectangle(x, y, Width, Height);
-
-        foreach (var screen in Screen.AllScreens)
+        if (x != int.MinValue && y != int.MinValue)
         {
-            var wa = screen.WorkingArea;
-            if (rect.IntersectsWith(wa))
+            var rect = new Rectangle(x, y, Width, Height);
+            foreach (var screen in Screen.AllScreens)
             {
+                if (!rect.IntersectsWith(screen.WorkingArea)) continue;
                 Location = new Point(x, y);
-                return true;
+                return;
             }
         }
-        return false;
+        CenterToScreen();
+    }
+
+    /// <summary>Persists position and size while the window is in its normal state.</summary>
+    private void SaveBounds()
+    {
+        if (!_ready || WindowState != FormWindowState.Normal) return;
+        _s.PreferencesWindowX = Location.X;
+        _s.PreferencesWindowY = Location.Y;
+        _s.PreferencesWindowWidth = Width;
+        _s.PreferencesWindowHeight = Height;
+        _s.Save();
     }
 
     protected override void OnLocationChanged(EventArgs e)
     {
         base.OnLocationChanged(e);
-        if (_ready && WindowState == FormWindowState.Normal)
-        {
-            _s.PreferencesWindowX = Location.X;
-            _s.PreferencesWindowY = Location.Y;
-            _s.Save();
-        }
+        SaveBounds();
+    }
+
+    protected override void OnResizeEnd(EventArgs e)
+    {
+        base.OnResizeEnd(e);
+        SaveBounds();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (WindowState == FormWindowState.Normal)
-        {
-            _s.PreferencesWindowX = Location.X;
-            _s.PreferencesWindowY = Location.Y;
-            _s.Save();
-        }
+        SaveBounds();
         base.OnFormClosing(e);
     }
 
