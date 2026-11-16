@@ -1,0 +1,34 @@
+# Local references and development notes
+/.local/
+/video/
+/tests/
+/启动最新版.cmd
+/scripts/test-ocr.ps1
+/docs/OCR_TRANSLATION_PLAN.md
+/logo/SnipLite_*.png
+
+# Build and publish output
+**/bin/
+**/obj/
+/artifacts/
+/publish/
+/out/
+**/TestResults/
+
+# IDE and operating-system files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+selftest-progress.txt
