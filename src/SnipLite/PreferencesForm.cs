@@ -38,7 +38,60 @@ internal sealed partial class PreferencesForm : Form
     private readonly AppSettings _s;
     private sealed class BufferedPage : Panel
     {
-        public BufferedPage() { DoubleBuffered = true; ResizeRedraw = true; }
+        private const int WmHScroll = 0x0114;
+        private const int WmSize = 0x0005;
+        private const int SbHorz = 0;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowScrollBar(IntPtr hWnd, int wBar, bool show);
+
+        public BufferedPage()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+            AutoScroll = true;
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            base.OnLayout(e);
+            HideHorizontalBar();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            HideHorizontalBar();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            // The page only ever scrolls vertically: swallow horizontal scrolling
+            // and re-hide the bar after the control re-evaluates its scroll ranges.
+            if (m.Msg == WmHScroll) return;
+
+            base.WndProc(ref m);
+
+            if (m.Msg == WmSize) HideHorizontalBar();
+        }
+
+        private bool _hidingHorizontalBar;
+
+        private void HideHorizontalBar()
+        {
+            if (!IsHandleCreated || IsDisposed || _hidingHorizontalBar) return;
+
+            _hidingHorizontalBar = true;
+            try
+            {
+                if (HorizontalScroll.Maximum != 0) HorizontalScroll.Maximum = 0;
+                if (HorizontalScroll.Value != 0) HorizontalScroll.Value = 0;
+                if (HorizontalScroll.Visible) HorizontalScroll.Visible = false;
+
+                ShowScrollBar(Handle, SbHorz, false);
+            }
+            finally { _hidingHorizontalBar = false; }
+        }
     }
     private readonly Panel _page = new BufferedPage();
     private readonly Button _reset = new FluentButton();
@@ -567,7 +620,8 @@ internal sealed partial class PreferencesForm : Form
     // ------------------------------------------------------------- sections
 
     /// <summary>Width of the page's content column.</summary>
-    private int ContentWidth() => PageRect().Width - Px(PagePad * 2) - SystemInformation.VerticalScrollBarWidth;
+    private int ContentWidth() =>
+        PageRect().Width - Px(PagePad * 2) - Px(SystemInformation.VerticalScrollBarWidth);
 
     /// <summary>Width left for a field that starts in the control column.</summary>
     private int FillWidth() => ContentWidth() - Px(LabelW + ControlGap + 16);
