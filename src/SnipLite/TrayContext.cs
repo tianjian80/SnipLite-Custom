@@ -170,13 +170,18 @@ internal sealed class TrayContext : ApplicationContext
         try
         {
             var screen = Screen.FromPoint(Cursor.Position);
-            var bounds = IsFullScreenForeground(screen) ? screen.Bounds : screen.WorkingArea;
+            // Toggle off skips window detection entirely (taskbar included);
+            // on, only full-screen apps get Bounds, desktops use WorkingArea.
+            var bounds = _settings.SmartFullScreenCapture && !IsFullScreenForeground(screen)
+                ? screen.WorkingArea : screen.Bounds;
             using var image = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
             using (var g = Graphics.FromImage(image))
                 g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
 
             var path = Services.SaveCaptureFile(image, _settings, _settings.QuickSaveDirectory);
-            AppLog.Write($"全屏截图并自动保存：{(bounds == screen.Bounds ? "全屏应用" : "桌面工作区")} {bounds.Width}×{bounds.Height} → {path}");
+            var mode = !_settings.SmartFullScreenCapture ? "全屏（含任务栏）"
+                : bounds == screen.Bounds ? "全屏应用" : "桌面工作区";
+            AppLog.Write($"全屏截图并自动保存：{mode} {bounds.Width}×{bounds.Height} → {path}");
             if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
         }
         catch (Exception ex)

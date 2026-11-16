@@ -89,6 +89,13 @@ internal sealed partial class AppSettings
     public Keys CaptureHotkey { get; set; } = Keys.F1;
     public Keys CopyCaptureHotkey { get; set; } = Keys.None;
     public Keys CustomCaptureHotkey { get; set; } = Keys.None;
+
+    /// <summary>
+    /// Full-screen capture excludes the taskbar for ordinary desktop windows and
+    /// captures the whole monitor only for full-screen apps/games. When off, the
+    /// whole monitor is always captured, taskbar included.
+    /// </summary>
+    public bool SmartFullScreenCapture { get; set; } = true;
     public Keys PinHotkey { get; set; } = Keys.F3;
     public Keys TogglePinsHotkey { get; set; } = Keys.None;
     public Keys SwitchGroupHotkey { get; set; } = Keys.None;

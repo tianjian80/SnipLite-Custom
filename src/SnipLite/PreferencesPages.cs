@@ -462,6 +462,20 @@ internal sealed partial class PreferencesForm
                     current.Text = BindingText();
                 }
             };
+            if (name == nameof(AppSettings.CustomCaptureHotkey))
+            {
+                var smart = new FluentToggle
+                {
+                    Text = UiText.T("智能排除任务栏"),
+                    AutoSize = false,
+                    Width = Px(180),
+                    Height = Px(ControlH),
+                    Checked = (bool)Value(nameof(AppSettings.SmartFullScreenCapture))
+                };
+                smart.CheckedChanged += (_, _) => Set(nameof(AppSettings.SmartFullScreenCapture), smart.Checked);
+                Row(label, change, current, smart);
+                continue;
+            }
             Row(label, change, current);
         }
         HintText("点击「更改」录入快捷键，确认后生效。");
