@@ -301,7 +301,7 @@ internal sealed partial class PreferencesForm : Form
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
         TextRenderer.DrawText(g, $"{AppInfo.ProductName}\r\n{AppInfo.Version}", Font,
-            new Rectangle(Px(4), ClientSize.Height - Px(58), Px(SidebarW - 8), Px(40)), Hint,
+            new Rectangle(Px(4), ClientSize.Height - Px(66), Px(SidebarW - 8), Px(40)), Hint,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
@@ -316,7 +316,7 @@ internal sealed partial class PreferencesForm : Form
 
         for (var i = 0; i < _tabs.Length; i++)
         {
-            var y = i < 6 ? Px(105 + i * 40) : ClientSize.Height - Px(144 - (i - 6) * 40);
+            var y = i < 6 ? Px(105 + i * 40) : ClientSize.Height - Px(152 - (i - 6) * 40);
             _tabRects.Add((new Rectangle(Px(10), y, Px(SidebarW - 20), Px(36)), i));
         }
     }
