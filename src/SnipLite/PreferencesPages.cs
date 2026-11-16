@@ -502,9 +502,21 @@ internal sealed partial class PreferencesForm
                     Text = UiText.T("智能排除任务栏"), AutoSize = true, Font = Font,
                     ForeColor = Ink, BackColor = Color.Transparent
                 };
-                caption.Location = new Point(smart.Left - Px(8) - caption.Width, (height - caption.Height) / 2);
-                caption.Anchor = AnchorStyles.Right;
                 card.Controls.Add(caption);
+                caption.Anchor = AnchorStyles.Right;
+
+                // Position from the label's real AutoSize width (DPI/font metrics can
+                // differ from the pre-parent size) so it never slides under the switch,
+                // and re-run on every resize to keep the 8px gap.
+                void PlaceCaption()
+                {
+                    caption.Width = caption.PreferredWidth;
+                    caption.Height = caption.PreferredHeight;
+                    caption.Left = smart.Left - caption.Width - Px(8);
+                    caption.Top = (height - caption.Height) / 2;
+                }
+                PlaceCaption();
+                card.Resize += (_, _) => PlaceCaption();
                 _y += height + Px(6);
                 continue;
             }
