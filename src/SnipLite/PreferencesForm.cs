@@ -194,10 +194,23 @@ internal sealed partial class PreferencesForm : Form
         AppTheme.ApplyWindow(this);
     }
 
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         AppTheme.ApplyWindow(this);
+
+        // A composited window (WS_EX_COMPOSITED) is snapshotted by DWM for the
+        // maximise/restore animation; without WM_PRINTCLIENT support that frame
+        // is black. Disabling the transition removes those black blocks.
+        try
+        {
+            var disabled = 1;
+            DwmSetWindowAttribute(Handle, 3 /* DWMWA_TRANSITIONS_FORCEDISABLED */, ref disabled, sizeof(int));
+        }
+        catch { /* older Windows builds simply ignore the attribute */ }
     }
 
     protected override void Dispose(bool disposing)
@@ -326,6 +339,31 @@ internal sealed partial class PreferencesForm : Form
         // Row widths are computed from the client width, so a width change
         // (drag-resize or maximise) needs the current page rebuilt.
         if (_laidOutWidth != ClientSize.Width) QueueContentRelayout();
+    }
+
+    private static readonly System.Reflection.PropertyInfo? DoubleBufferedProperty =
+        typeof(Control).GetProperty("DoubleBuffered",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    /// <summary>
+    /// Turns on double buffering for every nested container of the page so the
+    /// maximised/resized window never shows half-painted (black) card areas.
+    /// Native editors keep their own painting untouched.
+    /// </summary>
+    private static void EnableDoubleBuffering(Control root)
+    {
+        if (DoubleBufferedProperty is null) return;
+
+        foreach (Control child in root.Controls)
+        {
+            if (child is not (TextBoxBase or ComboBox or NumericUpDown or UpDownBase))
+            {
+                try { DoubleBufferedProperty.SetValue(child, true); }
+                catch { /* control does not support the style */ }
+            }
+
+            EnableDoubleBuffering(child);
+        }
     }
 
     private void QueueContentRelayout()
@@ -588,6 +626,7 @@ internal sealed partial class PreferencesForm : Form
         _page.AutoScrollMinSize = new Size(0, _y + Px(PagePad));
         _page.ResumeLayout();
         _laidOutWidth = ClientSize.Width;
+        EnableDoubleBuffering(_page);
         UiText.Apply(_page, _s.DisplayLanguage);
         AppTheme.Apply(_page);
         _reset.Visible = index <= 5;
