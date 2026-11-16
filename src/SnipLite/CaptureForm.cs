@@ -79,6 +79,8 @@ internal sealed partial class CaptureForm : Form
     private Point? _lastAutomationPoint;
     private long _lastAutomationResolvedAt;
     private readonly Rectangle? _preset;
+    /// <summary>"截屏并自动复制": finish (copy and close) as soon as a region is framed.</summary>
+    private readonly bool _autoCopy;
     private CaptureKeyboardHook? _keyboardHook;
     private readonly List<ContextMenuStrip> _optionMenus = new();
     private CaptureCrosshair? _crosshair;
@@ -120,9 +122,10 @@ internal sealed partial class CaptureForm : Form
 
     public event Action<CaptureResult?>? Done;
 
-    public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null)
+    public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null, bool autoCopy = false)
     {
         _virtual = virtualScreen;
+        _autoCopy = autoCopy;
         _ocrCapture = mode == CaptureMode.Ocr;
         _translationCapture = mode == CaptureMode.Translation;
         _qrCaptureOnly = mode == CaptureMode.Qr;
@@ -810,6 +813,15 @@ internal sealed partial class CaptureForm : Form
             }
 
             Invalidate();
+
+            // "截屏并自动复制": a framed region finishes straight away — the tray's
+            // result handler copies it, the window closes here and no toolbar shows.
+            if (_autoCopy && _hasSelection && Crop.Width > 0 && Crop.Height > 0)
+            {
+                Confirm();
+                return;
+            }
+
             if (_hasSelection && _settings.CopyAfterCapture && !_ocrCapture && !_qrCaptureOnly && !_translationCapture)
                 CopySelectionToClipboard();
             if (_translationCapture && _hasSelection && !TranslationVisible) _ = TranslateSelectionAsync();

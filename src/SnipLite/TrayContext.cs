@@ -153,7 +153,7 @@ internal sealed class TrayContext : ApplicationContext
         _overlay?.Dispose();
         try
         {
-            var overlay = new CaptureForm(SystemInformation.VirtualScreen, mode, _settings, preset); _overlay = overlay;
+            var overlay = new CaptureForm(SystemInformation.VirtualScreen, mode, _settings, preset, forceCopy); _overlay = overlay;
             overlay.Done += result =>
             {
                 if (result is null || !result.KeepOpen) if (ReferenceEquals(_overlay, overlay)) _overlay = null;
