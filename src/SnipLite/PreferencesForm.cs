@@ -55,6 +55,8 @@ internal sealed partial class PreferencesForm : Form
     private int _controlX;   // x of the first control
 
     private bool _ready;
+    private bool _relayoutQueued;
+    private int _laidOutWidth = -1;
 
     /// <summary>Raised after an option changed, so the tray can re-apply hotkeys etc.</summary>
     public event Action? Applied;
@@ -67,9 +69,9 @@ internal sealed partial class PreferencesForm : Form
 
         Text = "SnipLite 首选项";
         Icon = AppIcon.Window;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
-        MinimizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
+        MinimizeBox = true;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         BackColor = Chrome;
@@ -151,6 +153,13 @@ internal sealed partial class PreferencesForm : Form
 
         var area = Screen.FromControl(this).WorkingArea;
         ClientSize = new Size(Math.Min(Px(WinW), area.Width - Px(32)), Math.Min(Px(WinH), area.Height - Px(64)));
+
+        // Minimum = the default client size, expressed as an outer size so the
+        // window can be shrunk only down to the layout's design width/height.
+        MinimumSize = new Size(
+            ClientSize.Width + (Width - ClientSize.Width),
+            ClientSize.Height + (Height - ClientSize.Height));
+
         PlaceChrome();
 
         _ready = true;
@@ -236,6 +245,22 @@ internal sealed partial class PreferencesForm : Form
         PlaceChrome();
         _tabRects.Clear();
         Invalidate();
+
+        // Row widths are computed from the client width, so a width change
+        // (drag-resize or maximise) needs the current page rebuilt.
+        if (_laidOutWidth != ClientSize.Width) QueueContentRelayout();
+    }
+
+    private void QueueContentRelayout()
+    {
+        if (_relayoutQueued) return;
+        _relayoutQueued = true;
+        BeginInvoke(() =>
+        {
+            _relayoutQueued = false;
+            if (IsDisposed || Disposing || !_ready) return;
+            ShowTab(_selected);
+        });
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -435,6 +460,7 @@ internal sealed partial class PreferencesForm : Form
 
         _page.AutoScrollMinSize = new Size(0, _y + Px(PagePad));
         _page.ResumeLayout();
+        _laidOutWidth = ClientSize.Width;
         UiText.Apply(_page, _s.DisplayLanguage);
         AppTheme.Apply(_page);
         _reset.Visible = index <= 5;
