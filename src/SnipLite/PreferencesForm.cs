@@ -336,8 +336,58 @@ internal sealed partial class PreferencesForm : Form
         {
             _relayoutQueued = false;
             if (IsDisposed || Disposing || !_ready) return;
+            if (_laidOutWidth == ClientSize.Width) return;   // already rebuilt synchronously
             ShowTab(_selected);
         });
+    }
+
+    // ------------------------------------------------------- maximising paint
+
+    private const int WmSysCommand = 0x0112;
+    private const int ScMaximize = 0xF030;
+    private const int WsExComposited = 0x02000000;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= WsExComposited;   // composite the whole window, no half-painted areas
+            return cp;
+        }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        var maximizing = m.Msg == WmSysCommand && (m.WParam.ToInt32() & 0xFFF0) == ScMaximize;
+
+        if (!maximizing || !_ready)
+        {
+            base.WndProc(ref m);
+            return;
+        }
+
+        // Maximising resizes the form and every child in several passes; suppress
+        // the intermediate layouts/paints, then rebuild the page for the new width
+        // and blit everything in one go so no black patches or ghost cards show.
+        SuspendLayout();
+        _page.SuspendLayout();
+        try
+        {
+            base.WndProc(ref m);
+
+            PlaceChrome();
+            _tabRects.Clear();
+            ShowTab(_selected);
+        }
+        finally
+        {
+            _page.ResumeLayout(true);
+            ResumeLayout(true);
+        }
+
+        Invalidate(true);
+        Update();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
