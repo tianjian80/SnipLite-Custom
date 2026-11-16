@@ -300,9 +300,15 @@ internal sealed partial class PreferencesForm : Form
                 new Rectangle(rect.X + Px(43), rect.Y, rect.Width - Px(47), rect.Height), Ink,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
-        TextRenderer.DrawText(g, $"{AppInfo.ProductName}\r\n{AppInfo.Version}", Font,
-            new Rectangle(Px(4), ClientSize.Height - Px(66), Px(SidebarW - 8), Px(40)), Hint,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        var lineHeight = TextRenderer.MeasureText(g, "Ag", Font, new Size(int.MaxValue, int.MaxValue),
+            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Height;
+        var versionRect = new Rectangle(Px(4), ClientSize.Height - Px(70), Px(SidebarW - 8), lineHeight * 2);
+        TextRenderer.DrawText(g, AppInfo.ProductName, Font,
+            new Rectangle(versionRect.X, versionRect.Y, versionRect.Width, lineHeight), Hint,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        TextRenderer.DrawText(g, AppInfo.Version, Font,
+            new Rectangle(versionRect.X, versionRect.Y + lineHeight, versionRect.Width, lineHeight), Hint,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
         var themeText = palette.HighContrast ? "跟随 Windows · 高对比度" : palette.Dark ? "跟随 Windows · 深色" : "跟随 Windows · 浅色";
@@ -316,7 +322,7 @@ internal sealed partial class PreferencesForm : Form
 
         for (var i = 0; i < _tabs.Length; i++)
         {
-            var y = i < 6 ? Px(105 + i * 40) : ClientSize.Height - Px(152 - (i - 6) * 40);
+            var y = i < 6 ? Px(105 + i * 40) : ClientSize.Height - Px(162 - (i - 6) * 40);
             _tabRects.Add((new Rectangle(Px(10), y, Px(SidebarW - 20), Px(36)), i));
         }
     }
