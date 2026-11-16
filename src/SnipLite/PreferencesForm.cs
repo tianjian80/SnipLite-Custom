@@ -38,6 +38,7 @@ internal sealed partial class PreferencesForm : Form
     private readonly AppSettings _s;
     private sealed class BufferedPage : Panel
     {
+        private const int WmNcCalcSize = 0x0083;
         private const int WmHScroll = 0x0114;
         private const int WmSize = 0x0005;
         private const int SbHorz = 0;
@@ -54,6 +55,10 @@ internal sealed partial class PreferencesForm : Form
 
         protected override void OnLayout(LayoutEventArgs e)
         {
+            // Clamp before the base layout so the scroll-range calculation never
+            // sees a child wider than the visible area (that is what makes the
+            // horizontal bar flash for a frame while the window is drag-resized).
+            ClampChildrenToWidth();
             base.OnLayout(e);
             HideHorizontalBar();
         }
@@ -67,12 +72,31 @@ internal sealed partial class PreferencesForm : Form
         protected override void WndProc(ref Message m)
         {
             // The page only ever scrolls vertically: swallow horizontal scrolling
-            // and re-hide the bar after the control re-evaluates its scroll ranges.
+            // and re-hide the bar whenever Windows recalculates the client area.
             if (m.Msg == WmHScroll) return;
 
             base.WndProc(ref m);
 
-            if (m.Msg == WmSize) HideHorizontalBar();
+            if (m.Msg is WmSize or WmNcCalcSize) HideHorizontalBar();
+        }
+
+        /// <summary>
+        /// Keeps every top-level child inside the client width. The page content is
+        /// left-anchored (horizontal scroll is always zero), so shrinking a child's
+        /// width is enough to remove the horizontal scroll extent until the owner
+        /// rebuilds the page with the new layout width.
+        /// </summary>
+        private void ClampChildrenToWidth()
+        {
+            var maxRight = ClientSize.Width;
+
+            foreach (Control child in Controls)
+            {
+                if (child.Width <= 0) continue;
+
+                var available = maxRight - child.Left;
+                if (available > 0 && child.Width > available) child.Width = available;
+            }
         }
 
         private bool _hidingHorizontalBar;
