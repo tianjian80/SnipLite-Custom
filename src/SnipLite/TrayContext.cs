@@ -47,7 +47,7 @@ internal sealed class TrayContext : ApplicationContext
         if (_settings.EnhancedTrayMenu)
         {
             menu.Items.Add(SnipMenu.Item("截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), HotkeyDefinitions.Format(_settings.CopyCaptureHotkey)));
-            menu.Items.Add(SnipMenu.Item("自定义截屏…", CustomCapture, HotkeyDefinitions.Format(_settings.CustomCaptureHotkey)));
+            menu.Items.Add(SnipMenu.Item("全屏截图并自动保存", CustomCapture, HotkeyDefinitions.Format(_settings.CustomCaptureHotkey)));
         }
         menu.Items.Add(SnipMenu.Item("贴图 / 恢复贴图", PasteFromClipboard, HotkeyDefinitions.Format(_settings.PinHotkey)));
         menu.Items.Add(SnipMenu.Item("隐藏 / 显示所有贴图", PinForm.ToggleAll, HotkeyDefinitions.Format(_settings.TogglePinsHotkey)));
@@ -130,22 +130,78 @@ internal sealed class TrayContext : ApplicationContext
             [nameof(_settings.OcrHotkey)] = () => StartCapture(CaptureMode.Ocr),
             [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr)
         };
-        foreach (var (label, name) in HotkeyDefinitions.Items)
+        // "截屏并自动复制" registers before the plain capture hotkey: if both were
+        // assigned the same key (e.g. F1, which the plain capture owns by default),
+        // the copy-on-release feature wins instead of silently losing the key.
+        var order = HotkeyDefinitions.Items
+            .OrderBy(item => item.Name == nameof(_settings.CopyCaptureHotkey) ? 0 : 1);
+        var used = new Dictionary<Keys, string>();
+        foreach (var (label, name) in order)
         {
             var binding = (Keys)typeof(AppSettings).GetProperty(name)!.GetValue(_settings)!;
             if (binding == Keys.None || name == nameof(AppSettings.CopyCoordinatesHotkey)) continue;
-            if (_hotkeys.Register(binding, handlers[name])) continue;
+            if (used.TryGetValue(binding, out var owner))
+            {
+                _settings.HotkeyErrors[name] = "与其他快捷键重复";
+                AppLog.Write($"快捷键重复：{label} 与 {owner} 同为 {HotkeyDefinitions.Format(binding)}");
+                continue;
+            }
+            used[binding] = label;
+            if (_hotkeys.Register(binding, handlers[name]))
+            {
+                AppLog.Write($"快捷键已注册：{label} {HotkeyDefinitions.Format(binding)}");
+                continue;
+            }
+            used.Remove(binding);
             _settings.HotkeyErrors[name] = "已被其他程序占用";
+            AppLog.Write($"快捷键注册失败：{label} {HotkeyDefinitions.Format(binding)}");
             Toast.Error(Localization.LanguageService.Format("{0}快捷键 {1} 已被占用", UiText.T(label), HotkeyDefinitions.Format(binding)));
         }
     }
+    /// <summary>
+    /// Silent full-screen capture of the monitor under the pointer, with no overlay
+    /// (an overlay from a hotkey used to leave a stuck transparent window). Full
+    ///screen games/apps cover the whole physical monitor, so their capture uses
+    /// <see cref="Screen.Bounds"/>; ordinary windows use <see cref="Screen.WorkingArea"/>
+    /// so the taskbar is excluded. The pointer is never drawn.
+    /// </summary>
     private void CustomCapture()
     {
-        using var dialog = new CaptureRegionForm(_settings);
-        if (dialog.ShowDialog() != DialogResult.OK) return;
-        var bounds = Rectangle.Intersect(dialog.RegionBounds, SystemInformation.VirtualScreen);
-        if (bounds.Width < 1 || bounds.Height < 1) { Toast.Error(UiText.T("区域不在屏幕范围内")); return; }
-        StartCapture(CaptureMode.Snip, preset: bounds);
+        try
+        {
+            var screen = Screen.FromPoint(Cursor.Position);
+            var bounds = IsFullScreenForeground(screen) ? screen.Bounds : screen.WorkingArea;
+            using var image = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(image))
+                g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
+
+            var path = Services.SaveCaptureFile(image, _settings, _settings.QuickSaveDirectory);
+            AppLog.Write($"全屏截图并自动保存：{(bounds == screen.Bounds ? "全屏应用" : "桌面工作区")} {bounds.Width}×{bounds.Height} → {path}");
+            if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("全屏截图并自动保存失败", ex);
+            Toast.Error(UiText.T("截图输出失败：") + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// True when the active window covers the monitor's entire physical bounds and is
+    /// not the desktop shell (Progman / WorkerW), i.e. a full-screen game or app.
+    /// </summary>
+    private static bool IsFullScreenForeground(Screen screen)
+    {
+        var window = GetForegroundWindow();
+        if (window == IntPtr.Zero) return false;
+
+        var name = new System.Text.StringBuilder(64);
+        GetClassName(window, name, name.Capacity);
+        if (name.ToString() is "Progman" or "WorkerW") return false;
+
+        if (!GetWindowRect(window, out var rect)) return false;
+        return rect.Left <= screen.Bounds.Left && rect.Top <= screen.Bounds.Top &&
+               rect.Right >= screen.Bounds.Right && rect.Bottom >= screen.Bounds.Bottom;
     }
     private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null)
     {
@@ -153,6 +209,7 @@ internal sealed class TrayContext : ApplicationContext
         _overlay?.Dispose();
         try
         {
+            if (forceCopy) AppLog.Write("截屏并自动复制：打开遮罩，框选松手即复制并退出");
             var overlay = new CaptureForm(SystemInformation.VirtualScreen, mode, _settings, preset, forceCopy); _overlay = overlay;
             overlay.Done += result =>
             {
@@ -169,6 +226,14 @@ internal sealed class TrayContext : ApplicationContext
         var transferred = false;
         try
         {
+            // The auto-copy overlay already wrote the bitmap to the clipboard, so the
+            // tray must not touch history or auto-save (those could fail and used to
+            // abort the whole result handling). Just dispose the bitmap.
+            if (result.AlreadyCopied && forceCopy)
+            {
+                AppLog.Write("截屏并自动复制：已由遮罩写入剪贴板，跳过历史与自动保存");
+                return;
+            }
             _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
             if (_settings.AutoSave) Services.SaveCaptureFile(result.Image, _settings, _settings.SaveDirectory);
             if (result.Pin || result.Action == CaptureAction.Pin)
@@ -179,7 +244,7 @@ internal sealed class TrayContext : ApplicationContext
                 if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
 
             }
-            else if (forceCopy || result.Action == CaptureAction.Copy || _settings.CopyAfterCapture)
+            else if (!result.AlreadyCopied && (forceCopy || result.Action == CaptureAction.Copy || _settings.CopyAfterCapture))
             {
                 Services.CopyImage(result.Image, _settings.CaptureBitmapClipboard, _settings);
                 if (_history.Entries.Count > 0) _lastPasteSequence = GetClipboardSequenceNumber();
@@ -252,4 +317,14 @@ internal sealed class TrayContext : ApplicationContext
         _overlay?.Invalidate();
     }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int length);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out RECT rect);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
 }

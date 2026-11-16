@@ -22,6 +22,12 @@ internal sealed class CaptureResult
     public bool Pin { get; init; }
     public CaptureAction? Action { get; init; }
     public bool KeepOpen { get; init; }
+
+    /// <summary>
+    /// The overlay already put the image on the clipboard, so the tray must not
+    /// copy it a second time (auto-copy hotkey path).
+    /// </summary>
+    public bool AlreadyCopied { get; init; }
 }
 
 /// <summary>
@@ -814,11 +820,13 @@ internal sealed partial class CaptureForm : Form
 
             Invalidate();
 
-            // "截屏并自动复制": a framed region finishes straight away — the tray's
-            // result handler copies it, the window closes here and no toolbar shows.
+            // "截屏并自动复制": a framed region finishes straight away — write the
+            // bitmap to the clipboard right here (no history, no auto-save, no tray
+            // round-trip) and close the overlay without ever showing the toolbar.
             if (_autoCopy && _hasSelection && Crop.Width > 0 && Crop.Height > 0)
             {
-                Confirm();
+                var copied = AutoCopySelection();
+                Confirm(alreadyCopied: copied);
                 return;
             }
 
@@ -1721,19 +1729,53 @@ internal sealed partial class CaptureForm : Form
         }
     }
 
-    private void CopySelectionToClipboard()
+    private bool CopySelectionToClipboard(bool notify = false)
     {
         var crop = Crop;
-        if (crop.Width < 1 || crop.Height < 1) return;
+        if (crop.Width < 1 || crop.Height < 1) return false;
         try
         {
             using var image = RenderComposite(crop);
             Services.CopyImage(image, _settings.CaptureBitmapClipboard, _settings);
+            if (notify) Toast.Show(Localization.LanguageService.Format("已复制  {0} × {1}", crop.Width, crop.Height));
+            return true;
         }
-        catch (Exception ex) { AppLog.Write("自动复制截图失败", ex); Toast.Error(UiText.T("自动复制截图失败：") + ex.Message); }
+        catch (Exception ex)
+        {
+            AppLog.Write("自动复制截图失败", ex);
+            Toast.Error(UiText.T("自动复制截图失败：") + ex.Message);
+            return false;
+        }
     }
 
-    private void Confirm()
+    /// <summary>
+    /// Auto-copy hotkey path: put the framed region on the clipboard directly via
+    /// <see cref="Clipboard.SetImage(Image)"/> and report success so the caller can
+    /// close the overlay. Deliberately bypasses <c>Services.CopyImage</c> and every
+    /// history / auto-save branch, so a broken save directory or clipboard format
+    /// setting can never swallow the copy.
+    /// </summary>
+    private bool AutoCopySelection()
+    {
+        var crop = Crop;
+        if (crop.Width < 1 || crop.Height < 1) return false;
+        try
+        {
+            using var image = RenderComposite(crop);
+            Clipboard.SetImage(image);
+            AppLog.Write($"截屏并自动复制：框选 {crop.Width}×{crop.Height}，已写入剪贴板并关闭");
+            Toast.Show(Localization.LanguageService.Format("已复制  {0} × {1}", crop.Width, crop.Height));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("截屏并自动复制：写入剪贴板失败", ex);
+            Toast.Error(UiText.T("自动复制截图失败：") + ex.Message);
+            return false;
+        }
+    }
+
+    private void Confirm(bool alreadyCopied = false)
     {
         if (_finished || !_hasSelection) return;
 
@@ -1746,7 +1788,8 @@ internal sealed partial class CaptureForm : Form
         {
             Image = RenderComposite(crop),
             Bounds = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height),
-            Pin = _resultPin
+            Pin = _resultPin,
+            AlreadyCopied = alreadyCopied
         });
     }
 

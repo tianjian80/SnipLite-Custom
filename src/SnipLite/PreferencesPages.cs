@@ -410,6 +410,7 @@ internal sealed partial class PreferencesForm
                     StyleButton(confirm, "确认");
                     StyleButton(cancel, "取消");
                     confirm.Enabled = false;
+                    var stolen = new List<string>();
                     box.BindingChanged += candidate =>
                     {
                         confirm.Enabled = candidate != binding;
@@ -418,12 +419,20 @@ internal sealed partial class PreferencesForm
                     confirm.Click += (_, _) =>
                     {
                         var candidate = box.Binding;
-                        if (candidate != Keys.None && HotkeyDefinitions.Items.Any(item => item.Name != name &&
-                            (Keys)typeof(AppSettings).GetProperty(item.Name)!.GetValue(_s)! == candidate))
+                        stolen.Clear();
+                        if (candidate != Keys.None)
                         {
-                            status.Text = UiText.T("与其他功能重复，请重新输入。");
-                            box.Focus();
-                            return;
+                            // A key can only belong to one feature. Assigning it here
+                            // moves it away from the feature that owned it instead of
+                            // refusing the change — otherwise setting F1 on
+                            // "截屏并自动复制" silently failed because the default F1
+                            // was still held by plain capture, so the hotkey appeared dead.
+                            foreach (var item in HotkeyDefinitions.Items)
+                            {
+                                if (item.Name == name) continue;
+                                if ((Keys)typeof(AppSettings).GetProperty(item.Name)!.GetValue(_s)! != candidate) continue;
+                                stolen.Add(item.Name);
+                            }
                         }
                         if (candidate != Keys.None && name != nameof(AppSettings.CopyCoordinatesHotkey) &&
                             HotkeyAvailable?.Invoke(candidate) == false)
@@ -442,6 +451,7 @@ internal sealed partial class PreferencesForm
                     AppTheme.Apply(dialog);
                     if (dialog.ShowDialog(this) == DialogResult.OK)
                     {
+                        foreach (var other in stolen) Set(other, Keys.None);
                         Set(name, box.Binding);
                         binding = box.Binding;
                     }

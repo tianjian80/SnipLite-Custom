@@ -5,7 +5,7 @@ internal static class HotkeyDefinitions
     public static readonly (string Label, string Name)[] Items =
     {
         ("截屏", nameof(AppSettings.CaptureHotkey)), ("截屏并自动复制", nameof(AppSettings.CopyCaptureHotkey)),
-        ("自定义截屏", nameof(AppSettings.CustomCaptureHotkey)), ("贴图", nameof(AppSettings.PinHotkey)),
+        ("全屏截图并自动保存", nameof(AppSettings.CustomCaptureHotkey)), ("贴图", nameof(AppSettings.PinHotkey)),
         ("隐藏 / 显示所有贴图", nameof(AppSettings.TogglePinsHotkey)), ("切换到另一贴图分组", nameof(AppSettings.SwitchGroupHotkey)),
         ("鼠标穿透开关", nameof(AppSettings.MouseThroughHotkey)), ("文字识别", nameof(AppSettings.OcrHotkey)), ("截图翻译", nameof(AppSettings.TranslationHotkey)), ("二维码识别", nameof(AppSettings.QrHotkey)), ("复制坐标（截图中）", nameof(AppSettings.CopyCoordinatesHotkey))
     };
