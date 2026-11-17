@@ -9,8 +9,8 @@ internal sealed partial class PreferencesForm
     public Func<Keys, bool>? HotkeyAvailable { get; set; }
 
     /// <summary>Shared width for the General page pickers; fits the longest engine label.</summary>
-    private int ChooserWidth => Math.Max(Px(270),
-        TextRenderer.MeasureText("本地增强（中英自动识别）", Font).Width + Px(56));
+    private int ChooserWidth => Math.Max(Px(200),
+        TextRenderer.MeasureText("本地增强 (自动识别)", Font).Width + Px(56));
 
     private void SubPages(string[] names, params Action[] pages)
     {
@@ -101,7 +101,7 @@ internal sealed partial class PreferencesForm
             new[] { UiText.T("跟随系统") }.Concat(Localization.LanguageService.Languages.Select(l => l.NativeName)).ToArray(),
             new object[] { Localization.LanguageService.SystemDefault }.Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray(),
             chooserWidth, true);
-        Choice("识别引擎", nameof(_s.OcrEngine), new[] { "本地增强（中英自动识别）", "Windows 系统识别" }, new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows }, chooserWidth, true);
+        Choice("识别引擎", nameof(_s.OcrEngine), new[] { "本地增强 (自动识别)", "Windows 系统识别" }, new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows }, chooserWidth, true);
         Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true);
         var translationServices = TranslationProviders.Choices.Select(choice => choice.Kind).ToArray();
         var translationLabels = TranslationProviders.Choices.Select(choice => choice.Label).ToArray();

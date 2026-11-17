@@ -40,7 +40,11 @@ internal sealed class SnipMenuRenderer : ToolStripProfessionalRenderer
     {
         e.TextColor = e.Item.Enabled ? AppTheme.Current.Text : AppTheme.Current.Disabled;
         e.TextRectangle = new Rectangle(e.TextRectangle.X, 0, e.TextRectangle.Width, e.Item.Height);
-        e.TextFormat = (e.TextFormat & ~TextFormatFlags.Bottom) | TextFormatFlags.VerticalCenter;
+        var format = (e.TextFormat & ~(TextFormatFlags.Bottom | TextFormatFlags.Left | TextFormatFlags.Right)) | TextFormatFlags.VerticalCenter;
+        // Center-aligned pickers ask for centered option text as well; the default
+        // ToolStrip layout keeps text left even when TextAlign says otherwise.
+        if (e.Item.TextAlign == ContentAlignment.MiddleCenter) format |= TextFormatFlags.HorizontalCenter;
+        e.TextFormat = format;
         base.OnRenderItemText(e);
     }
 
