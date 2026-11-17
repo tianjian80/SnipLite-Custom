@@ -13,9 +13,9 @@
     <ApplicationIcon>../../logo/SnipLite.ico</ApplicationIcon>
     <AssemblyName>SnipLite</AssemblyName>
     <RootNamespace>SnipLite</RootNamespace>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <Description>A Windows screenshot and pinning tool with local OCR and barcode recognition.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/tianjian80/SnipLite-Custom</RepositoryUrl>
