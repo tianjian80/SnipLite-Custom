@@ -5,7 +5,7 @@ namespace SnipLite;
 /// <summary>
 /// Theme-aware rounded menus shared by the tray, setting pickers and capture tools.
 /// </summary>
-internal sealed class SnipMenuRenderer : ToolStripProfessionalRenderer
+internal class SnipMenuRenderer : ToolStripProfessionalRenderer
 {
     internal static Color Back => AppTheme.Current.Card;
     internal static Color Hover => AppTheme.Current.Hover;
@@ -40,11 +40,7 @@ internal sealed class SnipMenuRenderer : ToolStripProfessionalRenderer
     {
         e.TextColor = e.Item.Enabled ? AppTheme.Current.Text : AppTheme.Current.Disabled;
         e.TextRectangle = new Rectangle(e.TextRectangle.X, 0, e.TextRectangle.Width, e.Item.Height);
-        var format = (e.TextFormat & ~(TextFormatFlags.Bottom | TextFormatFlags.Left | TextFormatFlags.Right)) | TextFormatFlags.VerticalCenter;
-        // Center-aligned pickers ask for centered option text as well; the default
-        // ToolStrip layout keeps text left even when TextAlign says otherwise.
-        if (e.Item.TextAlign == ContentAlignment.MiddleCenter) format |= TextFormatFlags.HorizontalCenter;
-        e.TextFormat = format;
+        e.TextFormat = (e.TextFormat & ~TextFormatFlags.Bottom) | TextFormatFlags.VerticalCenter;
         base.OnRenderItemText(e);
     }
 
@@ -59,7 +55,7 @@ internal sealed class SnipMenuRenderer : ToolStripProfessionalRenderer
             Math.Max(4, box.Width / 3));
     }
 
-    private static void DrawTick(Graphics g, int x, int y, int arm)
+    protected static void DrawTick(Graphics g, int x, int y, int arm)
     {
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -117,9 +113,44 @@ internal sealed class SnipMenuRenderer : ToolStripProfessionalRenderer
     }
 }
 
+/// <summary>
+/// Dedicated renderer for the settings pickers' drop-down lists: option text is
+/// centered across the whole row and the tick hugs the centered text instead of
+/// sitting in an image margin. The tray menu keeps using <see cref="SnipMenuRenderer"/>.
+/// </summary>
+internal sealed class ComboPopupRenderer : SnipMenuRenderer
+{
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+    {
+        var color = e.Item.Enabled ? AppTheme.Current.Text : AppTheme.Current.Disabled;
+        var row = new Rectangle(0, 0, e.Item.Width, e.Item.Height);
+        TextRenderer.DrawText(e.Graphics, e.Text, e.Item.Font, row, color,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+
+        if (e.Item is ToolStripMenuItem { Checked: true } item && !string.IsNullOrEmpty(item.Text))
+        {
+            var dpi = (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
+            var textWidth = TextRenderer.MeasureText(item.Text, item.Font).Width;
+            var textLeft = Math.Max(0, (e.Item.Width - textWidth) / 2);
+            DrawTick(e.Graphics, textLeft - (int)(10 * dpi), e.Item.Height / 2, Math.Max(4, (int)(4 * dpi)));
+        }
+    }
+
+    protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+    {
+        // The tick sits next to the centered label, drawn in OnRenderItemText.
+    }
+}
+
 internal static class SnipMenu
 {
-    public static ContextMenuStrip Create()
+    public static ContextMenuStrip Create() => Build(combo: false);
+
+    /// <summary>Drop-down list for a settings picker: centered options, no icon column.</summary>
+    public static ContextMenuStrip CreateComboPopup() => Build(combo: true);
+
+    private static ContextMenuStrip Build(bool combo)
     {
         var menu = new ContextMenuStrip
         {
@@ -127,9 +158,9 @@ internal static class SnipMenu
             BackColor = SnipMenuRenderer.Back,
             ForeColor = AppTheme.Current.Text,
             ShowImageMargin = false,
-            ShowCheckMargin = true,
+            ShowCheckMargin = !combo,
             DropShadowEnabled = true,
-            Renderer = new SnipMenuRenderer(),
+            Renderer = combo ? new ComboPopupRenderer() : new SnipMenuRenderer(),
             Padding = new Padding(4)
         };
         void ApplyTheme() { if (!menu.IsDisposed) { menu.BackColor = SnipMenuRenderer.Back; menu.ForeColor = AppTheme.Current.Text; menu.Invalidate(true); } }

@@ -915,7 +915,7 @@ internal sealed partial class PreferencesForm : Form
         // One menu for the life of the chooser, owned by the button so it is
         // disposed together with it. Re-creating (and disposing) the menu on
         // every click upsets ToolStripManager's message filter.
-        var menu = SnipMenu.Create();
+        var menu = center ? SnipMenu.CreateComboPopup() : SnipMenu.Create();
         var items = new ToolStripMenuItem[options.Length];
 
         button.ContextMenuStrip = menu;
@@ -932,7 +932,14 @@ internal sealed partial class PreferencesForm : Form
             items[i].Tag = null;
             if (nativeLanguages) items[i].Tag = "localization:native";
             items[i].Text = options[i];
-            if (center) items[i].TextAlign = ContentAlignment.MiddleCenter;
+            if (center)
+            {
+                // Fixed row width keeps the popup as wide as the picker while the
+                // combo renderer centers each label over the whole row.
+                items[i].AutoSize = false;
+                var rowHeight = TextRenderer.MeasureText(options[i], menu.Font).Height + Px(12);
+                items[i].Size = new Size(button.Width - Px(8), Math.Max(Px(28), rowHeight));
+            }
 
             menu.Items.Add(items[i]);
         }
