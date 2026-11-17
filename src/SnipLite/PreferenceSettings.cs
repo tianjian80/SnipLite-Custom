@@ -88,6 +88,7 @@ internal sealed partial class AppSettings
     public bool PinBitmapClipboard { get; set; }
     public Keys CaptureHotkey { get; set; } = Keys.F1;
     public Keys CopyCaptureHotkey { get; set; } = Keys.None;
+    public Keys PreferencesHotkey { get; set; } = Keys.None;
     public Keys CustomCaptureHotkey { get; set; } = Keys.None;
 
     /// <summary>

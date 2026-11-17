@@ -4,6 +4,7 @@ internal static class HotkeyDefinitions
 {
     public static readonly (string Label, string Name)[] Items =
     {
+        ("首选项", nameof(AppSettings.PreferencesHotkey)),
         ("截屏", nameof(AppSettings.CaptureHotkey)), ("截屏并自动复制", nameof(AppSettings.CopyCaptureHotkey)),
         ("全屏截图并自动保存", nameof(AppSettings.CustomCaptureHotkey)), ("贴图", nameof(AppSettings.PinHotkey)),
         ("隐藏 / 显示所有贴图", nameof(AppSettings.TogglePinsHotkey)), ("切换到另一贴图分组", nameof(AppSettings.SwitchGroupHotkey)),

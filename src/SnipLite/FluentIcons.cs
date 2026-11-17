@@ -5,7 +5,7 @@ namespace SnipLite;
 /// <summary>Resolution-independent 24-unit line icons shared by navigation, menus and capture tools.</summary>
 internal static class FluentIcons
 {
-    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy";
+    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy" or "gear" or "mouse";
 
     public static void Draw(Graphics g, string id, RectangleF bounds, Color color)
     {
@@ -47,6 +47,20 @@ internal static class FluentIcons
                 case "settings":
                     Line(3, 6, 21, 6); Line(3, 12, 21, 12); Line(3, 18, 21, 18);
                     Box(7, 4, 3, 4, 1); Box(15, 10, 3, 4, 1); Box(6, 16, 3, 4, 1); break;
+                case "gear":
+                    g.DrawEllipse(pen, 4.5f, 4.5f, 15, 15);
+                    g.DrawEllipse(pen, 9.5f, 9.5f, 5, 5);
+                    for (var i = 0; i < 8; i++)
+                    {
+                        var a = i * Math.PI / 4;
+                        Line(12 + (float)Math.Cos(a) * 7.5f, 12 + (float)Math.Sin(a) * 7.5f,
+                             12 + (float)Math.Cos(a) * 10f, 12 + (float)Math.Sin(a) * 10f);
+                    }
+                    break;
+                case "mouse":
+                    Box(7, 2, 10, 20, 5);
+                    Line(12, 2, 12, 4.4f); Box(10.8f, 4.4f, 2.4f, 3.4f, 1.2f); Line(12, 7.8f, 12, 9);
+                    break;
                 case "palette": g.DrawEllipse(pen, 3, 3, 18, 18); g.DrawEllipse(pen, 7, 7, 2, 2); g.DrawEllipse(pen, 14, 7, 2, 2); g.DrawEllipse(pen, 7, 14, 2, 2); Line(15, 14, 18, 18); break;
                 case "output": Lines(new(3, 8), new(3, 5), new(10, 5), new(12, 8), new(21, 8), new(21, 20), new(3, 20), new(3, 8)); Line(10, 14, 17, 14); Lines(new(14, 11), new(17, 14), new(14, 17)); break;
                 case "keyboard": Box(2, 5, 20, 14); for(var y=9;y<=12;y+=3) for(var x=6;x<=18;x+=4) Line(x,y,x+.5f,y); Line(7,16,17,16); break;
@@ -64,7 +78,8 @@ internal static class FluentIcons
         if (label.Contains("退出") || label.Contains("关闭")) return "close";
         if (label.Contains("重新启动") || label.Contains("恢复")) return "update";
         if (label.Contains("二维码")) return "qr";
-        if (label.Contains("首选项")) return "settings";
+        if (label.Contains("首选项")) return "gear";
+        if (label.Contains("鼠标")) return "mouse";
         if (label.Contains("帮助") || label.Contains("关于") || label.Contains("许可证")) return "about";
         if (label.Contains("翻译")) return "translate";
         if (label.Contains("识别") || label.Contains("语言")) return "ocr";

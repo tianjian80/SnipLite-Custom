@@ -85,13 +85,21 @@ internal sealed class TrayContext : ApplicationContext
 
     private void ShowPreferences(int tab)
     {
-        if (_prefs is { IsDisposed: false }) { _prefs.Activate(); _prefs.SelectTab(tab); return; }
+        if (_prefs is { IsDisposed: false })
+        {
+            if (_prefs.WindowState == FormWindowState.Minimized) _prefs.WindowState = FormWindowState.Normal;
+            _prefs.Activate(); _prefs.SelectTab(tab); _prefs.BringToFront();
+            Win32.SetForegroundWindow(_prefs.Handle);
+            return;
+        }
         _prefs = new PreferencesForm(_settings, tab);
         _prefs.Applied += ApplySettings;
         _prefs.HotkeyAvailable = _hotkeys.CanRegister;
         _prefs.HotkeyEditing += editing => { _editingHotkey = editing; _hotkeySignature = ""; ApplyHotkeys(); };
         _prefs.FormClosed += (_, _) => { _prefs = null; _editingHotkey = false; _hotkeySignature = ""; ApplyHotkeys(); };
         _prefs.Show();
+        _prefs.Activate();
+        Win32.SetForegroundWindow(_prefs.Handle);
     }
     private void ApplySettings()
     {
@@ -120,6 +128,7 @@ internal sealed class TrayContext : ApplicationContext
         var handlers = new Dictionary<string, Action>
         {
             [nameof(_settings.CaptureHotkey)] = () => StartCapture(CaptureMode.Snip),
+            [nameof(_settings.PreferencesHotkey)] = () => ShowPreferences(0),
             [nameof(_settings.CopyCaptureHotkey)] = () => StartCapture(CaptureMode.Snip, true),
             [nameof(_settings.CustomCaptureHotkey)] = CustomCapture,
             [nameof(_settings.PinHotkey)] = PasteFromClipboard,
