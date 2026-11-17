@@ -567,13 +567,14 @@ internal sealed partial class PreferencesForm
     }
     private void GridCheck(params (string Label, string Property, string Icon)[] items)
     {
-        var gap = Px(12);
+        const int columns = 3;
+        var gap = Px(10);
         var width = ContentWidth();
-        var cardWidth = (width - gap) / 2;
+        var cardWidth = (width - gap * (columns - 1)) / columns;
         var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
-        for (var index = 0; index < items.Length; index += 2)
+        for (var index = 0; index < items.Length; index += columns)
         {
-            for (var column = 0; column < 2 && index + column < items.Length; column++)
+            for (var column = 0; column < columns && index + column < items.Length; column++)
             {
                 var item = items[index + column];
                 var card = new FluentSettingRow
@@ -581,12 +582,18 @@ internal sealed partial class PreferencesForm
                     Bounds = new Rectangle(_labelX + column * (cardWidth + gap), _y, cardWidth, height)
                 };
                 _page.Controls.Add(card);
-                AddRowIcon(card, item.Icon);
+                var icon = new Panel
+                {
+                    Bounds = new Rectangle(Px(12), (height - Px(20)) / 2, Px(20), Px(20)),
+                    BackColor = AppTheme.Current.Card
+                };
+                icon.Paint += (_, e) => FluentIcons.Draw(e.Graphics, item.Icon, icon.ClientRectangle, Ink);
+                card.Controls.Add(icon);
                 var box = new FluentToggle
                 {
                     Text = item.Label,
                     AutoSize = false,
-                    Bounds = new Rectangle(Px(48), Px(10), Math.Max(Px(60), card.Width - Px(62)), card.Height - Px(20)),
+                    Bounds = new Rectangle(Px(38), Px(10), Math.Max(Px(60), card.Width - Px(50)), card.Height - Px(20)),
                     BackColor = AppTheme.Current.Card,
                     ForeColor = Ink,
                     Checked = (bool)Value(item.Property)
@@ -594,7 +601,7 @@ internal sealed partial class PreferencesForm
                 box.CheckedChanged += (_, _) => Set(item.Property, box.Checked);
                 card.Controls.Add(box);
             }
-            _y += height + Px(10);
+            _y += height + Px(8);
         }
     }
     private void LayoutPage()

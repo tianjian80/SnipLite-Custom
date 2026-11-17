@@ -502,7 +502,7 @@ internal sealed partial class PreferencesForm : Form
 
         for (var i = 0; i < _tabs.Length; i++)
         {
-            var y = i < 6 ? Px(105 + i * 40) : ClientSize.Height - Px(162 - (i - 6) * 40);
+            var y = i < 7 ? Px(105 + i * 40) : ClientSize.Height - Px(162 - (i - 7) * 40);
             _tabRects.Add((new Rectangle(Px(10), y, Px(SidebarW - 20), Px(36)), i));
         }
     }
