@@ -143,26 +143,45 @@ internal sealed class ComboPopupRenderer : SnipMenuRenderer
     }
 }
 
+/// <summary>
+/// Tray menu window styled as a tool window so Windows never adds a taskbar
+/// button for it while it is foregrounded to receive outside-click closing.
+/// </summary>
+internal sealed class TrayContextMenuStrip : ContextMenuStrip
+{
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x00000080;   // WS_EX_TOOLWINDOW
+            cp.ExStyle &= ~0x00040000;  // WS_EX_APPWINDOW
+            return cp;
+        }
+    }
+}
+
 internal static class SnipMenu
 {
     public static ContextMenuStrip Create() => Build(combo: false);
 
+    /// <summary>Tray menu: same look, but its window never gets a taskbar button.</summary>
+    public static ContextMenuStrip CreateTray() => Build(combo: false, toolWindow: true);
+
     /// <summary>Drop-down list for a settings picker: centered options, no icon column.</summary>
     public static ContextMenuStrip CreateComboPopup() => Build(combo: true);
 
-    private static ContextMenuStrip Build(bool combo)
+    private static ContextMenuStrip Build(bool combo, bool toolWindow = false)
     {
-        var menu = new ContextMenuStrip
-        {
-            Font = new Font("Microsoft YaHei UI", 9f),
-            BackColor = SnipMenuRenderer.Back,
-            ForeColor = AppTheme.Current.Text,
-            ShowImageMargin = false,
-            ShowCheckMargin = !combo,
-            DropShadowEnabled = true,
-            Renderer = combo ? new ComboPopupRenderer() : new SnipMenuRenderer(),
-            Padding = new Padding(4)
-        };
+        ContextMenuStrip menu = toolWindow ? new TrayContextMenuStrip() : new ContextMenuStrip();
+        menu.Font = new Font("Microsoft YaHei UI", 9f);
+        menu.BackColor = SnipMenuRenderer.Back;
+        menu.ForeColor = AppTheme.Current.Text;
+        menu.ShowImageMargin = false;
+        menu.ShowCheckMargin = !combo;
+        menu.DropShadowEnabled = true;
+        menu.Renderer = combo ? new ComboPopupRenderer() : new SnipMenuRenderer();
+        menu.Padding = new Padding(4);
         void ApplyTheme() { if (!menu.IsDisposed) { menu.BackColor = SnipMenuRenderer.Back; menu.ForeColor = AppTheme.Current.Text; menu.Invalidate(true); } }
         AppTheme.Changed += ApplyTheme;
         menu.Disposed += (_, _) => AppTheme.Changed -= ApplyTheme;
