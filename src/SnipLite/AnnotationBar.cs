@@ -121,6 +121,11 @@ internal sealed class AnnotationBar
 
     public bool Visible => _items.Count > 0;
 
+    /// <summary>Which toolbar buttons are configured to show; null shows every one.</summary>
+    public Func<string, bool>? ItemVisible { get; set; }
+
+    private bool Shows(string id) => ItemVisible?.Invoke(id) ?? true;
+
     private int Px(int value) => (int)Math.Round(value * Scale);
 
     private bool ShowsFill => Tool is ToolKind.Rectangle or ToolKind.Ellipse;
@@ -162,18 +167,10 @@ internal sealed class AnnotationBar
 
         void Cell(string id)
         {
+            if (!Shows(id)) return;
             Add(x, y, button, button, id);
             x += button + gap;
         }
-
-        Cell("rect");
-        Cell("ellipse");
-        Cell("arrow");
-        Cell("pen");
-        Cell("marker");
-        Cell("mosaic");
-        Cell("text");
-        Cell("eraser");
 
         void Divider()
         {
@@ -182,19 +179,25 @@ internal sealed class AnnotationBar
             x += group;
         }
 
-        Divider();
-        Cell("undo");
-        Cell("redo");
-        Divider();
+        // Groups stay together, empty groups and their dividers disappear, and the
+        // remaining buttons pack left with no gap in between.
+        var groups = new[]
+        {
+            new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser" },
+            new[] { "undo", "redo" },
+            new[] { "ocr", "translate", "qr" },
+            new[] { "close", "pin", "save", "copy" }
+        };
 
-        Cell("ocr");
-        Cell("translate"); Cell("qr");
-        Divider();
-
-        Cell("close");
-        Cell("pin");
-        Cell("save");
-        Cell("copy");
+        var drewGroup = false;
+        foreach (var items in groups)
+        {
+            var visible = items.Where(Shows).ToArray();
+            if (visible.Length == 0) continue;
+            if (drewGroup) Divider();
+            drewGroup = true;
+            foreach (var id in visible) Cell(id);
+        }
 
         var mainWidth = x - gap + pad;
         var mainHeight = button + pad * 2;

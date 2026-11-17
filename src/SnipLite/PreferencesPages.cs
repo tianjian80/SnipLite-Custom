@@ -565,6 +565,32 @@ internal sealed partial class PreferencesForm
         MouseRow("快速缩略图", nameof(_s.PinThumbnailMouse)); MouseRow("复制文本", nameof(_s.PinCopyTextMouse));
         HintText("冲突时按上方功能优先匹配；可在任意页面恢复当前分组默认值。");
     }
+    private void ToolRow(string label, string name, string icon)
+        => Check(label, (bool)Value(name), value => Set(name, value), icon);
+    private void LayoutPage()
+    {
+        HintText("自定义截屏工具栏显示的按钮");
+        Section("绘图工具", () => { });
+        ToolRow("矩形（R）", nameof(_s.ShowToolRect), "rect");
+        ToolRow("椭圆（E）", nameof(_s.ShowToolEllipse), "ellipse");
+        ToolRow("箭头（A）", nameof(_s.ShowToolArrow), "arrow");
+        ToolRow("铅笔（P）", nameof(_s.ShowToolPen), "pen");
+        ToolRow("马克笔（H）", nameof(_s.ShowToolMarker), "marker");
+        ToolRow("马赛克（M）", nameof(_s.ShowToolMosaic), "mosaic");
+        ToolRow("文字（T）", nameof(_s.ShowToolText), "text");
+        ToolRow("橡皮擦（X），仅擦除标注", nameof(_s.ShowToolEraser), "eraser");
+        Section("辅助识别", () => { });
+        ToolRow("识别文字（OCR）", nameof(_s.ShowToolOcr), "ocr");
+        ToolRow("截图翻译", nameof(_s.ShowToolTranslate), "translate");
+        ToolRow("识别二维码 / 条码", nameof(_s.ShowToolQr), "qr");
+        Section("动作操作", () => { });
+        ToolRow("撤销（Ctrl+Z）", nameof(_s.ShowToolUndo), "undo");
+        ToolRow("重做（Ctrl+Y）", nameof(_s.ShowToolRedo), "redo");
+        ToolRow("取消截图", nameof(_s.ShowToolClose), "close");
+        ToolRow("贴图", nameof(_s.ShowToolPin), "pin");
+        ToolRow("保存", nameof(_s.ShowToolSave), "save");
+        ToolRow("复制", nameof(_s.ShowToolCopy), "copy");
+    }
     private static void OpenFile(string path)
     {
         try

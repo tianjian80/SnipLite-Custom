@@ -5,7 +5,7 @@ namespace SnipLite;
 /// <summary>Resolution-independent 24-unit line icons shared by navigation, menus and capture tools.</summary>
 internal static class FluentIcons
 {
-    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy" or "gear" or "mouse";
+    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy" or "gear" or "mouse" or "layout";
 
     public static void Draw(Graphics g, string id, RectangleF bounds, Color color)
     {
@@ -64,6 +64,7 @@ internal static class FluentIcons
                 case "palette": g.DrawEllipse(pen, 3, 3, 18, 18); g.DrawEllipse(pen, 7, 7, 2, 2); g.DrawEllipse(pen, 14, 7, 2, 2); g.DrawEllipse(pen, 7, 14, 2, 2); Line(15, 14, 18, 18); break;
                 case "output": Lines(new(3, 8), new(3, 5), new(10, 5), new(12, 8), new(21, 8), new(21, 20), new(3, 20), new(3, 8)); Line(10, 14, 17, 14); Lines(new(14, 11), new(17, 14), new(14, 17)); break;
                 case "keyboard": Box(2, 5, 20, 14); for(var y=9;y<=12;y+=3) for(var x=6;x<=18;x+=4) Line(x,y,x+.5f,y); Line(7,16,17,16); break;
+                case "layout": Box(3, 3, 18, 18); Line(3, 10, 21, 10); Line(12, 10, 12, 21); break;
                 case "update": g.DrawArc(pen, 4, 4, 16, 16, 40, 280); Lines(new(21, 5), new(21, 11), new(15, 11)); break;
                 case "about": g.DrawEllipse(pen, 3, 3, 18, 18); Line(12, 10, 12, 17); Line(12, 7, 12, 7.2f); break;
                 case "check": Lines(new(5, 12), new(10, 17), new(20, 6)); break;

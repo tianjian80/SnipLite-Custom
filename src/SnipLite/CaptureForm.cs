@@ -198,6 +198,27 @@ internal sealed partial class CaptureForm : Form
 
         _bar.Scale = Ui;
         _bar.Accent = _settings.Accent;
+        _bar.ItemVisible = id => id switch
+        {
+            "rect" => _settings.ShowToolRect,
+            "ellipse" => _settings.ShowToolEllipse,
+            "arrow" => _settings.ShowToolArrow,
+            "pen" => _settings.ShowToolPen,
+            "marker" => _settings.ShowToolMarker,
+            "mosaic" => _settings.ShowToolMosaic,
+            "text" => _settings.ShowToolText,
+            "eraser" => _settings.ShowToolEraser,
+            "undo" => _settings.ShowToolUndo,
+            "redo" => _settings.ShowToolRedo,
+            "ocr" => _settings.ShowToolOcr,
+            "translate" => _settings.ShowToolTranslate,
+            "qr" => _settings.ShowToolQr,
+            "close" => _settings.ShowToolClose,
+            "pin" => _settings.ShowToolPin,
+            "save" => _settings.ShowToolSave,
+            "copy" => _settings.ShowToolCopy,
+            _ => true
+        };
         if (_preset is Rectangle preset)
         {
             preset.Offset(-_virtual.X, -_virtual.Y);

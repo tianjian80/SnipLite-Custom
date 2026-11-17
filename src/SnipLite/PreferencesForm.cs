@@ -30,9 +30,9 @@ internal sealed partial class PreferencesForm : Form
     private static Color Hint => AppTheme.Current.Muted;
     private static Color Field => AppTheme.Current.Field;
     private static Color FieldEdge => AppTheme.Current.Border;
-    private static readonly string[] TabIcons = { "settings", "palette", "capture", "pin", "output", "keyboard", "update", "about" };
+    private static readonly string[] TabIcons = { "settings", "palette", "capture", "pin", "output", "keyboard", "layout", "update", "about" };
 
-    private readonly string[] _tabs = { "常规", "界面", "截屏", "贴图", "输出", "控制", "更新", "关于" };
+    private readonly string[] _tabs = { "常规", "界面", "截屏", "贴图", "输出", "控制", "布局", "更新", "关于" };
     private readonly List<(Rectangle Rect, int Index)> _tabRects = new();
 
     private readonly AppSettings _s;
@@ -609,7 +609,8 @@ internal sealed partial class PreferencesForm : Form
             case 3: BuildPin(); break;
             case 4: BuildOutput(); break;
             case 5: BuildControl(); break;
-            case 6: BuildUpdate(); break;
+            case 6: BuildLayout(); break;
+            case 7: BuildUpdate(); break;
             default: BuildAbout(); break;
         }
 
@@ -619,7 +620,7 @@ internal sealed partial class PreferencesForm : Form
         AppTheme.Apply(_page);
         PrepareTree(_page);
         _laidOutWidth = ClientSize.Width;
-        _reset.Visible = index <= 5;
+        _reset.Visible = index <= 6;
         ActiveControl = null;
         Invalidate();
     }
@@ -630,6 +631,7 @@ internal sealed partial class PreferencesForm : Form
     private void BuildPin() => SubPages(new[] { "显示", "行为", "转换" }, PinDisplayPage, PinBehaviorPage, PinConversionPage);
     private void BuildOutput() => SubPages(new[] { "文件", "剪贴板" }, OutputFilePage, OutputClipboardPage);
     private void BuildControl() => SubPages(new[] { "全局快捷键", "鼠标" }, HotkeysPage, MousePage);
+    private void BuildLayout() => LayoutPage();
     private void BuildUpdate()
     {
         Row("当前版本", MakeStatic($"{AppInfo.ProductName} {AppInfo.Version}"));
@@ -807,7 +809,7 @@ internal sealed partial class PreferencesForm : Form
         var card = NewSettingRow(height);
         if (label.Length > 0)
         {
-            AddRowIcon(card, label);
+            AddRowIcon(card, FluentIcons.ForLabel(label));
             card.Controls.Add(new Label { Text = label, AutoSize = false, AutoEllipsis = true, Bounds = new Rectangle(Px(48), Px(10), Px(LabelW - 52), height - Px(20)),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent });
         }
@@ -832,10 +834,10 @@ internal sealed partial class PreferencesForm : Form
         return row;
     }
 
-    private void AddRowIcon(Control row, string label)
+    private void AddRowIcon(Control row, string iconId)
     {
         var icon = new Panel { Bounds = new Rectangle(Px(15), (row.Height - Px(20)) / 2, Px(20), Px(20)), BackColor = AppTheme.Current.Card };
-        icon.Paint += (_, e) => FluentIcons.Draw(e.Graphics, FluentIcons.ForLabel(label), icon.ClientRectangle, Ink);
+        icon.Paint += (_, e) => FluentIcons.Draw(e.Graphics, iconId, icon.ClientRectangle, Ink);
         row.Controls.Add(icon);
     }
 
@@ -856,10 +858,10 @@ internal sealed partial class PreferencesForm : Form
         Row(label, all);
     }
 
-    private void Check(string text, bool value, Action<bool> onChange)
+    private void Check(string text, bool value, Action<bool> onChange, string? icon = null)
     {
         var card = NewSettingRow(AdaptiveRowHeight(Math.Max(TextHeight, Px(38))));
-        AddRowIcon(card, text);
+        AddRowIcon(card, icon ?? FluentIcons.ForLabel(text));
         var box = new FluentToggle
         {
             Text = text,

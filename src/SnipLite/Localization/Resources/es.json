@@ -413,5 +413,9 @@
   "ui.47d946118a99": "SnipLite ya se está ejecutando",
   "ui.24ab6e8657e9": "Tecla del traductor",
   "ui.625cfaca0f11": "Efecto de sonido WAV|*.wav",
-  "ui.dee70307d1fe": "Windows OCR"
+  "ui.dee70307d1fe": "Windows OCR",
+  "布局": "Diseño",
+  "撤销（Ctrl+Z）": "Deshacer (Ctrl+Z)",
+  "重做（Ctrl+Y）": "Rehacer (Ctrl+Y)",
+  "自定义截屏工具栏显示的按钮": "Elegir los botones de la barra de captura"
 }

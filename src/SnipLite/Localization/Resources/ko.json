@@ -413,5 +413,9 @@
   "ui.47d946118a99": "SnipLite가 이미 실행 중입니다.",
   "ui.24ab6e8657e9": "번역기 키",
   "ui.625cfaca0f11": "WAV 음향 효과|*.wav",
-  "ui.dee70307d1fe": "Windows OCR"
+  "ui.dee70307d1fe": "Windows OCR",
+  "布局": "레이아웃",
+  "撤销（Ctrl+Z）": "실행 취소 (Ctrl+Z)",
+  "重做（Ctrl+Y）": "다시 실행 (Ctrl+Y)",
+  "自定义截屏工具栏显示的按钮": "캡처 도구 모음에 표시할 버튼 선택"
 }

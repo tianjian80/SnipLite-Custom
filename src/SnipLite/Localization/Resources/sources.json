@@ -413,5 +413,9 @@
   "SnipLite 已在运行": "ui.47d946118a99",
   "Translator 密钥": "ui.24ab6e8657e9",
   "WAV 音效|*.wav": "ui.625cfaca0f11",
-  "Windows 系统识别": "ui.dee70307d1fe"
+  "Windows 系统识别": "ui.dee70307d1fe",
+  "布局": "ui.3f8a2d6c9b14",
+  "撤销（Ctrl+Z）": "ui.8c4e1b7f2a63",
+  "重做（Ctrl+Y）": "ui.6d2a9f4e8c57",
+  "自定义截屏工具栏显示的按钮": "ui.1b7c5e3a9d42"
 }

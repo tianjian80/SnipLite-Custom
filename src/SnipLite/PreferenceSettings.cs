@@ -22,6 +22,24 @@ internal sealed partial class AppSettings
     public string CustomTrayIcon { get; set; } = "";
     /// <summary>What the title-bar close button does: hide to tray or quit the app.</summary>
     public CloseButtonAction CloseButtonAction { get; set; } = CloseButtonAction.MinimizeToTray;
+    // Which buttons the capture toolbar shows; every toggle defaults to on.
+    public bool ShowToolRect { get; set; } = true;
+    public bool ShowToolEllipse { get; set; } = true;
+    public bool ShowToolArrow { get; set; } = true;
+    public bool ShowToolPen { get; set; } = true;
+    public bool ShowToolMarker { get; set; } = true;
+    public bool ShowToolMosaic { get; set; } = true;
+    public bool ShowToolText { get; set; } = true;
+    public bool ShowToolEraser { get; set; } = true;
+    public bool ShowToolUndo { get; set; } = true;
+    public bool ShowToolRedo { get; set; } = true;
+    public bool ShowToolOcr { get; set; } = true;
+    public bool ShowToolTranslate { get; set; } = true;
+    public bool ShowToolQr { get; set; } = true;
+    public bool ShowToolClose { get; set; } = true;
+    public bool ShowToolPin { get; set; } = true;
+    public bool ShowToolSave { get; set; } = true;
+    public bool ShowToolCopy { get; set; } = true;
     public bool ColorHex { get; set; }
     public bool ColorHideHash { get; set; }
     public bool ColorUppercase { get; set; } = true;

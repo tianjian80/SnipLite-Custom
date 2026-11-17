@@ -413,5 +413,9 @@
   "ui.47d946118a99": "SnipLite est déjà en cours d'exécution",
   "ui.24ab6e8657e9": "Clé du traducteur",
   "ui.625cfaca0f11": "Effet sonore WAV|*.wav",
-  "ui.dee70307d1fe": "Windows OCR"
+  "ui.dee70307d1fe": "Windows OCR",
+  "布局": "Disposition",
+  "撤销（Ctrl+Z）": "Annuler (Ctrl+Z)",
+  "重做（Ctrl+Y）": "Rétablir (Ctrl+Y)",
+  "自定义截屏工具栏显示的按钮": "Choisir les boutons de la barre d'outils de capture"
 }
