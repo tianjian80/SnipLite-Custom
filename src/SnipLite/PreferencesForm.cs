@@ -202,7 +202,7 @@ internal sealed partial class PreferencesForm : Form
     // height, so larger fonts and high-DPI scaling keep comfortable padding.
     private int TextHeight => TextRenderer.MeasureText("国Ag", Font).Height;
     private int FieldHeight => Math.Max(Px(ControlH), TextHeight + Px(12));
-    private int AdaptiveRowHeight(int contentHeight) => Math.Max(Px(44), contentHeight + Px(34));
+    private int AdaptiveRowHeight(int contentHeight) => Math.Max(Px(44), contentHeight + Px(20));
 
     private Rectangle PageRect() => new(
         Px(SidebarW + 22),
@@ -703,17 +703,18 @@ internal sealed partial class PreferencesForm : Form
 
         if (_captions)
         {
+            var height = TextRenderer.MeasureText(title, Font).Height + Px(12);
             _page.Controls.Add(new Label
             {
                 Text = title,
                 AutoSize = false,
-                Bounds = new Rectangle(_labelX, _y, ContentWidth(), Px(18)),
+                Bounds = new Rectangle(_labelX, _y, ContentWidth(), height),
                 ForeColor = Muted,
                 BackColor = Page,
                 TextAlign = ContentAlignment.MiddleLeft
             });
 
-            _y += Px(CaptionH);
+            _y += height;
         }
 
         content();
@@ -784,7 +785,7 @@ internal sealed partial class PreferencesForm : Form
             card.Controls.Add(control);
             x += control.Width + Px(ControlGap);
         }
-        _y += height + Px(10);
+        _y += height + Px(6);
     }
 
     private FluentSettingRow NewSettingRow(int height)
@@ -835,7 +836,7 @@ internal sealed partial class PreferencesForm : Form
         box.CheckedChanged += (_, _) => onChange(box.Checked);
 
         card.Controls.Add(box);
-        _y += card.Height + Px(10);
+        _y += card.Height + Px(6);
     }
 
     private void AddLabel(string text, int x, int y, int width)

@@ -526,7 +526,7 @@ internal sealed partial class PreferencesForm
                 }
                 PlaceCaption();
                 card.Resize += (_, _) => PlaceCaption();
-                _y += height + Px(10);
+                _y += height + Px(6);
                 continue;
             }
             Row(label, change, current);
