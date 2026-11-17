@@ -4,6 +4,7 @@ internal sealed class TrayContext : ApplicationContext
 {
     private readonly AppSettings _settings;
     private readonly NotifyIcon _tray;
+    private ContextMenuStrip? _trayMenu;
     private readonly HotkeyHost _hotkeys = new();
     private readonly ThemeMonitor _themeMonitor = new();
     private readonly Localization.LanguageMonitor _languageMonitor;
@@ -22,6 +23,9 @@ internal sealed class TrayContext : ApplicationContext
         _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = "SnipLite", Visible = true };
         AppTheme.Changed += RefreshTheme;
         _tray.DoubleClick += (_, _) => StartCapture(CaptureMode.Snip);
+        // The menu is shown manually so it can always open towards the right of
+        // the cursor instead of letting WinForms flip it left in the right half.
+        _tray.MouseUp += (_, e) => { if (e.Button == MouseButtons.Right) ShowTrayMenu(); };
         ApplySettings();
         _languageMonitor = new Localization.LanguageMonitor(ApplySettings);
         _languageMonitor.Start();
@@ -32,7 +36,7 @@ internal sealed class TrayContext : ApplicationContext
         }
         if (captureOnStart) Once(() => StartCapture(CaptureMode.Snip));
         if (openPreferencesTab >= 0) Once(() => ShowPreferences(openPreferencesTab));
-        if (openMenu) Once(() => _tray.ContextMenuStrip?.Show(200, 200));
+        if (openMenu) Once(() => _trayMenu?.Show(new Point(200, 200)));
         if (_settings.KeepResponsive) _ = Task.Run(() =>
         {
             try { Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages(); } catch { }
@@ -83,6 +87,23 @@ internal sealed class TrayContext : ApplicationContext
         return menu;
     }
 
+    /// <summary>
+    /// Opens the tray menu to the upper right of the cursor. WinForms normally
+    /// flips a menu left when the cursor is in the right half of the screen; here
+    /// the left edge stays at the cursor and only shifts when the right border
+    /// would otherwise be crossed.
+    /// </summary>
+    private void ShowTrayMenu()
+    {
+        var menu = _trayMenu;
+        if (menu is null) return;
+        var screen = Screen.FromPoint(Cursor.Position);
+        var width = menu.GetPreferredSize(Size.Empty).Width;
+        var x = Cursor.Position.X;
+        if (x + width > screen.Bounds.Right) x = screen.Bounds.Right - width;
+        menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
+    }
+
     /// <summary>The preferences hotkey toggles: visible window closes, otherwise it opens.</summary>
     private void TogglePreferences()
     {
@@ -121,7 +142,7 @@ internal sealed class TrayContext : ApplicationContext
         var signature = $"{_settings.EnhancedTrayMenu}|{Localization.LanguageService.CurrentLanguage}|{_settings.InterfaceFont}|{_settings.InterfaceFontSize}|" + string.Join(',', HotkeyDefinitions.Items.Select(item => typeof(AppSettings).GetProperty(item.Name)!.GetValue(_settings)));
         if (_menuSignature != signature)
         {
-            var oldMenu = _tray.ContextMenuStrip; _tray.ContextMenuStrip = BuildMenu(); _menuSignature = signature;
+            var oldMenu = _trayMenu; _trayMenu = BuildMenu(); _menuSignature = signature;
             // Wait until ToolStrip's closing stack has unwound before disposal.
             if (oldMenu is not null) SynchronizationContext.Current?.Post(_ => oldMenu.Dispose(), null);
         }
