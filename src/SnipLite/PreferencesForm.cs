@@ -432,7 +432,9 @@ internal sealed partial class PreferencesForm : Form
                 new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);
         var blockWidth = iconSize + gap + maxTextWidth;
         var navRect = new Rectangle(Px(10), 0, Px(SidebarW - 20), 0);
-        var blockLeft = navRect.Left + Math.Max(Px(6), (navRect.Width - blockWidth) / 2);
+        // Center the label column, not the whole block: subtract half of the icon
+        // and gap so the text shares the header's vertical center line.
+        var blockLeft = navRect.Left + Math.Max(Px(6), (navRect.Width - blockWidth) / 2 - (iconSize + gap) / 2);
 
         foreach (var (rect, index) in _tabRects)
         {
