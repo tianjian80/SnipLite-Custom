@@ -8,6 +8,10 @@ internal sealed partial class PreferencesForm
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Func<Keys, bool>? HotkeyAvailable { get; set; }
 
+    /// <summary>Shared width for the General page pickers; fits the longest engine label.</summary>
+    private int ChooserWidth => Math.Max(Px(270),
+        TextRenderer.MeasureText("本地增强（中英自动识别）", Font).Width + Px(56));
+
     private void SubPages(string[] names, params Action[] pages)
     {
         var selected = Math.Clamp(_subPages[_selected], 0, pages.Length - 1);
@@ -35,10 +39,10 @@ internal sealed partial class PreferencesForm
     private void Flag(string label, string name) => Check(label, (bool)Value(name), value => Set(name, value));
     private void Number(string label, string name, int min, int max, string suffix = "")
         => Row(label, MakeNumber(min, max, Convert.ToInt32(Value(name)), 140, value => Set(name, value)), MakeStatic(suffix));
-    private void Choice(string label, string name, string[] labels, object[] values)
+    private void Choice(string label, string name, string[] labels, object[] values, int width = 0, bool center = false)
     {
         var value = Value(name);
-        Row(label, MakeChooser(labels, Math.Max(0, Array.IndexOf(values, value)), index => Set(name, values[index])));
+        Row(label, MakeChooser(labels, Math.Max(0, Array.IndexOf(values, value)), index => Set(name, values[index]), width, center));
     }
     private void ColorRow(string label, string name)
     {
@@ -91,9 +95,10 @@ internal sealed partial class PreferencesForm
         Section("语言与识别", () => { });
         Choice("显示语言", nameof(_s.DisplayLanguage),
             new[] { UiText.T("跟随系统") }.Concat(Localization.LanguageService.Languages.Select(l => l.NativeName)).ToArray(),
-            new object[] { Localization.LanguageService.SystemDefault }.Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray());
-        Choice("识别引擎", nameof(_s.OcrEngine), new[] { "本地增强（中英自动识别）", "Windows 系统识别" }, new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows });
-        Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" });
+            new object[] { Localization.LanguageService.SystemDefault }.Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray(),
+            ChooserWidth, true);
+        Choice("识别引擎", nameof(_s.OcrEngine), new[] { "本地增强（中英自动识别）", "Windows 系统识别" }, new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows }, ChooserWidth, true);
+        Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, ChooserWidth, true);
         var translationServices = TranslationProviders.Choices.Select(choice => choice.Kind).ToArray();
         var translationLabels = TranslationProviders.Choices.Select(choice => choice.Label).ToArray();
         int CurrentServiceIndex() => Math.Max(0, Array.IndexOf(translationServices, _s.TranslationProvider));
@@ -116,7 +121,7 @@ internal sealed partial class PreferencesForm
                 Set(nameof(_s.TranslationProvider), requested);
                 if (!translationService.IsDisposed) translationService.Text = UiText.T(translationLabels[index]);
             });
-        });
+        }, ChooserWidth, true);
         var configureTranslator = new FluentButton();
         StyleButton(configureTranslator, "配置微软密钥");
         configureTranslator.Click += (_, _) =>

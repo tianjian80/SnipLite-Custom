@@ -885,7 +885,7 @@ internal sealed partial class PreferencesForm : Form
     /// that opens the same menu the tray uses. The native flat ComboBox loses
     /// its text while unfocused, and its blue selection fights the palette.
     /// </summary>
-    private Button MakeChooser(string[] options, int selected, Action<int> onChange)
+    private Button MakeChooser(string[] options, int selected, Action<int> onChange, int width = 0, bool center = false)
     {
         // Language names stay in their native scripts so users can always find their language.
         var nativeLanguages = options.SequenceEqual(new[] { UiText.T("跟随系统") }
@@ -900,9 +900,9 @@ internal sealed partial class PreferencesForm : Form
             FlatStyle = FlatStyle.Flat,
             BackColor = Field,
             ForeColor = Ink,
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = center ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleLeft,
             Padding = new Padding(Px(8), 0, Px(26), 0),
-            Width = Px(190),
+            Width = width > 0 ? width : Px(190),
             Height = FieldHeight,
             TabStop = true
         };
@@ -931,6 +931,7 @@ internal sealed partial class PreferencesForm : Form
             items[i].Tag = null;
             if (nativeLanguages) items[i].Tag = "localization:native";
             items[i].Text = options[i];
+            if (center) items[i].TextAlign = ContentAlignment.MiddleCenter;
 
             menu.Items.Add(items[i]);
         }
