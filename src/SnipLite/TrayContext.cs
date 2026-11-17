@@ -97,11 +97,16 @@ internal sealed class TrayContext : ApplicationContext
     {
         var menu = _trayMenu;
         if (menu is null) return;
+        menu.AutoClose = true;
         var screen = Screen.FromPoint(Cursor.Position);
         var width = menu.GetPreferredSize(Size.Empty).Width;
         var x = Cursor.Position.X;
         if (x + width > screen.Bounds.Right) x = screen.Bounds.Right - width;
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
+        // A drop-down shown without a foreground owner never receives the
+        // outside-click notification that closes it, so claim foreground for the
+        // menu itself once its handle exists.
+        if (menu.IsHandleCreated) Win32.SetForegroundWindow(menu.Handle);
     }
 
     /// <summary>The preferences hotkey toggles: visible window closes, otherwise it opens.</summary>
