@@ -22,7 +22,7 @@ internal sealed partial class PreferencesForm
             button.Click += (_, _) => { _subPages[_selected] = index; ShowTab(_selected); };
             _page.Controls.Add(button); x += button.Width + Px(4);
         }
-        _y += Px(44);
+        _y += Math.Max(Px(44), FieldHeight + Px(12));
         _captions = false;
         pages[selected]();
     }
@@ -467,13 +467,13 @@ internal sealed partial class PreferencesForm
                 // Custom row: the toggle is pinned to the card's right edge so its
                 // Right matches the "启用全局快捷键" toggle exactly, and the caption
                 // sits immediately to its left without ever being ellipsized.
-                var height = Math.Max(Px(RowH), Px(ControlH) + Px(22));
+                var height = AdaptiveRowHeight(Math.Max(Px(38), TextHeight));
                 var card = NewSettingRow(height);
                 AddRowIcon(card, label);
                 card.Controls.Add(new Label
                 {
                     Text = label, AutoSize = false, AutoEllipsis = true,
-                    Bounds = new Rectangle(Px(48), Px(6), Px(LabelW - 52), height - Px(12)),
+                    Bounds = new Rectangle(Px(48), Px(10), Px(LabelW - 52), height - Px(20)),
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 });
 

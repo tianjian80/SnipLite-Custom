@@ -198,6 +198,12 @@ internal sealed partial class PreferencesForm : Form
 
     private int Px(int value) => (int)Math.Round(value * _ui);
 
+    // Rows scale with the configured interface font instead of a hard-coded
+    // height, so larger fonts and high-DPI scaling keep comfortable padding.
+    private int TextHeight => TextRenderer.MeasureText("国Ag", Font).Height;
+    private int FieldHeight => Math.Max(Px(ControlH), TextHeight + Px(12));
+    private int AdaptiveRowHeight(int contentHeight) => Math.Max(Px(44), contentHeight + Px(20));
+
     private Rectangle PageRect() => new(
         Px(SidebarW + 22),
         Px(86),
@@ -757,19 +763,21 @@ internal sealed partial class PreferencesForm : Form
     }
     private void Row(string label, params Control[] controls)
     {
-        var height = Math.Max(Px(RowH), controls.Select(c => c.Height + Px(22)).DefaultIfEmpty(0).Max());
+        var content = Math.Max(controls.Select(c => c.Height).DefaultIfEmpty(0).Max(), TextHeight);
+        if (controls.Any(c => c is TextBoxBase or NumericUpDown)) content = Math.Max(content, FieldHeight);
+        var height = AdaptiveRowHeight(content);
         var card = NewSettingRow(height);
         if (label.Length > 0)
         {
             AddRowIcon(card, label);
-            card.Controls.Add(new Label { Text = label, AutoSize = false, AutoEllipsis = true, Bounds = new Rectangle(Px(48), Px(6), Px(LabelW - 52), height - Px(12)),
+            card.Controls.Add(new Label { Text = label, AutoSize = false, AutoEllipsis = true, Bounds = new Rectangle(Px(48), Px(10), Px(LabelW - 52), height - Px(20)),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent });
         }
         var x = Px(LabelW + ControlGap);
         foreach (var original in controls)
         {
             if (string.IsNullOrEmpty(original.AccessibleName)) original.AccessibleName = label;
-            var control = original is TextBoxBase or NumericUpDown ? new FluentInputFrame(original) { Height = Px(ControlH) } : original;
+            var control = original is TextBoxBase or NumericUpDown ? new FluentInputFrame(original) { Height = FieldHeight } : original;
             control.Location = new Point(x, Math.Max(0, (height - control.Height) / 2));
             if (control.Width > card.Width - x - Px(14)) control.Width = Math.Max(Px(40), card.Width - x - Px(14));
             if (string.IsNullOrEmpty(control.AccessibleName)) control.AccessibleName = label;
@@ -812,13 +820,13 @@ internal sealed partial class PreferencesForm : Form
 
     private void Check(string text, bool value, Action<bool> onChange)
     {
-        var card = NewSettingRow(Px(CheckH));
+        var card = NewSettingRow(AdaptiveRowHeight(Math.Max(TextHeight, Px(38))));
         AddRowIcon(card, text);
         var box = new FluentToggle
         {
             Text = text,
             AutoSize = false,
-            Bounds = new Rectangle(Px(48), Px(8), card.Width - Px(62), card.Height - Px(16)),
+            Bounds = new Rectangle(Px(48), Px(10), card.Width - Px(62), card.Height - Px(20)),
             BackColor = AppTheme.Current.Card,
             ForeColor = Ink,
             Checked = value
@@ -827,7 +835,7 @@ internal sealed partial class PreferencesForm : Form
         box.CheckedChanged += (_, _) => onChange(box.Checked);
 
         card.Controls.Add(box);
-        _y += Px(CheckH + 6);
+        _y += card.Height + Px(6);
     }
 
     private void AddLabel(string text, int x, int y, int width)
@@ -895,7 +903,7 @@ internal sealed partial class PreferencesForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(Px(8), 0, Px(26), 0),
             Width = Px(190),
-            Height = Px(ControlH),
+            Height = FieldHeight,
             TabStop = true
         };
 
@@ -984,9 +992,9 @@ internal sealed partial class PreferencesForm : Form
         button.FlatAppearance.BorderColor = FieldEdge;
         button.FlatAppearance.MouseOverBackColor = AppTheme.Current.Hover;
         button.FlatAppearance.MouseDownBackColor = AppTheme.Current.AccentSoft;
-        button.Height = Px(ControlH);
         using var metrics = IsHandleCreated ? CreateGraphics() : null;
         var measured = metrics is null ? TextRenderer.MeasureText(text, Font) : TextRenderer.MeasureText(metrics, text, Font);
+        button.Height = Math.Max(Px(ControlH), measured.Height + Px(10));
         button.Width = measured.Width + Px(28);
     }
 
@@ -994,7 +1002,7 @@ internal sealed partial class PreferencesForm : Form
     {
         var button = new FluentButton();
         StyleButton(button, text);
-        button.Bounds = new Rectangle(x, _y, button.Width, Px(28));
+        button.Bounds = new Rectangle(x, _y, button.Width, Math.Max(Px(28), TextHeight + Px(8)));
         button.Click += (_, _) => action();
 
         _page.Controls.Add(button);
