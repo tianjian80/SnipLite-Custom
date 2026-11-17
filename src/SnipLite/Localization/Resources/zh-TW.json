@@ -414,8 +414,10 @@
   "ui.24ab6e8657e9": "Translator 密鑰",
   "ui.625cfaca0f11": "WAV 音效|*.wav",
   "ui.dee70307d1fe": "Windows 系統識別",
-  "布局": "佈局",
-  "撤销（Ctrl+Z）": "復原（Ctrl+Z）",
-  "重做（Ctrl+Y）": "重做（Ctrl+Y）",
-  "自定义截屏工具栏显示的按钮": "自訂截圖工具列顯示的按鈕"
+  "ui.3f8a2d6c9b14": "佈局",
+  "ui.8c4e1b7f2a63": "復原（Ctrl+Z）",
+  "ui.6d2a9f4e8c57": "重做（Ctrl+Y）",
+  "ui.1b7c5e3a9d42": "自訂截圖工具列顯示的按鈕",
+  "ui.5e7b3a9c1d26": "橡皮擦（X）",
+  "ui.9a4c2e7b6d18": "文字辨識（OCR）"
 }

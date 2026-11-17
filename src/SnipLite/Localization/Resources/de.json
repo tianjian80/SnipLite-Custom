@@ -414,8 +414,10 @@
   "ui.24ab6e8657e9": "Übersetzerschlüssel",
   "ui.625cfaca0f11": "WAV-Soundeffekt|*.wav",
   "ui.dee70307d1fe": "Windows OCR",
-  "布局": "Layout",
-  "撤销（Ctrl+Z）": "Rückgängig (Ctrl+Z)",
-  "重做（Ctrl+Y）": "Wiederholen (Ctrl+Y)",
-  "自定义截屏工具栏显示的按钮": "Schaltflächen der Aufnahmesymbolleiste wählen"
+  "ui.3f8a2d6c9b14": "Layout",
+  "ui.8c4e1b7f2a63": "Rückgängig (Ctrl+Z)",
+  "ui.6d2a9f4e8c57": "Wiederholen (Ctrl+Y)",
+  "ui.1b7c5e3a9d42": "Schaltflächen der Aufnahmesymbolleiste wählen",
+  "ui.5e7b3a9c1d26": "Radierer (X)",
+  "ui.9a4c2e7b6d18": "Texterkennung (OCR)"
 }

@@ -146,6 +146,7 @@ internal sealed class FluentButton : Button
         ResizeRedraw = true;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
     }
+    protected override bool ShowFocusCues => false;
     protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnPaint(PaintEventArgs e)
@@ -174,6 +175,7 @@ internal sealed class FluentToggle : CheckBox
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         AccessibleRole = AccessibleRole.CheckButton;
     }
+    protected override bool ShowFocusCues => false;
     protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
