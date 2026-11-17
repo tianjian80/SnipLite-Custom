@@ -422,6 +422,18 @@ internal sealed partial class PreferencesForm : Form
 
         if (_tabRects.Count == 0) LayoutTabs(g);
 
+        // Center the icon + gap + label block as one unit. Using the widest label
+        // for every row keeps the icon column and the text column aligned.
+        var iconSize = Px(20);
+        var gap = Px(11);
+        var maxTextWidth = 0;
+        foreach (var tab in _tabs)
+            maxTextWidth = Math.Max(maxTextWidth, TextRenderer.MeasureText(g, UiText.T(tab, _s.DisplayLanguage), Font,
+                new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);
+        var blockWidth = iconSize + gap + maxTextWidth;
+        var navRect = new Rectangle(Px(10), 0, Px(SidebarW - 20), 0);
+        var blockLeft = navRect.Left + Math.Max(Px(6), (navRect.Width - blockWidth) / 2);
+
         foreach (var (rect, index) in _tabRects)
         {
             var active = index == _selected;
@@ -438,9 +450,9 @@ internal sealed partial class PreferencesForm : Form
                 using var path = FluentDrawing.Rounded(new Rectangle(rect.Left, rect.Top + Px(10), Px(3), rect.Height - Px(20)), Px(2));
                 g.FillPath(indicator, path);
             }
-            FluentIcons.Draw(g, TabIcons[index], new Rectangle(rect.X + Px(12), rect.Y + Px(8), Px(20), Px(20)), Ink);
+            FluentIcons.Draw(g, TabIcons[index], new Rectangle(blockLeft, rect.Y + Px(8), iconSize, iconSize), Ink);
             TextRenderer.DrawText(g, UiText.T(_tabs[index], _s.DisplayLanguage), Font,
-                new Rectangle(rect.X + Px(43), rect.Y, rect.Width - Px(47), rect.Height), Ink,
+                new Rectangle(blockLeft + iconSize + gap, rect.Y, maxTextWidth + Px(6), rect.Height), Ink,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
         var lineHeight = TextRenderer.MeasureText(g, "Ag", Font, new Size(int.MaxValue, int.MaxValue),
