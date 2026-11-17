@@ -14,6 +14,7 @@ internal sealed class TrayContext : ApplicationContext
     private bool _editingHotkey;
     private string _hotkeySignature = "";
     private string _menuSignature = "";
+    private bool _trayDisposed;
     private uint? _lastPasteSequence;
 
     public TrayContext(bool captureOnStart = false, int openPreferencesTab = -1, bool openMenu = false)
@@ -21,6 +22,7 @@ internal sealed class TrayContext : ApplicationContext
         _settings = AppSettings.Load();
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
         _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = "SnipLite", Visible = true };
+        Application.ApplicationExit += (_, _) => DisposeTrayIcon();
         AppTheme.Changed += RefreshTheme;
         _tray.DoubleClick += (_, _) => StartCapture(CaptureMode.Snip);
         // The menu is shown manually so it can always open towards the right of
@@ -131,6 +133,7 @@ internal sealed class TrayContext : ApplicationContext
         }
         _prefs = new PreferencesForm(_settings, tab);
         _prefs.Applied += ApplySettings;
+        _prefs.ExitRequested = Exit;
         _prefs.HotkeyAvailable = _hotkeys.CanRegister;
         _prefs.HotkeyEditing += editing => { _editingHotkey = editing; _hotkeySignature = ""; ApplyHotkeys(); };
         _prefs.FormClosed += (_, _) => { _prefs = null; _editingHotkey = false; _hotkeySignature = ""; ApplyHotkeys(); };
@@ -357,8 +360,19 @@ internal sealed class TrayContext : ApplicationContext
         AppTheme.Changed -= RefreshTheme;
         _themeMonitor.Dispose();
         _languageMonitor.Dispose();
-        _tray.Visible = false; var icon = _tray.Icon; _tray.Dispose(); icon?.Dispose();
+        _tray.Visible = false; DisposeTrayIcon();
         _overlay?.Close(); _prefs?.Close(); _hotkeys.Dispose(); PinForm.CloseAllForExit(); ExitThread();
+    }
+
+    /// <summary>Removes the tray icon immediately so Windows leaves no ghost behind.</summary>
+    private void DisposeTrayIcon()
+    {
+        if (_trayDisposed) return;
+        _trayDisposed = true;
+        var icon = _tray.Icon;
+        _tray.Visible = false;
+        _tray.Dispose();
+        icon?.Dispose();
     }
     private void RefreshTheme()
     {

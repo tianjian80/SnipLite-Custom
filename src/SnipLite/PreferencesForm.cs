@@ -121,6 +121,10 @@ internal sealed partial class PreferencesForm : Form
     /// <summary>Raised after an option changed, so the tray can re-apply hotkeys etc.</summary>
     public event Action? Applied;
 
+    /// <summary>Quits the app; the owner disposes the tray icon before exiting.</summary>
+    public Action? ExitRequested;
+    private bool _exiting;
+
     public PreferencesForm(AppSettings settings, int startTab = 0)
     {
         _s = settings;
@@ -288,7 +292,7 @@ internal sealed partial class PreferencesForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         SaveBounds();
-        if (e.CloseReason == CloseReason.UserClosing)
+        if (e.CloseReason == CloseReason.UserClosing && !_exiting)
         {
             if (_s.CloseButtonAction == CloseButtonAction.MinimizeToTray)
             {
@@ -296,9 +300,16 @@ internal sealed partial class PreferencesForm : Form
                 Hide();
                 return;
             }
-            // "直接关闭" quits the whole app; the tray menu's exit path never
-            // passes through here and always terminates as before.
-            Application.Exit();
+            // "直接关闭" quits the whole app. Let the owner dispose the tray icon
+            // first, otherwise Windows keeps a ghost icon until the mouse hovers it.
+            e.Cancel = true;
+            _exiting = true;
+            BeginInvoke(() =>
+            {
+                if (ExitRequested is not null) ExitRequested();
+                else Application.Exit();
+            });
+            return;
         }
         base.OnFormClosing(e);
     }
@@ -1033,15 +1044,36 @@ internal sealed partial class PreferencesForm : Form
         button.Width = measured.Width + Px(28);
     }
 
-    private void AddButton(int x, string text, Action action)
+    private void AddButton(int x, string text, Action action, string? hint = null)
     {
         var button = new FluentButton();
         StyleButton(button, text);
-        button.Bounds = new Rectangle(x, _y, button.Width, Math.Max(Px(28), TextHeight + Px(8)));
+        var top = _y;
+        button.Bounds = new Rectangle(x, top, button.Width, Math.Max(Px(28), TextHeight + Px(8)));
         button.Click += (_, _) => action();
 
         _page.Controls.Add(button);
-        _y += Px(RowH + 2);
+        if (hint is null)
+        {
+            _y = top + Px(RowH + 2);
+            return;
+        }
+
+        // Keep the explainer right under its button instead of one row lower.
+        hint = UiText.T(hint, _s.DisplayLanguage);
+        var hintHeight = Math.Max(Px(22), TextRenderer.MeasureText(hint, Font,
+            new Size(ContentWidth(), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + Px(4));
+        var hintTop = button.Bottom + Px(7);
+        _page.Controls.Add(new Label
+        {
+            Text = hint,
+            AutoSize = false,
+            Bounds = new Rectangle(_labelX, hintTop, ContentWidth(), hintHeight),
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Hint,
+            BackColor = Page
+        });
+        _y = hintTop + hintHeight + Px(10);
     }
 
     private static string Hex(Color color) =>
