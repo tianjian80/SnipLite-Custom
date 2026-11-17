@@ -229,9 +229,9 @@ internal sealed partial class PreferencesForm
         HintText("界面与图标跟随 Windows 浅色 / 深色模式，切换后即时生效。");
         FontRow("界面字体", nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
         ColorRow("主题颜色", nameof(_s.AccentArgb));
-        Choice("托盘图标", nameof(_s.TrayIconStyle), new[] { "自动", "彩色", "自定义" }, new object[] { "Auto", "Color", "Custom" });
-        Value(nameof(_s.CustomTrayIcon));
-        AddButton(_controlX, "选择图标文件…", () =>
+        var trayStyle = Value(nameof(_s.TrayIconStyle));
+        var iconButton = new FluentButton(); StyleButton(iconButton, "选择图标文件…");
+        iconButton.Click += (_, _) =>
         {
             using var dialog = new OpenFileDialog { Filter = UiText.T("图标与图片|*.ico;*.png;*.bmp"), CheckFileExists = true };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -241,7 +241,14 @@ internal sealed partial class PreferencesForm
                 _s.CustomTrayIcon = dialog.FileName; Set(nameof(_s.TrayIconStyle), "Custom"); ShowTab(_selected);
             }
             catch (Exception ex) { Toast.Error("图标无法读取：" + ex.Message); }
-        }, "自定义图标仅在本机读取，不会复制或上传。");
+        };
+        // Keep the picker and its button on one line, like the translation row.
+        var trayStyles = new[] { "Auto", "Color", "Custom" };
+        var trayWidth = Math.Min(ChooserWidth, Math.Max(Px(150), FillWidth() - iconButton.Width - Px(ControlGap)));
+        Row("托盘图标", MakeChooser(new[] { "自动", "彩色", "自定义" },
+            Math.Max(0, Array.IndexOf(trayStyles, trayStyle)), index => Set(nameof(_s.TrayIconStyle), trayStyles[index]),
+            trayWidth, true), iconButton);
+        Value(nameof(_s.CustomTrayIcon));
         Choice("关闭程序", nameof(_s.CloseButtonAction),
             new[] { "最小化到托盘", "直接关闭" },
             new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit }, ChooserWidth, true);
