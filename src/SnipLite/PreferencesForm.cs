@@ -288,6 +288,18 @@ internal sealed partial class PreferencesForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         SaveBounds();
+        if (e.CloseReason == CloseReason.UserClosing)
+        {
+            if (_s.CloseButtonAction == CloseButtonAction.MinimizeToTray)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
+            // "直接关闭" quits the whole app; the tray menu's exit path never
+            // passes through here and always terminates as before.
+            Application.Exit();
+        }
         base.OnFormClosing(e);
     }
 

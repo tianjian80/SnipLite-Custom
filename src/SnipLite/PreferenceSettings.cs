@@ -5,6 +5,7 @@ namespace SnipLite;
 internal enum CaptureAction { Copy, Pin, QuickSave, None }
 internal enum PointerGesture { None, LeftDoubleClick, MiddleClick, RightClick, LeftClick }
 internal enum RightClickBehavior { QuickSave, ExitCapture, ShowMenu, SaveFile, None }
+internal enum CloseButtonAction { MinimizeToTray, Exit }
 internal sealed record MouseBinding(Keys Modifiers, PointerGesture Gesture);
 
 internal sealed partial class AppSettings
@@ -19,6 +20,8 @@ internal sealed partial class AppSettings
     public float InterfaceFontSize { get; set; } = 9;
     public string TrayIconStyle { get; set; } = "Auto";
     public string CustomTrayIcon { get; set; } = "";
+    /// <summary>What the title-bar close button does: hide to tray or quit the app.</summary>
+    public CloseButtonAction CloseButtonAction { get; set; } = CloseButtonAction.MinimizeToTray;
     public bool ColorHex { get; set; }
     public bool ColorHideHash { get; set; }
     public bool ColorUppercase { get; set; } = true;
@@ -140,5 +143,6 @@ internal sealed partial class AppSettings
         if (string.IsNullOrWhiteSpace(InterfaceFont)) InterfaceFont = "Microsoft YaHei UI";
         if (string.IsNullOrWhiteSpace(TextImageFont)) TextImageFont = "Microsoft YaHei UI";
         if (!Enum.IsDefined(RightClickAction)) RightClickAction = RightClickBehavior.QuickSave;
+        if (!Enum.IsDefined(CloseButtonAction)) CloseButtonAction = CloseButtonAction.MinimizeToTray;
     }
 }

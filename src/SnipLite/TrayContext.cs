@@ -123,6 +123,7 @@ internal sealed class TrayContext : ApplicationContext
     {
         if (_prefs is { IsDisposed: false })
         {
+            if (!_prefs.Visible) _prefs.Show();
             if (_prefs.WindowState == FormWindowState.Minimized) _prefs.WindowState = FormWindowState.Normal;
             _prefs.Activate(); _prefs.SelectTab(tab); _prefs.BringToFront();
             Win32.SetForegroundWindow(_prefs.Handle);

@@ -243,6 +243,9 @@ internal sealed partial class PreferencesForm
             catch (Exception ex) { Toast.Error("图标无法读取：" + ex.Message); }
         });
         HintText("自定义图标仅在本机读取，不会复制或上传。");
+        Choice("关闭按钮行为", nameof(_s.CloseButtonAction),
+            new[] { "最小化到托盘", "直接关闭" },
+            new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit }, ChooserWidth, true);
     }
     private void MagnifierPage()
     {
