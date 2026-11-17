@@ -419,5 +419,7 @@
   "ui.6d2a9f4e8c57": "Rehacer (Ctrl+Y)",
   "ui.1b7c5e3a9d42": "Elegir los botones de la barra de captura",
   "ui.5e7b3a9c1d26": "Borrador (X)",
-  "ui.9a4c2e7b6d18": "Reconocimiento de texto (OCR)"
+  "ui.9a4c2e7b6d18": "Reconocimiento de texto (OCR)",
+  "ui.4d6f8a2c9e31": "Deshacer",
+  "ui.7c3b5a1e8f92": "Rehacer"
 }

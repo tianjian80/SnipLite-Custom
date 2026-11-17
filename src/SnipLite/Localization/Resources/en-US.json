@@ -419,5 +419,7 @@
   "ui.6d2a9f4e8c57": "Redo (Ctrl+Y)",
   "ui.1b7c5e3a9d42": "Choose which buttons the capture toolbar shows",
   "ui.5e7b3a9c1d26": "Eraser (X)",
-  "ui.9a4c2e7b6d18": "Text recognition (OCR)"
+  "ui.9a4c2e7b6d18": "Text recognition (OCR)",
+  "ui.4d6f8a2c9e31": "Undo",
+  "ui.7c3b5a1e8f92": "Redo"
 }

@@ -619,13 +619,13 @@ internal sealed partial class PreferencesForm
             ("橡皮擦（X）", nameof(_s.ShowToolEraser), "eraser"));
         Section("辅助识别", () => { });
         GridCheck(
-            ("文字识别（OCR）", nameof(_s.ShowToolOcr), "ocr"),
+            ("文字识别", nameof(_s.ShowToolOcr), "ocr"),
             ("截图翻译", nameof(_s.ShowToolTranslate), "translate"),
             ("二维码识别", nameof(_s.ShowToolQr), "qr"));
         Section("动作操作", () => { });
         GridCheck(
-            ("撤销（Ctrl+Z）", nameof(_s.ShowToolUndo), "undo"),
-            ("重做（Ctrl+Y）", nameof(_s.ShowToolRedo), "redo"),
+            ("撤销", nameof(_s.ShowToolUndo), "undo"),
+            ("重做", nameof(_s.ShowToolRedo), "redo"),
             ("取消截图", nameof(_s.ShowToolClose), "close"),
             ("贴图", nameof(_s.ShowToolPin), "pin"),
             ("保存", nameof(_s.ShowToolSave), "save"),
