@@ -83,6 +83,16 @@ internal sealed class TrayContext : ApplicationContext
         return menu;
     }
 
+    /// <summary>The preferences hotkey toggles: visible window closes, otherwise it opens.</summary>
+    private void TogglePreferences()
+    {
+        if (_prefs is { IsDisposed: false } prefs && prefs.Visible && prefs.WindowState != FormWindowState.Minimized)
+        {
+            prefs.Close();
+            return;
+        }
+        ShowPreferences(0);
+    }
     private void ShowPreferences(int tab)
     {
         if (_prefs is { IsDisposed: false })
@@ -128,7 +138,7 @@ internal sealed class TrayContext : ApplicationContext
         var handlers = new Dictionary<string, Action>
         {
             [nameof(_settings.CaptureHotkey)] = () => StartCapture(CaptureMode.Snip),
-            [nameof(_settings.PreferencesHotkey)] = () => ShowPreferences(0),
+            [nameof(_settings.PreferencesHotkey)] = TogglePreferences,
             [nameof(_settings.CopyCaptureHotkey)] = () => StartCapture(CaptureMode.Snip, true),
             [nameof(_settings.CustomCaptureHotkey)] = CustomCapture,
             [nameof(_settings.PinHotkey)] = PasteFromClipboard,
