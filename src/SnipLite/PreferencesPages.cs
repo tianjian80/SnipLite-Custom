@@ -230,7 +230,7 @@ internal sealed partial class PreferencesForm
         FontRow("界面字体", nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
-        var iconButton = new FluentButton(); StyleButton(iconButton, "选择图标文件…");
+        var iconButton = new FluentButton(); StyleButton(iconButton, "选择图标文件");
         iconButton.Click += (_, _) =>
         {
             using var dialog = new OpenFileDialog { Filter = UiText.T("图标与图片|*.ico;*.png;*.bmp"), CheckFileExists = true };

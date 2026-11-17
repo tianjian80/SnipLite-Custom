@@ -24,7 +24,6 @@ internal sealed class TrayContext : ApplicationContext
         _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = "SnipLite", Visible = true };
         Application.ApplicationExit += (_, _) => DisposeTrayIcon();
         AppTheme.Changed += RefreshTheme;
-        _tray.DoubleClick += (_, _) => StartCapture(CaptureMode.Snip);
         // The menu is shown manually so it can always open towards the right of
         // the cursor instead of letting WinForms flip it left in the right half.
         _tray.MouseUp += (_, e) => { if (e.Button == MouseButtons.Right) ShowTrayMenu(); };
