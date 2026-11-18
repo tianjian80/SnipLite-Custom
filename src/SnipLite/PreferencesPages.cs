@@ -804,30 +804,16 @@ internal sealed partial class PreferencesForm
         }
 
         var pinned = nameof(AppSettings.CustomCaptureHotkey);
-        var placed = new HashSet<string> { pinned };
+        // Hidden rows keep their bindings and tray menu behaviour, they just leave the page.
+        var hidden = new HashSet<string> { nameof(AppSettings.TogglePinsHotkey), nameof(AppSettings.SwitchGroupHotkey), pinned };
 
         // Full-width card for the row that also carries the "智能排除任务栏" switch.
         var pinnedLabel = HotkeyDefinitions.Items.First(item => item.Name == pinned).Label;
         PlaceItem(pinnedLabel, pinned, true);
 
-        void Row(params (string Label, string Name)[] items)
-        {
-            var width = (ContentWidth() - gap * (items.Length - 1)) / items.Length;
-            for (var i = 0; i < items.Length; i++)
-            {
-                PlaceItem(items[i].Label, items[i].Name, false, _labelX + i * (width + gap), width);
-                placed.Add(items[i].Name);
-            }
-            _y += cardHeight + gap;
-        }
-
-        // Short captions fit three to a row; the rest keep the roomy two-column grid.
-        Row(("首选项", nameof(AppSettings.PreferencesHotkey)), ("截屏", nameof(AppSettings.CaptureHotkey)),
-            ("长截图", nameof(AppSettings.LongCaptureHotkey)));
-        Row(("录屏", nameof(AppSettings.RecordHotkey)), ("录制 GIF", nameof(AppSettings.GifHotkey)),
-            ("贴图", nameof(AppSettings.PinHotkey)));
-
-        var rest = HotkeyDefinitions.Items.Where(item => !placed.Contains(item.Name)).ToList();
+        // Everything else uses one uniform two-column grid: the roomy cards keep
+        // long combinations such as Ctrl+Alt+S on a single line.
+        var rest = HotkeyDefinitions.Items.Where(item => !hidden.Contains(item.Name)).ToList();
         for (var i = 0; i < rest.Count; i += 2)
         {
             var width = (ContentWidth() - gap) / 2;
