@@ -211,6 +211,10 @@ internal sealed class TrayContext : ApplicationContext
                     // The thumbnail popup is a plain drop-down, not a Form: strip its
                     // taskbar button at the window level as soon as it exists.
                     drop.HandleCreated += (_, _) => ToolWindow.HideTaskbarTab(drop.Handle);
+                    // WinForms adds ▲ / ▼ overflow strips when the hosted item is even a
+                    // pixel taller than the display rectangle. Hide them: the panel has
+                    // its own wheel scrolling, and the bars clip the first/last card.
+                    drop.Layout += (_, _) => HideScrollButtons(drop);
                 }
                 // Size the column to the real gap between the open tray menu and the
                 // right screen edge; the panel scrolls instead of growing off-screen.
@@ -273,6 +277,7 @@ internal sealed class TrayContext : ApplicationContext
                     var dropDown = history.DropDown;
                     if (dropDown is null) return;
                     ToolWindow.HideTaskbarTab(dropDown.Handle);
+                    HideScrollButtons(dropDown);
                     var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
                     var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
                     dropDown.Location = new Point(menu.Bounds.Right, top);
@@ -299,6 +304,80 @@ internal sealed class TrayContext : ApplicationContext
         TrimSeparators(menu.Items);
         UiText.Apply(menu, _settings.DisplayLanguage);
         return menu;
+    }
+
+    /// <summary>
+    /// Hides the internal ▲ / ▼ overflow strips that a drop-down creates when its
+    /// hosted item is a pixel taller than the display rectangle. Their items are
+    /// private, so they are located through the type hierarchy. The hosted panel
+    /// keeps handling the mouse wheel itself.
+    /// </summary>
+    private static void HideScrollButtons(ToolStripDropDown drop)
+    {
+        try
+        {
+            SetPrivate(drop, "RequiresScrollButtons", false);
+            foreach (var name in new[] { "UpScrollButton", "DownScrollButton" })
+            {
+                switch (GetPrivate(drop, name))
+                {
+                    case ToolStripItem item:
+                        item.Visible = false;
+                        item.Available = false;
+                        item.Height = 0;
+                        break;
+                    case Control control:
+                        control.Visible = false;
+                        control.Height = 0;
+                        break;
+                }
+            }
+        }
+        catch
+        {
+            // Purely cosmetic: never let a layout quirk break the tray menu.
+        }
+    }
+
+    private static object? GetPrivate(object target, string name)
+    {
+        for (var type = target.GetType(); type is not null; type = type.BaseType)
+        {
+            const System.Reflection.BindingFlags Flags =
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.DeclaredOnly;
+            var property = type.GetProperty(name, Flags);
+            if (property is not null) return property.GetValue(target);
+            var field = type.GetField(name, Flags);
+            if (field is not null) return field.GetValue(target);
+        }
+        return null;
+    }
+
+    private static void SetPrivate(object target, string name, object value)
+    {
+        for (var type = target.GetType(); type is not null; type = type.BaseType)
+        {
+            const System.Reflection.BindingFlags Flags =
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.DeclaredOnly;
+            var property = type.GetProperty(name, Flags);
+            if (property is { CanWrite: true })
+            {
+                property.SetValue(target, value);
+                return;
+            }
+            var field = type.GetField(name, Flags);
+            if (field is not null)
+            {
+                field.SetValue(target, value);
+                return;
+            }
+        }
     }
 
     /// <summary>Drops separators left dangling when the items around them are hidden.</summary>
