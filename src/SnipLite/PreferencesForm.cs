@@ -314,6 +314,18 @@ internal sealed partial class PreferencesForm : Form
         base.OnFormClosing(e);
     }
 
+    /// <summary>Settings window is a tool window: it must never own a taskbar button.</summary>
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x80;      // WS_EX_TOOLWINDOW
+            cp.ExStyle &= ~0x40000;  // remove WS_EX_APPWINDOW
+            return cp;
+        }
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);

@@ -34,6 +34,18 @@ internal sealed class LongEditForm : Form
     private int _scrollY;
     private int _maxScroll;
 
+    /// <summary>Tool window: no taskbar button and no Alt+Tab entry.</summary>
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x80;      // WS_EX_TOOLWINDOW
+            cp.ExStyle &= ~0x40000;  // remove WS_EX_APPWINDOW
+            return cp;
+        }
+    }
+
     public LongEditForm(Bitmap image, AppSettings settings)
     {
         _image = image;

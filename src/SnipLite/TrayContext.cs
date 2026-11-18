@@ -112,37 +112,49 @@ internal sealed class TrayContext : ApplicationContext
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
-                    // No icon/check gutter and no auto shrinking: the column is exactly 218px.
+                    // No icon/check gutter and no auto shrinking: the column is sized by code.
                     drop.AutoSize = false;
                     drop.ShowImageMargin = false;
                     drop.ShowCheckMargin = false;
-                    drop.Padding = new Padding(4);
+                    drop.Padding = new Padding(6);
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
                 }
-                // Fill from the in-memory thumbnail cache while the parent menu opens:
-                // hovering later never touches disk or decodes a full screenshot.
-                menu.Opening += (_, _) =>
+                // Fill from the in-memory thumbnail cache and size the column to the real gap
+                // between the open tray menu and the right screen edge. No disk I/O here.
+                void FitHistory()
                 {
+                    var screen = menu.Bounds.Width > 0
+                        ? Screen.FromRectangle(menu.Bounds).WorkingArea
+                        : Screen.FromPoint(Cursor.Position).WorkingArea;
+                    var available = menu.Bounds.Width > 0 ? screen.Right - menu.Bounds.Right : 240;
+                    if (menu.Visible && available < 220)
+                    {
+                        menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
+                        available = screen.Right - menu.Bounds.Right;
+                    }
+                    available = Math.Max(160, available);
+                    var cardWidth = Math.Max(120, available - 12);
+                    var cardHeight = Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0));
                     var entries = _history.Entries;
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
-                    if (history.Tag as string == signature) return;
-                    history.Tag = signature;
+                    var key = $"{signature}@{cardWidth}x{cardHeight}";
+                    if (history.Tag as string == key) return;
+                    history.Tag = key;
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
                     history.DropDownItems.Clear();
                     foreach (var item in stale) item.Dispose();
-                    var maxRows = Math.Max(1, (Screen.FromPoint(Cursor.Position).WorkingArea.Height - 48) / 118);
+                    var maxRows = Math.Max(1, (screen.Height - 60) / cardHeight);
                     var shown = Math.Min(entries.Count, maxRows);
                     for (var index = 0; index < shown; index++)
                     {
                         var entry = entries[index];
-                        // Fixed 16:9 landscape card so the dropdown is always wide, never a strip.
                         var row = new ThumbnailRow
                         {
                             Image = entry.Thumbnail,
                             Tag = "thumb",
                             AutoSize = false,
-                            Size = new Size(210, 118),
+                            Size = new Size(cardWidth, cardHeight),
                             Margin = Padding.Empty,
                             Padding = Padding.Empty
                         };
@@ -153,8 +165,12 @@ internal sealed class TrayContext : ApplicationContext
                     if (empty)
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
                     if (history.DropDown is ToolStripDropDownMenu sized)
-                        sized.Size = new Size(218, empty ? 34 : 8 + shown * 118);
-                };
+                        sized.Size = new Size(available, empty ? 36 : 12 + shown * cardHeight);
+                }
+                menu.Opening += (_, _) => FitHistory();
+                // Re-check right after showing: the real menu bounds and screen gap are
+                // known then, so the submenu always ends flush with the screen edge.
+                history.DropDownOpening += (_, _) => FitHistory();
                 menu.Items.Add(history);
             }
             Add(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
@@ -201,7 +217,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        var x = Math.Min(Cursor.Position.X, area.Right - width - 218);
+        var x = Math.Min(Cursor.Position.X, area.Right - width - 240);
         x = Math.Max(area.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         // A drop-down shown without a foreground owner never receives the

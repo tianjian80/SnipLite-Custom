@@ -27,10 +27,10 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
         if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
         {
             using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));
-            // Fixed 198 × 110 preview area, centred inside the 210 × 118 row.
-            var areaWidth = Math.Min(198, Math.Max(1, e.Item.Width - 2));
-            var areaHeight = Math.Min(110, Math.Max(1, e.Item.Height - 2));
-            var area = new Rectangle((e.Item.Width - areaWidth) / 2, (e.Item.Height - areaHeight) / 2, areaWidth, areaHeight);
+            // Landscaped 16:9 card: light grey canvas, fitted screenshot, hairline border.
+            var areaWidth = Math.Max(1, e.Item.Width - 2);
+            var areaHeight = Math.Max(1, e.Item.Height - 2);
+            var area = new Rectangle(1, 1, areaWidth, areaHeight);
             using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, area);
             var inner = new Rectangle(area.X + 1, area.Y + 1, Math.Max(1, area.Width - 2), Math.Max(1, area.Height - 2));
             var scale = Math.Min(inner.Width / (float)thumb.Width, inner.Height / (float)thumb.Height);
