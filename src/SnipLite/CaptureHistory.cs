@@ -7,7 +7,7 @@ internal sealed class CaptureHistory
     internal sealed record Entry(byte[] Png, Rectangle Bounds, DateTime Time)
     {
         public Bitmap Image() { using var stream = new MemoryStream(Png); using var image = new Bitmap(stream); return new Bitmap(image); }
-        public string Label => $"{Time:HH:mm:ss}  {Bounds.Width} × {Bounds.Height}";
+        public string Label => $"{Time:HH:mm}";
     }
     private readonly List<Entry> _entries = new();
     public IReadOnlyList<Entry> Entries => _entries;

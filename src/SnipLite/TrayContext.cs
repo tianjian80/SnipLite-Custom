@@ -71,34 +71,54 @@ internal sealed class TrayContext : ApplicationContext
         {
             if (visible) menu.Items.Add(SnipMenu.Item(text, action, key));
         }
+        // An unbound hotkey shows nothing on the right instead of a "未设置" label.
+        static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
-        Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), HotkeyDefinitions.Format(_settings.CaptureHotkey));
+        Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), Key(_settings.CaptureHotkey));
         if (_settings.EnhancedTrayMenu)
         {
-            Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), HotkeyDefinitions.Format(_settings.CopyCaptureHotkey));
-            Add(_settings.TrayItemFullSave, "全屏截图并自动保存", CustomCapture, HotkeyDefinitions.Format(_settings.CustomCaptureHotkey));
+            Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), Key(_settings.CopyCaptureHotkey));
+            Add(_settings.TrayItemFullSave, "全屏截图并自动保存", CustomCapture, Key(_settings.CustomCaptureHotkey));
         }
-        Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true), HotkeyDefinitions.Format(_settings.LongCaptureHotkey));
-        Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record), HotkeyDefinitions.Format(_settings.RecordHotkey));
-        Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif), HotkeyDefinitions.Format(_settings.GifHotkey));
+        Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true), Key(_settings.LongCaptureHotkey));
+        Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record), Key(_settings.RecordHotkey));
+        Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif), Key(_settings.GifHotkey));
         Add(_settings.TrayItemMouseThrough, "鼠标穿透", PinForm.ToggleMouseThroughActive);
-        Add(_settings.TrayItemPin, "贴图 / 恢复贴图", PasteFromClipboard, HotkeyDefinitions.Format(_settings.PinHotkey));
-        Add(_settings.TrayItemTogglePins, "隐藏 / 显示所有贴图", PinForm.ToggleAll, HotkeyDefinitions.Format(_settings.TogglePinsHotkey));
+        Add(_settings.TrayItemPin, "贴图 / 恢复贴图", PasteFromClipboard, Key(_settings.PinHotkey));
+        Add(_settings.TrayItemTogglePins, "隐藏 / 显示所有贴图", PinForm.ToggleAll, Key(_settings.TogglePinsHotkey));
         if (_settings.EnhancedTrayMenu)
         {
-            Add(_settings.TrayItemSwitchGroup, "切换到另一贴图分组", PinForm.SwitchGroup, HotkeyDefinitions.Format(_settings.SwitchGroupHotkey));
+            Add(_settings.TrayItemSwitchGroup, "切换到另一贴图分组", PinForm.SwitchGroup, Key(_settings.SwitchGroupHotkey));
             Add(_settings.TrayItemRestorePins, "恢复历史贴图", () => PinForm.RestoreLast(_settings));
             Add(_settings.TrayItemClosePins, "关闭全部贴图", PinForm.CloseAll);
             if (_settings.TrayItemHistory)
             {
-                var history = new ToolStripMenuItem(UiText.T("截屏历史"));
-                history.DropDownOpening += (_, _) =>
+                var history = new ToolStripMenuItem(UiText.T("截屏历史"))
                 {
-                    foreach (ToolStripItem item in history.DropDownItems) item.Dispose();
+                    // Open towards the right of the tray menu, not over it.
+                    DropDownDirection = ToolStripDropDownDirection.Right
+                };
+                // Fill from the in-memory metadata cache while the parent menu opens,
+                // so the very first hover shows instantly with no disk or image work.
+                menu.Opening += (_, _) =>
+                {
+                    var entries = _history.Entries;
+                    var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
+                    if (history.Tag as string == signature) return;
+                    history.Tag = signature;
+                    // Replace the rows; disposing after Clear keeps the drop-down stable.
+                    var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
                     history.DropDownItems.Clear();
-                    foreach (var entry in _history.Entries)
-                        history.DropDownItems.Add(SnipMenu.Item(entry.Label, () => PinImage(entry.Image(), entry.Bounds)));
-                    if (history.DropDownItems.Count == 0) history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
+                    foreach (var item in stale) item.Dispose();
+                    foreach (var entry in entries)
+                    {
+                        var row = SnipMenu.Item(entry.Label, () => PinImage(entry.Image(), entry.Bounds));
+                        // Time-only rows: no leading glyph, so the text stays clean.
+                        row.Tag = null;
+                        history.DropDownItems.Add(row);
+                    }
+                    if (history.DropDownItems.Count == 0)
+                        history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
                 };
                 menu.Items.Add(history);
             }
@@ -111,11 +131,11 @@ internal sealed class TrayContext : ApplicationContext
             menu.Items.Add(disable);
             menu.Opening += (_, _) => disable.Checked = !_settings.HotkeysEnabled;
         }
-        Add(_settings.TrayItemOcr, "文字识别", () => StartCapture(CaptureMode.Ocr), HotkeyDefinitions.Format(_settings.OcrHotkey));
-        Add(_settings.TrayItemQr, "二维码识别", () => StartCapture(CaptureMode.Qr), HotkeyDefinitions.Format(_settings.QrHotkey));
+        Add(_settings.TrayItemOcr, "文字识别", () => StartCapture(CaptureMode.Ocr), Key(_settings.OcrHotkey));
+        Add(_settings.TrayItemQr, "二维码识别", () => StartCapture(CaptureMode.Qr), Key(_settings.QrHotkey));
         menu.Items.Add(new ToolStripSeparator());
         // 退出 is permanent: hiding every entry must never lock the user out.
-        Add(_settings.TrayItemPreferences, "首选项…", () => ShowPreferences(0), HotkeyDefinitions.Format(_settings.PreferencesHotkey));
+        Add(_settings.TrayItemPreferences, "首选项…", () => ShowPreferences(0), Key(_settings.PreferencesHotkey));
         Add(_settings.TrayItemAbout, "关于", () => ShowPreferences(9));
         Add(_settings.TrayItemRestart, "重新启动", Restart);
         menu.Items.Add(SnipMenu.Item("退出", Exit));
