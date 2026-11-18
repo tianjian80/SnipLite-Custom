@@ -632,17 +632,9 @@ internal sealed partial class PreferencesForm
 
         // Two equal cards per row keep the whole hotkey list on one screen.
         var gap = Px(10);
-        var cardWidth = (ContentWidth() - gap) / 2;
         var cardHeight = AdaptiveRowHeight(Math.Max(Px(38), TextHeight));
-        var column = 0;
-        void FinishRow()
-        {
-            if (column == 0) return;
-            _y += cardHeight + gap;
-            column = 0;
-        }
 
-        void PlaceItem(string label, string name, bool fullWidth)
+        void PlaceItem(string label, string name, bool fullWidth = false, int left = 0, int width = 0)
         {
             var binding = (Keys)Value(name);
             string BindingText() => _s.HotkeyErrors.TryGetValue(name, out var error)
@@ -748,7 +740,6 @@ internal sealed partial class PreferencesForm
 
             if (fullWidth)
             {
-                FinishRow();
                 var card = NewSettingRow(cardHeight);
                 AddRowIcon(card, label);
                 card.Controls.Add(new Label
@@ -796,12 +787,12 @@ internal sealed partial class PreferencesForm
                 return;
             }
 
-            // Compact half-width card: icon + name on the left, key capsule hugging
-            // the right edge. No button, so the caption stays on a single line.
-            var half = NewSettingRow(column == 0 ? _labelX : _labelX + cardWidth + gap, cardWidth, cardHeight);
+            // Grid card: icon + name on the left, key capsule hugging the right edge.
+            // The caller decides the column geometry so 3- and 2-column rows can mix.
+            var half = NewSettingRow(left, width, cardHeight);
             AddRowIcon(half, label);
-            var right = cardWidth - Px(12);
-            var boxWidth = Math.Max(Px(96), Math.Min(Px(132), cardWidth / 3));
+            var right = width - Px(12);
+            var boxWidth = Math.Max(Px(96), Math.Min(Px(132), width / 3));
             box.SetBounds(right - boxWidth, Math.Max(0, (cardHeight - box.Height) / 2), boxWidth, box.Height);
             half.Controls.Add(box);
             half.Controls.Add(new Label
@@ -810,19 +801,40 @@ internal sealed partial class PreferencesForm
                 Bounds = new Rectangle(Px(36), 0, Math.Max(Px(40), box.Left - Px(36) - Px(8)), cardHeight),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
             });
-
-            column = 1 - column;
-            if (column == 0) _y += cardHeight + gap;
         }
 
-        // A full-width card keeps the extra "智能排除任务栏" switch out of the grid.
         var pinned = nameof(AppSettings.CustomCaptureHotkey);
-        foreach (var (label, name) in HotkeyDefinitions.Items)
-            if (name == pinned) PlaceItem(label, name, true);
-        foreach (var (label, name) in HotkeyDefinitions.Items)
-            if (name != pinned) PlaceItem(label, name, false);
+        var placed = new HashSet<string> { pinned };
 
-        FinishRow();
+        // Full-width card for the row that also carries the "智能排除任务栏" switch.
+        var pinnedLabel = HotkeyDefinitions.Items.First(item => item.Name == pinned).Label;
+        PlaceItem(pinnedLabel, pinned, true);
+
+        void Row(params (string Label, string Name)[] items)
+        {
+            var width = (ContentWidth() - gap * (items.Length - 1)) / items.Length;
+            for (var i = 0; i < items.Length; i++)
+            {
+                PlaceItem(items[i].Label, items[i].Name, false, _labelX + i * (width + gap), width);
+                placed.Add(items[i].Name);
+            }
+            _y += cardHeight + gap;
+        }
+
+        // Short captions fit three to a row; the rest keep the roomy two-column grid.
+        Row(("首选项", nameof(AppSettings.PreferencesHotkey)), ("截屏", nameof(AppSettings.CaptureHotkey)),
+            ("长截图", nameof(AppSettings.LongCaptureHotkey)));
+        Row(("录屏", nameof(AppSettings.RecordHotkey)), ("录制 GIF", nameof(AppSettings.GifHotkey)),
+            ("贴图", nameof(AppSettings.PinHotkey)));
+
+        var rest = HotkeyDefinitions.Items.Where(item => !placed.Contains(item.Name)).ToList();
+        for (var i = 0; i < rest.Count; i += 2)
+        {
+            var width = (ContentWidth() - gap) / 2;
+            PlaceItem(rest[i].Label, rest[i].Name, false, _labelX, width);
+            if (i + 1 < rest.Count) PlaceItem(rest[i + 1].Label, rest[i + 1].Name, false, _labelX + width + gap, width);
+            _y += cardHeight + gap;
+        }
         HintText("点击快捷键框即可录入新组合键，确认后生效。");
     }
     private void ModifierRow(string label, string property)

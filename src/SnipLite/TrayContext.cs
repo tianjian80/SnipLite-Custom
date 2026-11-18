@@ -78,9 +78,9 @@ internal sealed class TrayContext : ApplicationContext
             Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), HotkeyDefinitions.Format(_settings.CopyCaptureHotkey));
             Add(_settings.TrayItemFullSave, "全屏截图并自动保存", CustomCapture, HotkeyDefinitions.Format(_settings.CustomCaptureHotkey));
         }
-        Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true));
-        Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record));
-        Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif));
+        Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true), HotkeyDefinitions.Format(_settings.LongCaptureHotkey));
+        Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record), HotkeyDefinitions.Format(_settings.RecordHotkey));
+        Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif), HotkeyDefinitions.Format(_settings.GifHotkey));
         Add(_settings.TrayItemMouseThrough, "鼠标穿透", PinForm.ToggleMouseThroughActive);
         Add(_settings.TrayItemPin, "贴图 / 恢复贴图", PasteFromClipboard, HotkeyDefinitions.Format(_settings.PinHotkey));
         Add(_settings.TrayItemTogglePins, "隐藏 / 显示所有贴图", PinForm.ToggleAll, HotkeyDefinitions.Format(_settings.TogglePinsHotkey));
