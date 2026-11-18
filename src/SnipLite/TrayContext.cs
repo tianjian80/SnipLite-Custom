@@ -23,14 +23,103 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ThemeMonitor _themeMonitor = new();
     private readonly Localization.LanguageMonitor _languageMonitor;
     private readonly CaptureHistory _history = new();
-    /// <summary>History row that draws a cached thumbnail; never disposes that shared bitmap.</summary>
-    private sealed class ThumbnailRow : ToolStripMenuItem
+    /// <summary>
+    /// Scrollable thumbnail list for the history dropdown. Cards keep a 16:9 shape,
+    /// the wheel scrolls smoothly and no native scrollbar is shown.
+    /// </summary>
+    private sealed class HistoryPanel : Control
     {
-        public ThumbnailRow() : base(string.Empty) { }
-        protected override void Dispose(bool disposing)
+        private const int Pad = 6;
+        private const int Gap = 6;
+        private readonly IReadOnlyList<CaptureHistory.Entry> _entries;
+        private readonly int _cardWidth;
+        private readonly int _cardHeight;
+        private readonly Action<CaptureHistory.Entry> _click;
+        private int _offset;
+        private int _hover = -1;
+
+        public HistoryPanel(IReadOnlyList<CaptureHistory.Entry> entries, Size size, int cardWidth, int cardHeight, Action<CaptureHistory.Entry> click)
         {
-            if (disposing) Image = null;
-            base.Dispose(disposing);
+            _entries = entries;
+            _cardWidth = cardWidth;
+            _cardHeight = cardHeight;
+            _click = click;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
+                | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            BackColor = SnipMenuRenderer.Back;
+            Size = size;
+            TabStop = true;
+        }
+
+        private int Stride => _cardHeight + Gap;
+        private int ContentHeight => Pad * 2 + _entries.Count * _cardHeight + Math.Max(0, _entries.Count - 1) * Gap;
+
+        private int IndexAt(int y)
+        {
+            y += _offset - Pad;
+            if (y < 0) return -1;
+            var index = y / Stride;
+            if (index >= _entries.Count || y % Stride >= _cardHeight) return -1;
+            return index;
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            var hit = IndexAt(e.Y);
+            Cursor = hit >= 0 ? Cursors.Hand : Cursors.Default;
+            if (hit == _hover) return;
+            _hover = hit;
+            Invalidate();
+        }
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            Cursor = Cursors.Default;
+            if (_hover < 0) return;
+            _hover = -1;
+            Invalidate();
+        }
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            var max = Math.Max(0, ContentHeight - Height);
+            var next = Math.Clamp(_offset - e.Delta / 2, 0, max);
+            if (next == _offset) return;
+            _offset = next;
+            Invalidate();
+        }
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (e.Button != MouseButtons.Left) return;
+            var hit = IndexAt(e.Y);
+            if (hit >= 0) _click(_entries[hit]);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(BackColor);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            for (var index = 0; index < _entries.Count; index++)
+            {
+                var top = Pad + index * Stride - _offset;
+                if (top + _cardHeight < 0) continue;
+                if (top > Height) break;
+                var card = new Rectangle(Pad, top, _cardWidth, _cardHeight);
+                using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, card);
+                var thumb = _entries[index].Thumbnail;
+                var scale = Math.Min((card.Width - 2) / (float)thumb.Width, (card.Height - 2) / (float)thumb.Height);
+                var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
+                var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
+                var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
+                g.DrawImage(thumb, rect);
+                using var border = new Pen(index == _hover ? AppTheme.Current.Accent : Color.FromArgb(208, 208, 208), 1f);
+                g.DrawRectangle(border, card.X, card.Y, card.Width - 1, card.Height - 1);
+            }
         }
     }
     private CaptureForm? _overlay;
@@ -112,18 +201,19 @@ internal sealed class TrayContext : ApplicationContext
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
-                    // No icon/check gutter and no auto shrinking: the column is sized by code.
+                    // The hosted panel owns padding, painting and scrolling.
                     drop.AutoSize = false;
                     drop.ShowImageMargin = false;
                     drop.ShowCheckMargin = false;
-                    drop.Padding = new Padding(6);
+                    drop.Padding = Padding.Empty;
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
                 }
-                // Fill from the in-memory thumbnail cache and size the column to the real gap
-                // between the open tray menu and the right screen edge. No disk I/O here.
+                // Size the column to the real gap between the open tray menu and the
+                // right screen edge; the panel scrolls instead of growing off-screen.
                 void FitHistory()
                 {
+                    var dropMenu = (ToolStripDropDownMenu)history.DropDown!;
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
@@ -137,35 +227,36 @@ internal sealed class TrayContext : ApplicationContext
                     var cardWidth = Math.Max(120, available - 12);
                     var cardHeight = Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0));
                     var entries = _history.Entries;
+                    var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
+                    var maxHeight = Math.Max(cardHeight + 12, screen.Height - 16);
+                    var height = Math.Min(contentHeight, maxHeight);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
-                    var key = $"{signature}@{cardWidth}x{cardHeight}";
+                    var key = $"{signature}@{available}x{cardHeight}";
                     if (history.Tag as string == key) return;
                     history.Tag = key;
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
                     history.DropDownItems.Clear();
                     foreach (var item in stale) item.Dispose();
-                    var maxRows = Math.Max(1, (screen.Height - 60) / cardHeight);
-                    var shown = Math.Min(entries.Count, maxRows);
-                    for (var index = 0; index < shown; index++)
+                    if (entries.Count == 0)
                     {
-                        var entry = entries[index];
-                        var row = new ThumbnailRow
-                        {
-                            Image = entry.Thumbnail,
-                            Tag = "thumb",
-                            AutoSize = false,
-                            Size = new Size(cardWidth, cardHeight),
-                            Margin = Padding.Empty,
-                            Padding = Padding.Empty
-                        };
-                        row.Click += (_, _) => PinImage(entry.Image(), entry.Bounds);
-                        history.DropDownItems.Add(row);
-                    }
-                    var empty = shown == 0;
-                    if (empty)
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
-                    if (history.DropDown is ToolStripDropDownMenu sized)
-                        sized.Size = new Size(available, empty ? 36 : 12 + shown * cardHeight);
+                        dropMenu.Size = new Size(available, 40);
+                        return;
+                    }
+                    var panel = new HistoryPanel(entries, new Size(available, height), cardWidth, cardHeight, entry =>
+                    {
+                        history.DropDown?.Close();
+                        menu.Close();
+                        PinImage(entry.Image(), entry.Bounds);
+                    });
+                    history.DropDownItems.Add(new ToolStripControlHost(panel)
+                    {
+                        AutoSize = false,
+                        Size = new Size(available, height),
+                        Margin = Padding.Empty,
+                        Padding = Padding.Empty
+                    });
+                    dropMenu.Size = new Size(available, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Re-check right after showing: the real menu bounds and screen gap are

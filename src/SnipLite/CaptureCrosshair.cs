@@ -3,7 +3,7 @@ namespace SnipLite;
 /// <summary>Thin compositor windows move without repainting the frozen desktop.</summary>
 internal sealed class CaptureCrosshair : IDisposable
 {
-    private sealed class LineWindow : Form
+    private sealed class LineWindow : ToolWindow
     {
         private readonly bool _vertical;
         public LineWindow(Color color, bool vertical)

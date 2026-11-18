@@ -24,25 +24,6 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         // Uniform 16:9 landscape card: light grey canvas, fitted screenshot, hairline border.
-        if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
-        {
-            using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));
-            // Landscaped 16:9 card: light grey canvas, fitted screenshot, hairline border.
-            var areaWidth = Math.Max(1, e.Item.Width - 2);
-            var areaHeight = Math.Max(1, e.Item.Height - 2);
-            var area = new Rectangle(1, 1, areaWidth, areaHeight);
-            using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, area);
-            var inner = new Rectangle(area.X + 1, area.Y + 1, Math.Max(1, area.Width - 2), Math.Max(1, area.Height - 2));
-            var scale = Math.Min(inner.Width / (float)thumb.Width, inner.Height / (float)thumb.Height);
-            var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
-            var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-            var rect = new Rectangle(inner.X + (inner.Width - width) / 2, inner.Y + (inner.Height - height) / 2, width, height);
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.DrawImage(thumb, rect);
-            using var border = new Pen(e.Item.Selected ? AppTheme.Current.Accent : Color.FromArgb(208, 208, 208), 1f);
-            g.DrawRectangle(border, area.X, area.Y, area.Width - 1, area.Height - 1);
-            return;
-        }
         using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));
         if (e.Item.Selected && e.Item.Enabled)
         {

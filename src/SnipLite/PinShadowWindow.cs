@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace SnipLite;
 
 /// <summary>A per-pixel alpha shadow, separate from the exported image.</summary>
-internal sealed class PinShadowWindow : Form
+internal sealed class PinShadowWindow : ToolWindow
 {
     public PinShadowWindow()
     {

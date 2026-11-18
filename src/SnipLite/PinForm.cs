@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace SnipLite;
 
-internal sealed class PinForm : Form
+internal sealed class PinForm : ToolWindow
 {
     private static readonly List<PinForm> Open = new();
     private sealed record HistoryEntry(byte[] Png)

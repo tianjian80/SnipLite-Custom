@@ -1,6 +1,6 @@
 namespace SnipLite;
 
-internal sealed class CaptureRegionForm : Form
+internal sealed class CaptureRegionForm : ToolWindow
 {
     private readonly NumericUpDown[] _numbers;
     public Rectangle RegionBounds => new((int)_numbers[0].Value, (int)_numbers[1].Value, (int)_numbers[2].Value, (int)_numbers[3].Value);

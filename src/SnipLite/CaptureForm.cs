@@ -40,7 +40,7 @@ internal sealed class CaptureResult
 /// then copy / save / pin. All maths are in physical pixels so mixed-DPI
 /// setups behave the same everywhere.
 /// </summary>
-internal sealed partial class CaptureForm : Form
+internal sealed partial class CaptureForm : ToolWindow
 {
     private const int MagnifierSize = 168;
 

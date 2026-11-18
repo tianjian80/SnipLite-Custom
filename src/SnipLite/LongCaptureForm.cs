@@ -13,7 +13,7 @@ namespace SnipLite;
 /// so a new frame only allocates the rows it adds; the full long image is assembled
 /// once, when the user saves or copies.
 /// </summary>
-internal sealed class LongCaptureForm : Form
+internal sealed class LongCaptureForm : ToolWindow
 {
     private const int MatchRows = 20;   // consecutive content rows required to line up
     private const int MinOffset = 10;   // scroll below this many rows is jitter, not content
@@ -977,7 +977,7 @@ internal sealed class LongCaptureForm : Form
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
 }
 
-internal sealed class LongPreviewForm : Form
+internal sealed class LongPreviewForm : ToolWindow
 {
     private readonly LongCaptureForm _owner;
     private readonly PreviewCanvas _canvas;

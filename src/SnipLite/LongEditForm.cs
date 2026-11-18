@@ -8,7 +8,7 @@ namespace SnipLite;
 /// fit-to-width with vertical scrolling and the regular capture tool bar sits at the
 /// bottom, so every annotation tool works on the full-length image.
 /// </summary>
-internal sealed class LongEditForm : Form
+internal sealed class LongEditForm : ToolWindow
 {
     private readonly Bitmap _image;
     private readonly AppSettings _settings;
@@ -33,18 +33,6 @@ internal sealed class LongEditForm : Form
     private float _zoom = 1f;
     private int _scrollY;
     private int _maxScroll;
-
-    /// <summary>Tool window: no taskbar button and no Alt+Tab entry.</summary>
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            var cp = base.CreateParams;
-            cp.ExStyle |= 0x80;      // WS_EX_TOOLWINDOW
-            cp.ExStyle &= ~0x40000;  // remove WS_EX_APPWINDOW
-            return cp;
-        }
-    }
 
     public LongEditForm(Bitmap image, AppSettings settings)
     {

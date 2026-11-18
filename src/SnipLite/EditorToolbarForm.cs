@@ -7,7 +7,7 @@ namespace SnipLite;
 /// It is a separate top-level window, so the editor client area stays pure image, and
 /// it follows the editor's move / resize while scaling its own buttons with the width.
 /// </summary>
-internal sealed class EditorToolbarForm : Form
+internal sealed class EditorToolbarForm : ToolWindow
 {
     private readonly LongEditForm _editor;
     private readonly AnnotationBar _bar;

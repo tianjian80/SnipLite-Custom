@@ -3,7 +3,7 @@ using System.Drawing.Drawing2D;
 namespace SnipLite;
 
 /// <summary>A complete, selectable result. Copy is always an explicit action.</summary>
-internal sealed class RecognitionResultForm : Form
+internal sealed class RecognitionResultForm : ToolWindow
 {
     private static Color Ink => AppTheme.Current.Text;
     private static Color Muted => AppTheme.Current.Muted;

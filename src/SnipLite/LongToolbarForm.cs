@@ -5,7 +5,7 @@ namespace SnipLite;
 /// 编辑 / ↓ 保存 / × 取消 / ✓ 完成. All four buttons are laid out with measured widths,
 /// so nothing is ever clipped.
 /// </summary>
-internal sealed class LongToolbarForm : Form
+internal sealed class LongToolbarForm : ToolWindow
 {
     private readonly LongCaptureForm _owner;
     private readonly float _ui;

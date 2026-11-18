@@ -8,7 +8,7 @@ namespace SnipLite;
 /// control card with the elapsed time, pause / stop / cancel. The card sits outside
 /// the region so it never ends up inside the recorded video.
 /// </summary>
-internal sealed class RecordingForm : Form
+internal sealed class RecordingForm : ToolWindow
 {
     private const int RingThickness = 2;
 
@@ -361,7 +361,7 @@ internal sealed class RecordingForm : Form
         base.OnFormClosed(e);
     }
 
-    private sealed class FrameRing : Form
+    private sealed class FrameRing : ToolWindow
     {
         public FrameRing(Rectangle region, int thickness)
         {
