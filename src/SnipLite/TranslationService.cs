@@ -30,7 +30,7 @@ internal static class TranslationProviders
     /// <summary>Key-free engines, listed in their own preferences card.</summary>
     public static readonly (TranslationProviderKind Kind, string Label)[] FreeChoices =
     {
-        (TranslationProviderKind.Bing, "必应网页翻译"),
+        (TranslationProviderKind.Bing, "必应翻译"),
         (TranslationProviderKind.Google, "谷歌翻译"),
         (TranslationProviderKind.MyMemory, "翻译记忆")
     };

@@ -114,6 +114,27 @@ internal sealed partial class PreferencesForm
         button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
         button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
     }
+    /// <summary>Blue, clickable second line of a dialog hint; opens the page in the default browser.</summary>
+    private static LinkLabel HelpLink(string url)
+    {
+        var link = new LinkLabel
+        {
+            Text = url,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            LinkColor = Color.FromArgb(0, 103, 192),
+            ActiveLinkColor = Color.FromArgb(0, 82, 155),
+            LinkBehavior = LinkBehavior.HoverUnderline,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        link.LinkClicked += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (Exception ex) { Toast.Error(UiText.T("无法打开网页：") + ex.Message); }
+        };
+        return link;
+    }
+
     private void FontRow(string label, string family, string size)
     {
         Value(family); Value(size);
@@ -315,7 +336,7 @@ internal sealed partial class PreferencesForm
 
         using var dialog = new Form
         {
-            Text = "Microsoft Translator",
+            Text = "微软翻译开放平台",
             Font = Font,
             // Everything below is laid out manually in device pixels from DeviceDpi,
             // so WinForms must not scale it a second time.
@@ -351,11 +372,12 @@ internal sealed partial class PreferencesForm
         var regionField = new FluentInputFrame(region) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         var hint = new Label
         {
-            Text = requireKey ? "请输入 Azure Translator 密钥。全局资源可留空区域。" : "全局资源可留空区域；留空密钥并保存可清除配置。",
+            Text = requireKey ? "请输入微软翻译密钥，全局资源可留空区域。" : "在微软翻译开放平台申请区域和密钥",
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
+        var help = HelpLink("https://www.microsoft.com/zh-cn/translator/");
         var save = new FluentButton
         {
             Text = UiText.T("确定"),
@@ -370,7 +392,7 @@ internal sealed partial class PreferencesForm
             Text = UiText.T("取消"),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right, DialogResult = DialogResult.Cancel
         };
-        dialog.Controls.AddRange(new Control[] { keyLabel, keyField, regionLabel, regionField, hint, save, cancel });
+        dialog.Controls.AddRange(new Control[] { keyLabel, keyField, regionLabel, regionField, hint, help, save, cancel });
         dialog.Load += (_, _) =>
         {
             var scale = dialog.DeviceDpi / 96f;
@@ -382,6 +404,7 @@ internal sealed partial class PreferencesForm
             var width = dialog.ClientSize.Width - S(margin) * 2;
             var labelFont = Font;
             foreach (var label in new[] { keyLabel, regionLabel, hint }) label.Font = labelFont;
+            help.Font = labelFont;
             var y = S(16);
             keyLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
             y += S(labelHeight) + S(4);
@@ -392,6 +415,7 @@ internal sealed partial class PreferencesForm
             regionField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
             y += S(fieldHeight) + S(gap);
             hint.Bounds = new Rectangle(x, y, width, S(22));
+            help.Bounds = new Rectangle(x, y + S(22), width, S(22));
             var buttonWidth = S(84);
             var buttonHeight = S(34);
             var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;
@@ -462,11 +486,12 @@ internal sealed partial class PreferencesForm
         var secretField = new FluentInputFrame(secret) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         var hint = new Label
         {
-            Text = "在百度翻译开放平台申请通用文本翻译的 APP ID 与密钥；留空并保存可清除配置。",
+            Text = "在百度翻译开放平台申请通用文本翻译ID与密钥",
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
+        var help = HelpLink("https://fanyi-api.baidu.com/?fr=simultaneous");
         var save = new FluentButton
         {
             Text = UiText.T("确定"),
@@ -482,7 +507,7 @@ internal sealed partial class PreferencesForm
             Text = UiText.T("取消"),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right, DialogResult = DialogResult.Cancel
         };
-        dialog.Controls.AddRange(new Control[] { appIdLabel, appIdField, secretLabel, secretField, hint, save, cancel });
+        dialog.Controls.AddRange(new Control[] { appIdLabel, appIdField, secretLabel, secretField, hint, help, save, cancel });
         dialog.Load += (_, _) =>
         {
             var scale = dialog.DeviceDpi / 96f;
@@ -492,6 +517,9 @@ internal sealed partial class PreferencesForm
             const int margin = 18, labelHeight = 24, fieldHeight = 34, gap = 12;
             var x = S(margin);
             var width = dialog.ClientSize.Width - S(margin) * 2;
+            var labelFont = Font;
+            appIdLabel.Font = secretLabel.Font = hint.Font = labelFont;
+            help.Font = labelFont;
             var y = S(16);
             appIdLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
             y += S(labelHeight) + S(4);
@@ -502,6 +530,7 @@ internal sealed partial class PreferencesForm
             secretField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
             y += S(fieldHeight) + S(gap);
             hint.Bounds = new Rectangle(x, y, width, S(22));
+            help.Bounds = new Rectangle(x, y + S(22), width, S(22));
             var buttonWidth = S(84);
             var buttonHeight = S(34);
             var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;
