@@ -350,7 +350,14 @@ internal sealed partial class PreferencesForm
     /// <summary>Action chooser plus a "then exit capture" toggle; the toggle is disabled for actions that never save.</summary>
     private void ActionRowCore(string label, string action, string exit, string[] labels, object[] values, Func<object, bool> exitEnabled)
     {
-        var check = new FluentToggle { Text = UiText.T("然后退出截屏"), AutoSize = false, Width = Px(180), Height = Px(ControlH), Checked = (bool)Value(exit) };
+        var caption = UiText.T("然后退出截屏");
+        var check = new FluentToggle
+        {
+            Text = caption, AutoSize = false,
+            Width = TextRenderer.MeasureText(caption, Font).Width + Px(59),
+            Height = Px(24),
+            Checked = (bool)Value(exit)
+        };
         check.CheckedChanged += (_, _) => Set(exit, check.Checked);
         var chooser = MakeChooser(labels, Math.Max(0, Array.IndexOf(values, Value(action))), i =>
         {
@@ -358,7 +365,25 @@ internal sealed partial class PreferencesForm
             check.Enabled = exitEnabled(values[i]);
         });
         check.Enabled = exitEnabled(Value(action));
-        Row(label, chooser, check);
+
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Math.Max(FieldHeight, check.Height)));
+        var card = NewSettingRow(height);
+        AddRowIcon(card, label);
+        // The caption + switch hug the card's right padding so every toggle on
+        // the page lines up with the plain Flag rows above.
+        check.SetBounds(card.Width - Px(14) - check.Width, Math.Max(0, (height - check.Height) / 2), check.Width, check.Height);
+        var chooserLeft = Px(LabelW + ControlGap);
+        chooser.Width = Math.Min(chooser.Width, Math.Max(Px(120), check.Left - Px(ControlGap) - chooserLeft));
+        chooser.Location = new Point(chooserLeft, Math.Max(0, (height - chooser.Height) / 2));
+        card.Controls.Add(chooser);
+        card.Controls.Add(check);
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), chooserLeft - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
+        _y += height + Px(6);
     }
     private void CaptureKeysPage()
     {
