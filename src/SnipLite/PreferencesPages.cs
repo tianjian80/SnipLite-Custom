@@ -827,7 +827,8 @@ internal sealed partial class PreferencesForm
         var values = new object[] { Keys.None, Keys.Control, Keys.Alt, Keys.Shift, Keys.Control | Keys.Shift, Keys.Control | Keys.Alt };
         var value = Value(property);
         MouseCard(label, MakeChooser(new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" },
-            Math.Max(0, Array.IndexOf(values, value)), index => Set(property, values[index])));
+            Math.Max(0, Array.IndexOf(values, value)), index => Set(property, values[index]),
+            center: true, centeredRows: true));
     }
 
     private void MouseRow(string label, string name)
@@ -836,9 +837,9 @@ internal sealed partial class PreferencesForm
         var modifiers = new[] { Keys.None, Keys.Control, Keys.Alt, Keys.Shift, Keys.Control | Keys.Shift, Keys.Control | Keys.Alt };
         var gestures = Enum.GetValues<PointerGesture>();
         var mod = MakeChooser(new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" }, Math.Max(0, Array.IndexOf(modifiers, binding.Modifiers)), i =>
-        { binding = binding with { Modifiers = modifiers[i] }; Set(name, binding); });
+        { binding = binding with { Modifiers = modifiers[i] }; Set(name, binding); }, center: true, centeredRows: true);
         var action = MakeChooser(new[] { "无", "左键双击", "中键单击", "右键单击", "左键单击" }, Array.IndexOf(gestures, binding.Gesture), i =>
-        { binding = binding with { Gesture = gestures[i] }; Set(name, binding); });
+        { binding = binding with { Gesture = gestures[i] }; Set(name, binding); }, center: true, centeredRows: true);
         MouseCard(label, mod, action);
     }
 
