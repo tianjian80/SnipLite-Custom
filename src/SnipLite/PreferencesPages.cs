@@ -285,31 +285,64 @@ internal sealed partial class PreferencesForm
             Font = Font,
             AutoScaleDimensions = new SizeF(96, 96),
             AutoScaleMode = AutoScaleMode.Dpi,
-            ClientSize = new Size(440, 164),
-            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ClientSize = new Size(480, 272),
+            MinimumSize = new Size(420, 240),
+            FormBorderStyle = FormBorderStyle.Sizable,
             StartPosition = FormStartPosition.CenterParent,
             MinimizeBox = false,
             MaximizeBox = false,
             ShowInTaskbar = false
         };
-        var key = new TextBox { Bounds = new Rectangle(128, 17, 294, 26), UseSystemPasswordChar = true, Text = current?.Key ?? "" };
-        var region = new TextBox { Bounds = new Rectangle(128, 52, 294, 26), Text = current?.Region ?? "" };
-        var keyField = new FluentInputFrame(key) { Bounds = new Rectangle(128, 14, 294, 32) };
-        var regionField = new FluentInputFrame(region) { Bounds = new Rectangle(128, 49, 294, 32) };
-        var save = new FluentButton { Text = UiText.T("保存"), Bounds = new Rectangle(254, 118, 80, 30), Enabled = !requireKey || !string.IsNullOrWhiteSpace(key.Text) };
+        var key = new TextBox
+        {
+            Bounds = new Rectangle(122, 22, 340, 26), UseSystemPasswordChar = true,
+            Text = current?.Key ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var region = new TextBox
+        {
+            Bounds = new Rectangle(122, 64, 340, 26),
+            Text = current?.Region ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var keyField = new FluentInputFrame(key)
+        {
+            Bounds = new Rectangle(122, 18, 340, 32),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var regionField = new FluentInputFrame(region)
+        {
+            Bounds = new Rectangle(122, 60, 340, 32),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var save = new FluentButton
+        {
+            Text = UiText.T("保存"), Bounds = new Rectangle(292, 224, 80, 32),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+            Enabled = !requireKey || !string.IsNullOrWhiteSpace(key.Text)
+        };
         if (requireKey) key.TextChanged += (_, _) => save.Enabled = !string.IsNullOrWhiteSpace(key.Text);
-        var cancel = new FluentButton { Text = UiText.T("取消"), Bounds = new Rectangle(342, 118, 80, 30), DialogResult = DialogResult.Cancel };
+        var cancel = new FluentButton
+        {
+            Text = UiText.T("取消"), Bounds = new Rectangle(382, 224, 80, 32),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right, DialogResult = DialogResult.Cancel
+        };
         dialog.Controls.AddRange(new Control[]
         {
-            new Label { Text = UiText.T("Translator 密钥"), Bounds = new Rectangle(18, 20, 110, 26) },
-            new Label { Text = UiText.T("资源区域"), Bounds = new Rectangle(18, 55, 110, 26) },
+            new Label { Text = UiText.T("Translator 密钥"), Bounds = new Rectangle(18, 22, 96, 24) },
+            new Label { Text = UiText.T("资源区域"), Bounds = new Rectangle(18, 64, 96, 24) },
             new Label
             {
                 Text = requireKey ? "请输入 Azure Translator 密钥。全局资源可留空区域。" : "全局资源可留空区域。留空密钥并保存可清除配置。",
-                Bounds = new Rectangle(18, 86, 404, 28)
+                Bounds = new Rectangle(18, 104, 444, 56),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             },
             keyField, regionField, save, cancel
         });
+        // MinimumSize is in device pixels, so scale it with the monitor DPI.
+        dialog.Load += (_, _) =>
+        {
+            var scale = dialog.DeviceDpi / 96f;
+            dialog.MinimumSize = new Size((int)Math.Round(420 * scale), (int)Math.Round(240 * scale));
+        };
         save.Click += (_, _) =>
         {
             try
