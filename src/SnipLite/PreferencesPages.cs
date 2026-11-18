@@ -402,6 +402,8 @@ internal sealed partial class PreferencesForm
         var fieldWidth = TextRenderer.MeasureText("恢复默认", Font).Width + Px(28);
         var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), fieldWidth, value => Set(name, value));
         number.Width = fieldWidth;
+        // Digits hug the left edge so the narrow field never covers the spinner arrows.
+        number.TextAlign = HorizontalAlignment.Left;
         var field = new FluentInputFrame(number) { Height = FieldHeight, SpinnerReserve = 34 };
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
