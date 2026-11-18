@@ -283,65 +283,86 @@ internal sealed partial class PreferencesForm
         {
             Text = "Microsoft Translator",
             Font = Font,
-            AutoScaleDimensions = new SizeF(96, 96),
-            AutoScaleMode = AutoScaleMode.Dpi,
-            ClientSize = new Size(480, 272),
-            MinimumSize = new Size(420, 240),
+            // Everything below is laid out manually in device pixels from DeviceDpi,
+            // so WinForms must not scale it a second time.
+            AutoScaleMode = AutoScaleMode.None,
+            ClientSize = new Size(480, 300),
             FormBorderStyle = FormBorderStyle.Sizable,
             StartPosition = FormStartPosition.CenterParent,
             MinimizeBox = false,
             MaximizeBox = false,
             ShowInTaskbar = false
         };
+        var keyLabel = new Label
+        {
+            Text = UiText.T("密钥 (Subscription Key)"), TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var regionLabel = new Label
+        {
+            Text = UiText.T("区域 (Region)"), TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
         var key = new TextBox
         {
-            Bounds = new Rectangle(122, 22, 340, 26), UseSystemPasswordChar = true,
+            BorderStyle = BorderStyle.None, UseSystemPasswordChar = true,
             Text = current?.Key ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var region = new TextBox
         {
-            Bounds = new Rectangle(122, 64, 340, 26),
+            BorderStyle = BorderStyle.None,
             Text = current?.Region ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        var keyField = new FluentInputFrame(key)
+        var keyField = new FluentInputFrame(key) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var regionField = new FluentInputFrame(region) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var hint = new Label
         {
-            Bounds = new Rectangle(122, 18, 340, 32),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        var regionField = new FluentInputFrame(region)
-        {
-            Bounds = new Rectangle(122, 60, 340, 32),
+            Text = requireKey ? "请输入 Azure Translator 密钥。全局资源可留空区域。" : "全局资源可留空区域；留空密钥并保存可清除配置。",
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var save = new FluentButton
         {
-            Text = UiText.T("保存"), Bounds = new Rectangle(292, 224, 80, 32),
+            Text = UiText.T("确定"),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
             Enabled = !requireKey || !string.IsNullOrWhiteSpace(key.Text)
         };
+        save.Tag = "accent-button";
+        StyleAccent(save);
         if (requireKey) key.TextChanged += (_, _) => save.Enabled = !string.IsNullOrWhiteSpace(key.Text);
         var cancel = new FluentButton
         {
-            Text = UiText.T("取消"), Bounds = new Rectangle(382, 224, 80, 32),
+            Text = UiText.T("取消"),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right, DialogResult = DialogResult.Cancel
         };
-        dialog.Controls.AddRange(new Control[]
-        {
-            new Label { Text = UiText.T("Translator 密钥"), Bounds = new Rectangle(18, 22, 96, 24) },
-            new Label { Text = UiText.T("资源区域"), Bounds = new Rectangle(18, 64, 96, 24) },
-            new Label
-            {
-                Text = requireKey ? "请输入 Azure Translator 密钥。全局资源可留空区域。" : "全局资源可留空区域。留空密钥并保存可清除配置。",
-                Bounds = new Rectangle(18, 104, 444, 56),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            },
-            keyField, regionField, save, cancel
-        });
-        // MinimumSize is in device pixels, so scale it with the monitor DPI.
+        dialog.Controls.AddRange(new Control[] { keyLabel, keyField, regionLabel, regionField, hint, save, cancel });
         dialog.Load += (_, _) =>
         {
             var scale = dialog.DeviceDpi / 96f;
-            dialog.MinimumSize = new Size((int)Math.Round(420 * scale), (int)Math.Round(240 * scale));
+            int S(int value) => (int)Math.Round(value * scale);
+            dialog.MinimumSize = new Size(S(420), S(290));
+            dialog.ClientSize = new Size(S(480), S(300));
+            const int margin = 18, labelHeight = 24, fieldHeight = 34, gap = 12;
+            var x = S(margin);
+            var width = dialog.ClientSize.Width - S(margin) * 2;
+            var labelFont = Font;
+            foreach (var label in new[] { keyLabel, regionLabel, hint }) label.Font = labelFont;
+            var y = S(16);
+            keyLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
+            y += S(labelHeight) + S(4);
+            keyField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
+            y += S(fieldHeight) + S(gap);
+            regionLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
+            y += S(labelHeight) + S(4);
+            regionField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
+            y += S(fieldHeight) + S(gap);
+            hint.Bounds = new Rectangle(x, y, width, S(22));
+            var buttonWidth = S(84);
+            var buttonHeight = S(34);
+            var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;
+            cancel.Bounds = new Rectangle(dialog.ClientSize.Width - S(margin) - buttonWidth, buttonTop, buttonWidth, buttonHeight);
+            save.Bounds = new Rectangle(cancel.Left - S(10) - buttonWidth, buttonTop, buttonWidth, buttonHeight);
         };
         save.Click += (_, _) =>
         {
