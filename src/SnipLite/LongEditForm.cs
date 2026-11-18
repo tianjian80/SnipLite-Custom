@@ -43,7 +43,7 @@ internal sealed class LongEditForm : Form
         Text = UiText.T("编辑长截图");
         FormBorderStyle = FormBorderStyle.Sizable;
         StartPosition = FormStartPosition.CenterScreen;
-        ShowInTaskbar = true;
+        ShowInTaskbar = false;
         BackColor = Color.White;
         ForeColor = AppTheme.Current.Text;
         Font = settings.CreateInterfaceFont();

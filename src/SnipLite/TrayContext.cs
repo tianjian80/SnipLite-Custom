@@ -201,7 +201,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        var x = Math.Min(Cursor.Position.X, area.Right - width - 220);
+        var x = Math.Min(Cursor.Position.X, area.Right - width - 218);
         x = Math.Max(area.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         // A drop-down shown without a foreground owner never receives the
