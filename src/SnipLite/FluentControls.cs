@@ -37,6 +37,10 @@ internal sealed class FluentInputFrame : UserControl
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal bool Bare { get; set; }
 
+    /// <summary>Space kept for the numeric spinner; shrink it for narrow fields.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal int SpinnerReserve { get; set; } = 54;
+
     public FluentInputFrame(Control editor)
     {
         var editorWidth = editor.Width;
@@ -83,7 +87,7 @@ internal sealed class FluentInputFrame : UserControl
     {
         base.OnLayout(e);
         if (_editor is null || _editor.Parent != _clip || _clip.Parent != this) return;
-        var reserve = _number is not null ? Px(54)
+        var reserve = _number is not null ? Px(SpinnerReserve)
             : Suffix is null ? 0 : TextRenderer.MeasureText(Suffix, Font).Width + Px(4);
         var editorHeight = _editor.PreferredSize.Height;
         _clip.Bounds = new Rectangle(Px(8), Math.Max(Px(3), (Height - editorHeight) / 2), Math.Max(1, Width - Px(14) - reserve), editorHeight);

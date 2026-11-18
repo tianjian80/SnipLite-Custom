@@ -397,8 +397,12 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(96), value => Set(name, value));
-        var field = new FluentInputFrame(number) { Height = FieldHeight };
+        // Same total length as the "恢复默认" button above; the narrower field keeps
+        // a small spinner reserve so three-digit values still fit.
+        var fieldWidth = TextRenderer.MeasureText("恢复默认", Font).Width + Px(28);
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), fieldWidth, value => Set(name, value));
+        number.Width = fieldWidth;
+        var field = new FluentInputFrame(number) { Height = FieldHeight, SpinnerReserve = 34 };
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
         card.Controls.Add(new Label
