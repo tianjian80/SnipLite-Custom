@@ -714,12 +714,10 @@ internal sealed class AnnotationBar
             if (active)
             {
                 var selected = Rectangle.Inflate(rect, -Px(2), -Px(2));
-                using var fill = new SolidBrush(Color.FromArgb(229, 241, 251));
+                using var fill = new SolidBrush(Color.FromArgb(0, 103, 192));
                 using var path = FluentDrawing.Rounded(
                     new RectangleF(selected.X + .5f, selected.Y + .5f, selected.Width - 1, selected.Height - 1), Px(5));
                 g.FillPath(fill, path);
-                using var outline = new Pen(Color.FromArgb(0, 103, 192), Math.Max(1f, Scale));
-                g.DrawPath(outline, path);
             }
 
             DrawIcon(g, id, rect, active);
@@ -895,7 +893,7 @@ internal sealed class AnnotationBar
         var s = Scale;
         var cx = rect.X + rect.Width / 2f;
         var cy = rect.Y + rect.Height / 2f;
-        var color = active ? Color.FromArgb(0, 103, 192) : id == "undo" && !CanUndo || id == "redo" && !CanRedo
+        var color = active ? Color.White : id == "undo" && !CanUndo || id == "redo" && !CanRedo
             ? AppTheme.Current.Disabled : IconColor;
 
         if (FluentIcons.Supports(id))

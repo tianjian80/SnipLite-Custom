@@ -1701,22 +1701,32 @@ internal sealed partial class CaptureForm : ToolWindow
     private void DrawOcrSelection(Graphics g)
     {
         if (!_ocrMode || _ocrDocument is null) return;
-        using var fill = new SolidBrush(Color.FromArgb(90, 178, 24, 24));
-        using var edge = new Pen(Color.FromArgb(200, 165, 18, 18), Math.Max(1, Ui));
+        using var fill = new SolidBrush(Color.FromArgb(90, 0, 103, 192));
+        using var edge = new Pen(Color.FromArgb(0, 103, 192), Math.Max(1.5f, 1.5f * Ui));
         using var line = new Pen(Color.FromArgb(150, _bar.Accent), Math.Max(1, Ui));
         var start = Math.Min(_ocrAnchor, _ocrEnd);
         var end = Math.Max(_ocrAnchor, _ocrEnd);
+        // Merge the selected characters into one block per text line; filling every
+        // character separately produced a ghosted double outline over the glyphs.
+        var blocks = new List<RectangleF>();
         for (var i = 0; i < _ocrDocument.Characters.Count; i++)
         {
             var bounds = _ocrDocument.Characters[i].Bounds;
             bounds.Offset(_ocrCrop.Location);
             if (start >= 0 && i >= start && i <= end)
             {
-                bounds.Inflate(Math.Max(1, bounds.Height * .12f), Math.Max(1, Ui));
-                g.FillRectangle(fill, bounds);
-                g.DrawRectangle(edge, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                if (blocks.Count > 0 && bounds.Top < blocks[^1].Bottom && bounds.Bottom > blocks[^1].Top)
+                    blocks[^1] = RectangleF.Union(blocks[^1], bounds);
+                else blocks.Add(bounds);
+                continue;
             }
-            else g.DrawLine(line, bounds.Left, bounds.Bottom, bounds.Right, bounds.Bottom);
+            g.DrawLine(line, bounds.Left, bounds.Bottom, bounds.Right, bounds.Bottom);
+        }
+        foreach (var block in blocks)
+        {
+            var rect = RectangleF.Inflate(block, 1f, Math.Max(1, Ui));
+            g.FillRectangle(fill, rect);
+            g.DrawRectangle(edge, rect.X, rect.Y, rect.Width, rect.Height);
         }
     }
 
