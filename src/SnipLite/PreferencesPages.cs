@@ -369,7 +369,6 @@ internal sealed partial class PreferencesForm
         ActionRow("中键单击", nameof(_s.MiddleClickAction), nameof(_s.MiddleClickExit));
         ActionRow("回车键", nameof(_s.EnterAction), nameof(_s.EnterExit));
         RightClickRow();
-        HintText("Esc 按当前选项决定是否确认。鼠标右键的默认行为可在上方配置。");
     }
     private void LongCapturePage()
     {
