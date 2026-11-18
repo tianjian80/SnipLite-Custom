@@ -823,8 +823,13 @@ internal sealed partial class PreferencesForm
         }
     }
     private void ModifierRow(string label, string property)
-        => Choice(label, property, new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" },
-            new object[] { Keys.None, Keys.Control, Keys.Alt, Keys.Shift, Keys.Control | Keys.Shift, Keys.Control | Keys.Alt });
+    {
+        var values = new object[] { Keys.None, Keys.Control, Keys.Alt, Keys.Shift, Keys.Control | Keys.Shift, Keys.Control | Keys.Alt };
+        var value = Value(property);
+        MouseCard(label, MakeChooser(new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" },
+            Math.Max(0, Array.IndexOf(values, value)), index => Set(property, values[index])));
+    }
+
     private void MouseRow(string label, string name)
     {
         var binding = (MouseBinding)Value(name);
@@ -832,10 +837,62 @@ internal sealed partial class PreferencesForm
         var gestures = Enum.GetValues<PointerGesture>();
         var mod = MakeChooser(new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" }, Math.Max(0, Array.IndexOf(modifiers, binding.Modifiers)), i =>
         { binding = binding with { Modifiers = modifiers[i] }; Set(name, binding); });
-        mod.Width = Px(115);
         var action = MakeChooser(new[] { "无", "左键双击", "中键单击", "右键单击", "左键单击" }, Array.IndexOf(gestures, binding.Gesture), i =>
         { binding = binding with { Gesture = gestures[i] }; Set(name, binding); });
-        Row(label, mod, MakeStatic("+"), action);
+        MouseCard(label, mod, action);
+    }
+
+    /// <summary>
+    /// Mouse page row: the label column is wider than the shared default so
+    /// captions such as "贴图缩放（滚轮 / +/-）" stay on one line. The pickers start
+    /// 32px further right and the "+" sits in a full-height label, which keeps it
+    /// optically centred between the two pickers.
+    /// </summary>
+    private void MouseCard(string label, params Control[] controls)
+    {
+        var height = AdaptiveRowHeight(Math.Max(TextHeight,
+            Math.Max(FieldHeight, controls.Select(c => c.Height).DefaultIfEmpty(0).Max())));
+        var card = NewSettingRow(height);
+        AddRowIcon(card, label);
+        var right = card.Width - Px(14);
+        var first = Px(LabelW + ControlGap) + Px(32);
+        foreach (var control in controls)
+            if (string.IsNullOrEmpty(control.AccessibleName)) control.AccessibleName = label;
+
+        if (controls.Length == 1)
+        {
+            var control = controls[0];
+            control.Width = Math.Min(control.Width, Math.Max(Px(120), right - first));
+            control.Location = new Point(first, Math.Max(0, (height - control.Height) / 2));
+            card.Controls.Add(control);
+        }
+        else
+        {
+            var mod = controls[0];
+            var action = controls[1];
+            var actionWidth = Math.Min(action.Width, Math.Max(Px(120), right - first - Px(140)));
+            action.SetBounds(right - actionWidth, Math.Max(0, (height - action.Height) / 2), actionWidth, action.Height);
+            var modWidth = Math.Min(mod.Width, Math.Max(Px(90), action.Left - first - Px(34)));
+            mod.SetBounds(first, Math.Max(0, (height - mod.Height) / 2), modWidth, mod.Height);
+
+            var plus = new Label
+            {
+                Text = "+", AutoSize = false, ForeColor = Muted, BackColor = Color.Transparent,
+                Bounds = new Rectangle(mod.Right + (action.Left - mod.Right - Px(18)) / 2, 0, Px(18), height),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            card.Controls.Add(mod);
+            card.Controls.Add(plus);
+            card.Controls.Add(action);
+        }
+
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), first - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
+        _y += height + Px(6);
     }
     private void MousePage()
     {
