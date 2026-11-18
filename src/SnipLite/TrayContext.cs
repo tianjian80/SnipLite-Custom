@@ -196,8 +196,10 @@ internal sealed class TrayContext : ApplicationContext
             {
                 var history = new ToolStripMenuItem(UiText.T("截屏历史"))
                 {
-                    // Always unfold to the right of the tray panel.
-                    DropDownDirection = ToolStripDropDownDirection.Right
+                    // Open upwards first: near the screen bottom that avoids the manager's
+                    // height clamp (and its ▲ / ▼ overflow bars). DropDownOpened then
+                    // re-aligns the panel with the tray menu's bottom edge.
+                    DropDownDirection = ToolStripDropDownDirection.AboveRight
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
@@ -244,7 +246,7 @@ internal sealed class TrayContext : ApplicationContext
                     if (entries.Count == 0)
                     {
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
-                        dropMenu.Size = new Size(available, 40);
+                        dropMenu.Size = new Size(available, 40 + 4);
                         return;
                     }
                     var panel = new HistoryPanel(entries, new Size(available, height), cardWidth, cardHeight, entry =>
@@ -260,7 +262,9 @@ internal sealed class TrayContext : ApplicationContext
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    dropMenu.Size = new Size(available, height);
+                    // A couple of extra pixels keep the hosted panel shorter than the
+                    // drop-down client area, so WinForms never adds its ▲ / ▼ overflow bars.
+                    dropMenu.Size = new Size(available, height + 4);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Re-check right after showing: the real menu bounds and screen gap are
