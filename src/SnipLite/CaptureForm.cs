@@ -1750,11 +1750,11 @@ internal sealed partial class CaptureForm : ToolWindow
         }
         foreach (var block in blocks)
         {
-            // One seamless block per line. The left edge gets a wider 4 px margin so
-            // the first glyph on the line is fully covered; the right side keeps a
-            // couple of pixels of slack.
-            var left = Math.Max(_ocrCrop.Left, block.Left - Math.Max(4f, 4f * Ui));
-            var right = block.Right + Math.Max(2f, 2.5f * Ui);
+            // One seamless block per line, with 4 px of horizontal breathing room on
+            // both ends so the first and last glyphs are wrapped completely.
+            var slack = Math.Max(4f, 4f * Ui);
+            var left = Math.Max(_ocrCrop.Left, block.Left - slack);
+            var right = block.Right + slack;
             var rect = RectangleF.FromLTRB(left, block.Top, right, block.Bottom);
             g.FillRectangle(fill, rect);
         }
