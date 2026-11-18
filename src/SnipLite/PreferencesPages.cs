@@ -792,7 +792,7 @@ internal sealed partial class PreferencesForm
             // so the freed width goes to the capsule and longer combos stay readable.
             var half = NewSettingRow(left, width, cardHeight);
             var right = width - Px(12);
-            var boxWidth = Math.Max(Px(96), Math.Min(Px(156), width / 3 + Px(24)));
+            var boxWidth = Math.Max(Px(96), Math.Min(Px(156), width / 3 + Px(36)));
             box.SetBounds(right - boxWidth, Math.Max(0, (cardHeight - box.Height) / 2), boxWidth, box.Height);
             half.Controls.Add(box);
             half.Controls.Add(new Label
