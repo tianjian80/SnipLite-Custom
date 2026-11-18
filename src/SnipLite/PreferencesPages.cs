@@ -172,7 +172,7 @@ internal sealed partial class PreferencesForm
             if (!translationService.IsDisposed) translationService.Text = UiText.T(translationLabels[0]);
         };
         Row("翻译服务", translationService, configureTranslator);
-        Section("启动与运行", () => { });
+        Section("启动配置与日志", () => { });
         Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator));
         var gap = Px(10);
         var cardWidth = (ContentWidth() - gap) / 2;
@@ -224,7 +224,8 @@ internal sealed partial class PreferencesForm
         FlagCell("自动备份配置文件", nameof(_s.AutoBackup));
         FlagCell("保持快速响应", nameof(_s.KeepResponsive));
         if (column != 0) { column = 0; _y += height + gap; }
-        Section("配置与日志", () => { });
+        // The switch grid uses a wider column gap; close it back to the standard row gap.
+        _y += Px(6) - gap;
         var logLevels = new[] { "Off", "Error", "Normal", "Debug" };
         var logChooser = MakeChooser(new[] { "关闭", "仅错误", "普通", "调试" },
             Math.Max(0, Array.IndexOf(logLevels, (string)Value(nameof(_s.LogLevel)))),
