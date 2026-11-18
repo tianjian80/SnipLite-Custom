@@ -741,13 +741,13 @@ internal sealed partial class PreferencesForm
             if (fullWidth)
             {
                 var card = NewSettingRow(cardHeight);
-                AddRowIcon(card, label);
-                card.Controls.Add(new Label
+                var nameLabel = new Label
                 {
                     Text = label, AutoSize = false, AutoEllipsis = true,
-                    Bounds = new Rectangle(Px(48), 0, Px(LabelW - 52), cardHeight),
+                    Bounds = new Rectangle(Px(14), 0, Px(LabelW - 16), cardHeight),
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-                });
+                };
+                card.Controls.Add(nameLabel);
                 box.SetBounds(Px(LabelW + ControlGap), Math.Max(0, (cardHeight - box.Height) / 2), Px(132), box.Height);
                 card.Controls.Add(box);
 
@@ -780,6 +780,7 @@ internal sealed partial class PreferencesForm
                     caption.Left = smart.Left - caption.Width - Px(8);
                     caption.Top = (cardHeight - caption.Height) / 2;
                     box.Left = Math.Max(Px(LabelW), caption.Left - Px(16) - box.Width);
+                    nameLabel.Width = Math.Max(Px(60), box.Left - Px(14) - Px(10));
                 }
                 PlaceCaption();
                 card.Resize += (_, _) => PlaceCaption();
@@ -787,18 +788,17 @@ internal sealed partial class PreferencesForm
                 return;
             }
 
-            // Grid card: icon + name on the left, key capsule hugging the right edge.
-            // The caller decides the column geometry so 3- and 2-column rows can mix.
+            // Grid card: name on the left, key capsule hugging the right edge. No icon,
+            // so the freed width goes to the capsule and longer combos stay readable.
             var half = NewSettingRow(left, width, cardHeight);
-            AddRowIcon(half, label);
             var right = width - Px(12);
-            var boxWidth = Math.Max(Px(96), Math.Min(Px(132), width / 3));
+            var boxWidth = Math.Max(Px(96), Math.Min(Px(156), width / 3 + Px(24)));
             box.SetBounds(right - boxWidth, Math.Max(0, (cardHeight - box.Height) / 2), boxWidth, box.Height);
             half.Controls.Add(box);
             half.Controls.Add(new Label
             {
                 Text = label, AutoSize = false, AutoEllipsis = true,
-                Bounds = new Rectangle(Px(36), 0, Math.Max(Px(40), box.Left - Px(36) - Px(8)), cardHeight),
+                Bounds = new Rectangle(Px(14), 0, Math.Max(Px(40), box.Left - Px(14) - Px(8)), cardHeight),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
             });
         }
@@ -835,7 +835,6 @@ internal sealed partial class PreferencesForm
             if (i + 1 < rest.Count) PlaceItem(rest[i + 1].Label, rest[i + 1].Name, false, _labelX + width + gap, width);
             _y += cardHeight + gap;
         }
-        HintText("点击快捷键框即可录入新组合键，确认后生效。");
     }
     private void ModifierRow(string label, string property)
         => Choice(label, property, new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" },
