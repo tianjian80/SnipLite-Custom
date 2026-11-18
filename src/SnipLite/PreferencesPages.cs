@@ -773,12 +773,19 @@ internal sealed partial class PreferencesForm
 
     private void PinDisplayPage()
     {
-        Flag("窗口阴影", nameof(_s.PinShadow)); ColorRow("阴影颜色", nameof(_s.PinShadowColor));
+        // First row pairs the shadow switch with its colour button.
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        CheckCell(_labelX, cardWidth, height, "窗口阴影", nameof(_s.PinShadow));
+        ColorChoiceCell(_labelX + cardWidth + gap, cardWidth, height, "阴影颜色", nameof(_s.PinShadowColor));
+        _y += height + gap;
+
         Flag("在右键菜单显示助记键", nameof(_s.PinMenuShortcuts));
-        Number("默认不透明度", nameof(_s.PinOpacityPercent), 10, 100, "%");
-        Number("最大窗口尺寸", nameof(_s.PinMaxSize), 100, 20000, "像素");
-        Number("快速缩略图宽度", nameof(_s.ThumbnailWidth), 20, 1000, "像素");
-        Number("快速缩略图高度", nameof(_s.ThumbnailHeight), 20, 1000, "像素");
+        Number("默认不透明度", nameof(_s.PinOpacityPercent), 10, 100);
+        Number("最大窗口尺寸", nameof(_s.PinMaxSize), 100, 20000);
+        Number("快速缩略图宽度", nameof(_s.ThumbnailWidth), 20, 1000);
+        Number("快速缩略图高度", nameof(_s.ThumbnailHeight), 20, 1000);
     }
     private void PinBehaviorPage()
     {
