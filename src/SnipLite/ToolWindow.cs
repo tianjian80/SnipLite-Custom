@@ -72,6 +72,23 @@ internal class ToolWindow : Form
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>
+    /// Moves a tool/drop-down window to an exact screen position. WinForms may
+    /// reposition drop-downs again, so this talks to the window directly.
+    /// </summary>
+    internal static void PlaceWindow(IntPtr handle, int x, int y)
+    {
+        try
+        {
+            const uint SwpNoSize = 0x0001, SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+            SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+        }
+        catch { }
+    }
+
     /// <summary>
     /// Strips the taskbar button from any window, including WinForms drop-downs that
     /// are not ToolWindow instances. Safe to call repeatedly.
