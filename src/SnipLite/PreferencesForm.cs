@@ -502,7 +502,9 @@ internal sealed partial class PreferencesForm : Form
 
         for (var i = 0; i < _tabs.Length; i++)
         {
-            var y = i < 7 ? Px(105 + i * 40) : ClientSize.Height - Px(162 - (i - 7) * 40);
+            // The layout tab joins the main list under "控制"; only Updates/About
+            // stay pinned above the version line at the bottom.
+            var y = i < 8 ? Px(105 + i * 40) : ClientSize.Height - Px(162 - (i - 8) * 40);
             _tabRects.Add((new Rectangle(Px(10), y, Px(SidebarW - 20), Px(36)), i));
         }
     }
