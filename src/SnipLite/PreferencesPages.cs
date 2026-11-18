@@ -642,15 +642,32 @@ internal sealed partial class PreferencesForm
             column = 0;
         }
 
-        foreach (var (label, name) in HotkeyDefinitions.Items)
+        void PlaceItem(string label, string name, bool fullWidth)
         {
             var binding = (Keys)Value(name);
             string BindingText() => _s.HotkeyErrors.TryGetValue(name, out var error)
                 ? $"{HotkeyDefinitions.Format(binding)} · {UiText.T(error)}" : HotkeyDefinitions.Format(binding);
-            var current = MakeStatic(BindingText());
-            var change = new FluentButton();
-            StyleButton(change, UiText.T("更改", _s.DisplayLanguage));
-            change.Click += (_, _) =>
+
+            // The binding itself is the button: clicking the capsule starts recording.
+            var text = new Label
+            {
+                Text = BindingText(), AutoSize = false, AutoEllipsis = true,
+                Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Ink, BackColor = Color.Transparent, Cursor = Cursors.Hand
+            };
+            var box = new CapsuleFrame
+            {
+                HoverHighlight = true, Cursor = Cursors.Hand,
+                Padding = new Padding(Px(4), 0, Px(4), 0), Height = Px(30)
+            };
+            box.Controls.Add(text);
+            void Hover(bool on) => box.Hovered = on;
+            text.MouseEnter += (_, _) => Hover(true);
+            text.MouseLeave += (_, _) => Hover(false);
+            box.MouseEnter += (_, _) => Hover(true);
+            box.MouseLeave += (_, _) => Hover(false);
+
+            void StartEdit()
             {
                 HotkeyEditing?.Invoke(true);
                 try
@@ -666,7 +683,7 @@ internal sealed partial class PreferencesForm
                         AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false,
                         Padding = new Padding(Px(12))
                     };
-                    var box = new HotkeyBox { Binding = binding, Width = Px(310) };
+                    var input = new HotkeyBox { Binding = binding, Width = Px(310) };
                     var status = new Label { AutoSize = true, Text = UiText.T("按下新快捷键，或按 Delete 清除。") };
                     var buttons = new FlowLayoutPanel { AutoSize = true };
                     var confirm = new FluentButton();
@@ -675,14 +692,14 @@ internal sealed partial class PreferencesForm
                     StyleButton(cancel, "取消");
                     confirm.Enabled = false;
                     var stolen = new List<string>();
-                    box.BindingChanged += candidate =>
+                    input.BindingChanged += candidate =>
                     {
                         confirm.Enabled = candidate != binding;
                         status.Text = UiText.T(confirm.Enabled ? "点击确认以保存更改。" : "当前绑定未改变。");
                     };
                     confirm.Click += (_, _) =>
                     {
-                        var candidate = box.Binding;
+                        var candidate = input.Binding;
                         stolen.Clear();
                         if (candidate != Keys.None)
                         {
@@ -702,55 +719,46 @@ internal sealed partial class PreferencesForm
                             HotkeyAvailable?.Invoke(candidate) == false)
                         {
                             status.Text = UiText.T("组合键被占用或由系统保留，请重新输入。");
-                            box.Focus();
+                            input.Focus();
                             return;
                         }
                         dialog.DialogResult = DialogResult.OK;
                     };
                     buttons.Controls.AddRange(new Control[] { confirm, cancel });
-                    panel.Controls.AddRange(new Control[] { box, status, buttons });
+                    panel.Controls.AddRange(new Control[] { input, status, buttons });
                     dialog.Controls.Add(panel);
                     dialog.CancelButton = cancel;
-                    dialog.ActiveControl = box;
+                    dialog.ActiveControl = input;
                     AppTheme.Apply(dialog);
                     if (dialog.ShowDialog(this) == DialogResult.OK)
                     {
                         foreach (var other in stolen) Set(other, Keys.None);
-                        Set(name, box.Binding);
-                        binding = box.Binding;
+                        Set(name, input.Binding);
+                        binding = input.Binding;
                     }
                 }
                 finally
                 {
                     HotkeyEditing?.Invoke(false);
-                    current.Text = BindingText();
+                    text.Text = BindingText();
                 }
-            };
-            if (name == nameof(AppSettings.CustomCaptureHotkey))
+            }
+            text.Click += (_, _) => StartEdit();
+            box.Click += (_, _) => StartEdit();
+
+            if (fullWidth)
             {
-                // This row carries an extra switch, so it keeps the full width: the
-                // toggle is pinned to the card's right edge so its Right matches the
-                // "启用全局快捷键" toggle exactly, and the caption sits immediately
-                // to its left without ever being ellipsized.
                 FinishRow();
-                var height = cardHeight;
-                var card = NewSettingRow(height);
+                var card = NewSettingRow(cardHeight);
                 AddRowIcon(card, label);
                 card.Controls.Add(new Label
                 {
                     Text = label, AutoSize = false, AutoEllipsis = true,
-                    Bounds = new Rectangle(Px(48), Px(10), Px(LabelW - 52), height - Px(20)),
+                    Bounds = new Rectangle(Px(48), 0, Px(LabelW - 52), cardHeight),
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 });
-
-                var x = Px(LabelW + ControlGap);
-                foreach (var control in new Control[] { change, current })
-                {
-                    control.Location = new Point(x, Math.Max(0, (height - control.Height) / 2));
-                    if (control.Width > card.Width - x - Px(14)) control.Width = Math.Max(Px(40), card.Width - x - Px(14));
-                    card.Controls.Add(control);
-                    x += control.Width + Px(ControlGap);
-                }
+                box.SetBounds(Px(LabelW + ControlGap), Math.Max(0, (cardHeight - box.Height) / 2), Px(132), box.Height);
+                card.Controls.Add(box);
 
                 var smart = new FluentToggle
                 {
@@ -758,7 +766,7 @@ internal sealed partial class PreferencesForm
                     AccessibleName = UiText.T("智能排除任务栏"),
                     Checked = (bool)Value(nameof(AppSettings.SmartFullScreenCapture))
                 };
-                smart.Bounds = new Rectangle(card.Width - Px(14) - smart.Width, (height - smart.Height) / 2, smart.Width, smart.Height);
+                smart.Bounds = new Rectangle(card.Width - Px(14) - smart.Width, (cardHeight - smart.Height) / 2, smart.Width, smart.Height);
                 smart.Anchor = AnchorStyles.Right;
                 smart.CheckedChanged += (_, _) => Set(nameof(AppSettings.SmartFullScreenCapture), smart.Checked);
                 card.Controls.Add(smart);
@@ -779,39 +787,43 @@ internal sealed partial class PreferencesForm
                     caption.Width = caption.PreferredWidth;
                     caption.Height = caption.PreferredHeight;
                     caption.Left = smart.Left - caption.Width - Px(8);
-                    caption.Top = (height - caption.Height) / 2;
+                    caption.Top = (cardHeight - caption.Height) / 2;
+                    box.Left = Math.Max(Px(LabelW), caption.Left - Px(16) - box.Width);
                 }
                 PlaceCaption();
                 card.Resize += (_, _) => PlaceCaption();
-                _y += height + gap;
-                continue;
+                _y += cardHeight + gap;
+                return;
             }
 
-            // Compact half-width card: icon + name on the left, [更改] and the
-            // binding text hugged to the right edge.
+            // Compact half-width card: icon + name on the left, key capsule hugging
+            // the right edge. No button, so the caption stays on a single line.
             var half = NewSettingRow(column == 0 ? _labelX : _labelX + cardWidth + gap, cardWidth, cardHeight);
             AddRowIcon(half, label);
             var right = cardWidth - Px(12);
-            var valueWidth = Math.Max(Px(70), Math.Min(Px(104), cardWidth / 3));
-            current.AutoSize = false;
-            current.SetBounds(right - valueWidth, 0, valueWidth, cardHeight);
-            if (current is Label value) value.TextAlign = ContentAlignment.MiddleRight;
-            var changeWidth = change.Width;
-            change.SetBounds(right - valueWidth - Px(8) - changeWidth, Math.Max(0, (cardHeight - change.Height) / 2), changeWidth, change.Height);
+            var boxWidth = Math.Max(Px(96), Math.Min(Px(132), cardWidth / 3));
+            box.SetBounds(right - boxWidth, Math.Max(0, (cardHeight - box.Height) / 2), boxWidth, box.Height);
+            half.Controls.Add(box);
             half.Controls.Add(new Label
             {
                 Text = label, AutoSize = false, AutoEllipsis = true,
-                Bounds = new Rectangle(Px(36), 0, Math.Max(Px(40), change.Left - Px(36) - Px(8)), cardHeight),
+                Bounds = new Rectangle(Px(36), 0, Math.Max(Px(40), box.Left - Px(36) - Px(8)), cardHeight),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
             });
-            half.Controls.Add(change);
-            half.Controls.Add(current);
 
             column = 1 - column;
             if (column == 0) _y += cardHeight + gap;
         }
+
+        // A full-width card keeps the extra "智能排除任务栏" switch out of the grid.
+        var pinned = nameof(AppSettings.CustomCaptureHotkey);
+        foreach (var (label, name) in HotkeyDefinitions.Items)
+            if (name == pinned) PlaceItem(label, name, true);
+        foreach (var (label, name) in HotkeyDefinitions.Items)
+            if (name != pinned) PlaceItem(label, name, false);
+
         FinishRow();
-        HintText("点击「更改」录入快捷键，确认后生效。");
+        HintText("点击快捷键框即可录入新组合键，确认后生效。");
     }
     private void ModifierRow(string label, string property)
         => Choice(label, property, new[] { "无", "Ctrl", "Alt", "Shift", "Ctrl+Shift", "Ctrl+Alt" },

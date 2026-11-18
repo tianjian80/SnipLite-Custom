@@ -244,6 +244,23 @@ internal sealed class CapsuleFrame : Panel
 
     private int Px(float value) => (int)Math.Round(value * DeviceDpi / 96f);
 
+    /// <summary>Lets an interactive capsule tint itself while the pointer is over it.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal bool HoverHighlight { get; set; }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal bool Hovered
+    {
+        get => _hovered;
+        set
+        {
+            if (_hovered == value) return;
+            _hovered = value;
+            if (HoverHighlight) Invalidate();
+        }
+    }
+    private bool _hovered;
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var p = AppTheme.Current;
@@ -251,7 +268,7 @@ internal sealed class CapsuleFrame : Panel
         g.Clear(Parent?.BackColor ?? p.Card);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = FluentDrawing.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), Px(5));
-        using var fill = new SolidBrush(p.Field);
+        using var fill = new SolidBrush(HoverHighlight && Hovered ? p.Hover : p.Field);
         g.FillPath(fill, path);
         using var edge = new Pen(p.Border);
         g.DrawPath(edge, path);
