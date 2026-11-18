@@ -242,6 +242,8 @@ internal sealed class TrayContext : ApplicationContext
                 // right screen edge; the panel scrolls instead of growing off-screen.
                 void FitHistory()
                 {
+                    // Files deleted outside the app disappear from the list before it opens.
+                    _history.PruneMissing();
                     var dropMenu = (ToolStripDropDownMenu)history.DropDown!;
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
@@ -279,6 +281,14 @@ internal sealed class TrayContext : ApplicationContext
                     var panelHeight = Math.Max(60, height - 4);
                     var panel = new HistoryPanel(entries, new Size(available, panelHeight), cardWidth, cardHeight, entry =>
                     {
+                        // The file may have been deleted after the menu was filled.
+                        if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
+                        {
+                            _history.Remove(entry);
+                            history.DropDown?.Close();
+                            menu.Close();
+                            return;
+                        }
                         history.DropDown?.Close();
                         menu.Close();
                         PinImage(entry.Image(), entry.Bounds);
@@ -590,9 +600,10 @@ internal sealed class TrayContext : ApplicationContext
                 if (_settings.CaptureCursor) Win32.DrawCursor(g, bounds.Location);
             }
 
-            // Every full-screen capture is its own history record too.
-            _history.Add(image, bounds, _settings.HistoryImageLimit);
+            // Every full-screen capture is its own history record too; keep the saved
+            // path so deleting the file externally also clears the record.
             var path = Services.SaveCaptureFile(image, _settings, _settings.QuickSaveDirectory);
+            _history.Add(image, bounds, _settings.HistoryImageLimit, path);
             var mode = !_settings.SmartFullScreenCapture ? "全屏（含任务栏）"
                 : bounds == screen.Bounds ? "全屏应用" : "桌面工作区";
             AppLog.Write($"全屏截图并自动保存：{mode} {bounds.Width}×{bounds.Height} → {path}");
@@ -636,9 +647,9 @@ internal sealed class TrayContext : ApplicationContext
                 if (result is not null) HandleResult(result, forceCopy);
             };
             // Explicit save / save-as lives entirely inside the overlay: record it here.
-            overlay.Saved += (image, bounds) =>
+            overlay.Saved += (image, bounds, path) =>
             {
-                try { _history.Add(image, bounds, _settings.HistoryImageLimit); }
+                try { _history.Add(image, bounds, _settings.HistoryImageLimit, path); }
                 catch (Exception ex) { AppLog.Write("记录截屏历史失败", ex); }
             };
             overlay.FormClosed += (_, _) => { if (ReferenceEquals(_overlay, overlay)) _overlay = null; };
@@ -659,13 +670,16 @@ internal sealed class TrayContext : ApplicationContext
                 AppLog.Write("截屏并自动复制：已由遮罩写入剪贴板，仅记录历史");
                 return;
             }
-            if (!result.HistoryRecorded) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
-            if (_settings.AutoSave) Services.SaveCaptureFile(result.Image, _settings, _settings.SaveDirectory);
+            string? savedPath = null;
+            if (_settings.AutoSave)
+                savedPath = Services.SaveCaptureFile(result.Image, _settings, _settings.SaveDirectory);
+            if (!result.HistoryRecorded) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit, savedPath);
             if (result.Pin || result.Action == CaptureAction.Pin)
             { PinImage(result.Image, result.Bounds); transferred = true; }
             else if (result.Action == CaptureAction.QuickSave)
             {
                 var path = Services.SaveCaptureFile(result.Image, _settings, _settings.QuickSaveDirectory);
+                if (!result.HistoryRecorded && savedPath is null) _history.ReplaceLatestPath(path);
                 if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
 
             }

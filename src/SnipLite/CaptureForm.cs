@@ -139,7 +139,7 @@ internal sealed partial class CaptureForm : ToolWindow
     public event Action<CaptureResult?>? Done;
 
     /// <summary>Raised the moment an explicit save succeeds, so the tray can record history.</summary>
-    public event Action<Bitmap, Rectangle>? Saved;
+    public event Action<Bitmap, Rectangle, string>? Saved;
 
     public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null, bool autoCopy = false, bool longCapture = false)
     {
@@ -1802,7 +1802,7 @@ internal sealed partial class CaptureForm : ToolWindow
             // Record the saved capture immediately: saving is an independent exit path
             // that never reaches the overlay's Done callback.
             _historyRecorded = true;
-            try { Saved?.Invoke(image, new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height)); }
+            try { Saved?.Invoke(image, new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height), dialog.FileName); }
             catch (Exception ex) { AppLog.Write("记录截屏历史失败", ex); }
             if (_settings.SoundOnSave) _ = Services.PlaySoundAsync(_settings.CaptureSound);
             if (_settings.RememberImageExtension) { _settings.LastImageExtension = jpeg ? ".jpg" : ".png"; _settings.Save(); }
