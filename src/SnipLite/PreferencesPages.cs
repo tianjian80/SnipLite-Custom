@@ -303,13 +303,27 @@ internal sealed partial class PreferencesForm
     }
     private void CaptureBehaviorPage()
     {
-        Flag("自动检测窗口", nameof(_s.DetectWindows)); Flag("隐藏 1×1 提示", nameof(_s.HideOnePixelHint));
-        Flag("自动检测界面元素", nameof(_s.DetectElements));
-        Flag("移出屏幕", nameof(_s.AllowOffscreenSelection));
-        Flag("捕捉鼠标指针", nameof(_s.CaptureCursor)); Flag("完全禁用鼠标指针捕捉", nameof(_s.DisableCursorCapture));
-        Flag("其他程序窗口激活时退出截屏", nameof(_s.ExitCaptureOnDeactivate));
-        Number("截图及贴图各自的历史上限", nameof(_s.HistoryImageLimit), 0, 100);
-        Flag("截图后自动复制", nameof(_s.CopyAfterCapture));
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var column = 0;
+
+        // Two equal cards per row: the nine behaviour options fit in five rows.
+        void Cell(Action<int, int> place)
+        {
+            place(_labelX + column * (cardWidth + gap), cardWidth);
+            if (++column == 2) { column = 0; _y += height + gap; }
+        }
+        void FlagCell(string label, string name) => Cell((left, width) => CheckCell(left, width, height, label, name));
+
+        FlagCell("自动检测窗口", nameof(_s.DetectWindows)); FlagCell("隐藏 1×1 提示", nameof(_s.HideOnePixelHint));
+        FlagCell("自动检测界面元素", nameof(_s.DetectElements)); FlagCell("移出屏幕", nameof(_s.AllowOffscreenSelection));
+        FlagCell("捕捉鼠标指针", nameof(_s.CaptureCursor)); FlagCell("完全禁用鼠标指针捕捉", nameof(_s.DisableCursorCapture));
+        FlagCell("其他程序窗口激活时退出截屏", nameof(_s.ExitCaptureOnDeactivate));
+        Cell((left, width) => NumberCell(left, width, height, "截图及贴图各自的历史上限", nameof(_s.HistoryImageLimit), 0, 100));
+        FlagCell("截图后自动复制", nameof(_s.CopyAfterCapture));
+        if (column != 0) { column = 0; _y += height + gap; }
+
         var sound = MakeText((string)Value(nameof(_s.CaptureSound)), 0);
         sound.TextChanged += (_, _) => Set(nameof(_s.CaptureSound), sound.Text);
         var choose = new FluentButton(); StyleButton(choose, "更改"); choose.Click += (_, _) =>
@@ -332,8 +346,43 @@ internal sealed partial class PreferencesForm
         var resetSound = new FluentButton(); StyleButton(resetSound, "恢复默认");
         resetSound.Click += (_, _) => sound.Clear();
         RowFill("截图音效文件", sound, play, choose, resetSound);
-        HintText("留空使用内置截图提示音，自定义文件支持 WAV。");
-        Flag("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy)); Flag("保存截图时播放音效", nameof(_s.SoundOnSave));
+        FlagCell("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy)); FlagCell("保存截图时播放音效", nameof(_s.SoundOnSave));
+        if (column != 0) _y += height + gap;
+    }
+
+    /// <summary>Half-width card carrying one switch, mirroring the full-width Flag look.</summary>
+    private void CheckCell(int left, int width, int height, string label, string name)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var box = new FluentToggle
+        {
+            Text = label,
+            AutoSize = false,
+            Bounds = new Rectangle(Px(48), Px(6), Math.Max(Px(60), width - Px(62)), height - Px(12)),
+            BackColor = AppTheme.Current.Card,
+            ForeColor = Ink,
+            Checked = (bool)Value(name)
+        };
+        box.CheckedChanged += (_, _) => Set(name, box.Checked);
+        card.Controls.Add(box);
+    }
+
+    /// <summary>Half-width card with a right-aligned numeric field.</summary>
+    private void NumberCell(int left, int width, int height, string label, string name, int min, int max)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(104), value => Set(name, value));
+        var field = new FluentInputFrame(number) { Height = FieldHeight };
+        field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
+        card.Controls.Add(field);
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
     }
     private void ActionRow(string label, string action, string exit)
         => ActionRowCore(label, action, exit,
