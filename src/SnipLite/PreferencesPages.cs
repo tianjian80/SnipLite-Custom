@@ -1043,7 +1043,11 @@ internal sealed partial class PreferencesForm
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 };
                 card.Controls.Add(nameLabel);
-                box.SetBounds(Px(LabelW + ControlGap), Math.Max(0, (cardHeight - box.Height) / 2), Px(132), box.Height);
+                // Copy the row-3 grid card geometry exactly: same capsule width and
+                // the same 12 px right inset, so both columns line up pixel for pixel.
+                var gridWidth = (ContentWidth() - gap) / 2;
+                var gridBoxWidth = Math.Max(Px(96), Math.Min(Px(156), gridWidth / 3 + Px(36)));
+                box.SetBounds(gridWidth - Px(12) - gridBoxWidth, Math.Max(0, (cardHeight - box.Height) / 2), gridBoxWidth, box.Height);
                 card.Controls.Add(box);
 
                 var smart = new FluentToggle
@@ -1074,7 +1078,6 @@ internal sealed partial class PreferencesForm
                     caption.Height = caption.PreferredHeight;
                     caption.Left = smart.Left - caption.Width - Px(8);
                     caption.Top = (cardHeight - caption.Height) / 2;
-                    box.Left = Math.Max(Px(LabelW), caption.Left - Px(16) - box.Width);
                     nameLabel.Width = Math.Max(Px(60), box.Left - Px(14) - Px(10));
                 }
                 PlaceCaption();
