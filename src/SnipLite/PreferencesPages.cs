@@ -134,11 +134,20 @@ internal sealed partial class PreferencesForm
         var configureWidth = TextRenderer.MeasureText(UiText.T("配置微软密钥"), Font).Width + Px(28);
         var chooserWidth = Math.Min(ChooserWidth, Math.Max(Px(200), FillWidth() - configureWidth - Px(ControlGap)));
         Section("语言与识别", () => { });
-        Choice("显示语言", nameof(_s.DisplayLanguage),
-            new[] { UiText.T("跟随系统") }.Concat(Localization.LanguageService.Languages.Select(l => l.NativeName)).ToArray(),
-            new object[] { Localization.LanguageService.SystemDefault }.Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray(),
-            chooserWidth, true);
-        Choice("识别引擎", nameof(_s.OcrEngine), new[] { "本地增强 (自动识别)", "Windows 系统识别" }, new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows }, chooserWidth, true);
+        var languageLabels = new[] { UiText.T("跟随系统") }
+            .Concat(Localization.LanguageService.Languages.Select(l => l.NativeName)).ToArray();
+        var languageValues = new object[] { Localization.LanguageService.SystemDefault }
+            .Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray();
+        var languageChooser = MakeChooser(languageLabels,
+            Math.Max(0, Array.IndexOf(languageValues, Value(nameof(_s.DisplayLanguage)))),
+            index => Set(nameof(_s.DisplayLanguage), languageValues[index]), chooserWidth, true);
+        var engineValues = new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows };
+        var engineChooser = MakeChooser(new[] { "本地增强 (自动识别)", "Windows 系统识别" },
+            Math.Max(0, Array.IndexOf(engineValues, Value(nameof(_s.OcrEngine)))),
+            index => Set(nameof(_s.OcrEngine), engineValues[index]), chooserWidth, true);
+        // Two pickers share the first line; the grid gives each card the room its
+        // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
+        GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
         Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true);
         var translationServices = TranslationProviders.Choices.Select(choice => choice.Kind).ToArray();
         var translationLabels = TranslationProviders.Choices.Select(choice => choice.Label).ToArray();
@@ -229,7 +238,7 @@ internal sealed partial class PreferencesForm
         var logLevels = new[] { "Off", "Error", "Normal", "Debug" };
         var logChooser = MakeChooser(new[] { "关闭", "仅错误", "普通", "调试" },
             Math.Max(0, Array.IndexOf(logLevels, (string)Value(nameof(_s.LogLevel)))),
-            index => Set(nameof(_s.LogLevel), logLevels[index]));
+            index => Set(nameof(_s.LogLevel), logLevels[index]), 0, true, true);
         var openLog = new FluentButton(); StyleButton(openLog, "打开日志文件");
         openLog.Click += (_, _) => OpenFile(AppLog.FilePath);
         Row("日志级别", logChooser, openLog);
