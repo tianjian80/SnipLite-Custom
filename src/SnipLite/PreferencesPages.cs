@@ -1043,11 +1043,14 @@ internal sealed partial class PreferencesForm
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 };
                 card.Controls.Add(nameLabel);
-                // Copy the row-3 grid card geometry exactly: same capsule width and
-                // the same 12 px right inset, so both columns line up pixel for pixel.
+                // Left edge lines up with the row-3 grid capsule; the right edge runs
+                // ~50 px past the page centre so the wide combo is centred in a fuller
+                // capsule that bridges the two grid columns below.
                 var gridWidth = (ContentWidth() - gap) / 2;
                 var gridBoxWidth = Math.Max(Px(96), Math.Min(Px(156), gridWidth / 3 + Px(36)));
-                box.SetBounds(gridWidth - Px(12) - gridBoxWidth, Math.Max(0, (cardHeight - box.Height) / 2), gridBoxWidth, box.Height);
+                var boxLeft = gridWidth - Px(12) - gridBoxWidth;
+                var wide = Math.Max(gridBoxWidth, ContentWidth() / 2 + Px(50) - boxLeft);
+                box.SetBounds(boxLeft, Math.Max(0, (cardHeight - box.Height) / 2), wide, box.Height);
                 card.Controls.Add(box);
 
                 var smart = new FluentToggle
