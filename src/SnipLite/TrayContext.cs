@@ -51,15 +51,36 @@ internal sealed class TrayContext : ApplicationContext
             TabStop = true;
         }
 
-        private int Stride => _cardHeight + Gap;
-        private int ContentHeight => Pad * 2 + _entries.Count * _cardHeight + Math.Max(0, _entries.Count - 1) * Gap;
+        private int Stride => CardHeight + Gap;
+        /// <summary>
+        /// Effective card height: the constructor's 16:9 height, capped so the visible
+        /// cards always fit the hosted client area exactly (the drop-down keeps a
+        /// couple of pixels for its own border, which used to trigger ▲ / ▼ bars).
+        /// </summary>
+        private int CardHeight
+        {
+            get
+            {
+                var count = Math.Max(1, Math.Min(_entries.Count, 5));
+                var fit = (Height - Pad * 2 - (count - 1) * Gap) / count;
+                return Math.Min(_cardHeight, Math.Max(24, fit));
+            }
+        }
+        private int ContentHeight
+        {
+            get
+            {
+                var card = CardHeight;
+                return Pad * 2 + _entries.Count * card + Math.Max(0, _entries.Count - 1) * Gap;
+            }
+        }
 
         private int IndexAt(int y)
         {
             y += _offset - Pad;
             if (y < 0) return -1;
             var index = y / Stride;
-            if (index >= _entries.Count || y % Stride >= _cardHeight) return -1;
+            if (index >= _entries.Count || y % Stride >= CardHeight) return -1;
             return index;
         }
 
@@ -104,12 +125,13 @@ internal sealed class TrayContext : ApplicationContext
             g.Clear(BackColor);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            var cardHeight = CardHeight;
             for (var index = 0; index < _entries.Count; index++)
             {
                 var top = Pad + index * Stride - _offset;
-                if (top + _cardHeight < 0) continue;
+                if (top + cardHeight < 0) continue;
                 if (top > Height) break;
-                var card = new Rectangle(Pad, top, _cardWidth, _cardHeight);
+                var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
                 using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, card);
                 var thumb = _entries[index].Thumbnail;
                 var scale = Math.Min((card.Width - 2) / (float)thumb.Width, (card.Height - 2) / (float)thumb.Height);
@@ -251,7 +273,11 @@ internal sealed class TrayContext : ApplicationContext
                         dropMenu.Size = new Size(available, 40);
                         return;
                     }
-                    var panel = new HistoryPanel(entries, new Size(available, height), cardWidth, cardHeight, entry =>
+                    // The hosted item must stay a couple of pixels shorter than the
+                    // drop-down: ToolStripDropDownMenu reserves that strip for its own
+                    // border and would otherwise enable its ▲ / ▼ overflow bars.
+                    var panelHeight = Math.Max(60, height - 4);
+                    var panel = new HistoryPanel(entries, new Size(available, panelHeight), cardWidth, cardHeight, entry =>
                     {
                         history.DropDown?.Close();
                         menu.Close();
@@ -260,7 +286,7 @@ internal sealed class TrayContext : ApplicationContext
                     history.DropDownItems.Add(new ToolStripControlHost(panel)
                     {
                         AutoSize = false,
-                        Size = new Size(available, height),
+                        Size = new Size(available, panelHeight),
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
