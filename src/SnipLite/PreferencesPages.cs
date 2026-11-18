@@ -41,7 +41,25 @@ internal sealed partial class PreferencesForm
     }
     private void Flag(string label, string name) => Check(label, (bool)Value(name), value => Set(name, value));
     private void Number(string label, string name, int min, int max, string suffix = "")
-        => Row(label, MakeNumber(min, max, Convert.ToInt32(Value(name)), 140, value => Set(name, value)), MakeStatic(suffix));
+    {
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), 140, value => Set(name, value));
+        if (suffix.Length == 0) { Row(label, number); return; }
+        Row(label, number, MakeUnit(suffix));
+    }
+
+    /// <summary>Unit caption on the body font, centred on the field's midline.</summary>
+    private Control MakeUnit(string text) => new Label
+    {
+        Text = text,
+        AutoSize = false,
+        Font = Font,
+        Width = TextRenderer.MeasureText(text, Font).Width + Px(2),
+        Height = FieldHeight,
+        TextAlign = ContentAlignment.MiddleLeft,
+        ForeColor = Ink,
+        BackColor = Color.Transparent,
+        Margin = Padding.Empty
+    };
     private void Choice(string label, string name, string[] labels, object[] values, int width = 0, bool center = false, bool centeredRows = false)
     {
         var value = Value(name);
