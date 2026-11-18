@@ -131,6 +131,7 @@ internal sealed partial class CaptureForm : ToolWindow
     private int _ocrAnchor = -1;
     private int _ocrEnd = -1;
     private bool _selectingText;
+    private PointF _ocrDragStart;
     private Rectangle _ocrCrop;
     private string? _qrText;
     private Rectangle _lastMagnifierBounds;
@@ -566,10 +567,13 @@ internal sealed partial class CaptureForm : ToolWindow
             if (command is not null) { ExitRecognition(); Command(command); return; }
             if (_recognitionBusy) return;
             if (_bar.Bounds.Contains(p)) return;
-            _ocrAnchor = _ocrDocument?.HitTest(new PointF(p.X - _ocrCrop.X, p.Y - _ocrCrop.Y), tolerance: 16 * Ui) ?? -1;
+            _ocrDragStart = new PointF(p.X - _ocrCrop.X, p.Y - _ocrCrop.Y);
+            _ocrAnchor = _ocrDocument?.HitTest(_ocrDragStart, tolerance: 16 * Ui) ?? -1;
             _ocrEnd = _ocrAnchor;
             _bar.ResultCopied = false;
-            _selectingText = _ocrAnchor >= 0;
+            // Allow the drag to begin anywhere inside the crop, so a marquee that
+            // starts in the empty margin can still sweep the text backwards.
+            _selectingText = _ocrDocument is not null;
             Capture = _selectingText;
             Invalidate();
             return;
@@ -753,8 +757,29 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             if (_selectingText && _ocrDocument is not null)
             {
-                _ocrEnd = _ocrDocument.HitTest(new PointF(_cursor.X - _ocrCrop.X, _cursor.Y - _ocrCrop.Y), nearest: true);
-                Invalidate(_selection);
+                var current = new PointF(_cursor.X - _ocrCrop.X, _cursor.Y - _ocrCrop.Y);
+                var moved = Math.Abs(current.X - _ocrDragStart.X) >= 2f || Math.Abs(current.Y - _ocrDragStart.Y) >= 2f;
+                if (_ocrAnchor >= 0 || moved)
+                {
+                    // Always build a normalised rectangle: dragging right-to-left or
+                    // bottom-to-top must produce positive width/height, otherwise the
+                    // character intersection test silently fails.
+                    var dragRect = RectangleF.FromLTRB(
+                        Math.Min(_ocrDragStart.X, current.X),
+                        Math.Min(_ocrDragStart.Y, current.Y),
+                        Math.Max(_ocrDragStart.X, current.X),
+                        Math.Max(_ocrDragStart.Y, current.Y));
+                    var (start, end) = _ocrDocument.RangeIn(dragRect);
+                    if (start < 0)
+                    {
+                        // No glyph under the marquee (pointer in the margin): fall back
+                        // to the nearest character so selection still follows the drag.
+                        start = end = _ocrDocument.HitTest(current, nearest: true);
+                    }
+                    _ocrAnchor = start;
+                    _ocrEnd = end;
+                    Invalidate(_selection);
+                }
             }
             UpdateCursor();
             UpdateHint();
@@ -1725,10 +1750,12 @@ internal sealed partial class CaptureForm : ToolWindow
         }
         foreach (var block in blocks)
         {
-            // One seamless block per line, with a couple of pixels of horizontal slack so
-            // the first and last glyphs are never clipped in half.
-            var slack = Math.Max(2f, 2.5f * Ui);
-            var rect = RectangleF.Inflate(block, slack, 0);
+            // One seamless block per line. The left edge gets a wider 4 px margin so
+            // the first glyph on the line is fully covered; the right side keeps a
+            // couple of pixels of slack.
+            var left = Math.Max(_ocrCrop.Left, block.Left - Math.Max(4f, 4f * Ui));
+            var right = block.Right + Math.Max(2f, 2.5f * Ui);
+            var rect = RectangleF.FromLTRB(left, block.Top, right, block.Bottom);
             g.FillRectangle(fill, rect);
         }
     }

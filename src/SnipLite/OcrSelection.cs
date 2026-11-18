@@ -70,6 +70,20 @@ internal sealed class OcrDocument
         return result.ToString();
     }
 
+    /// <summary>First and last characters intersecting the rectangle, in reading order.</summary>
+    public (int Start, int End) RangeIn(RectangleF rect)
+    {
+        var start = -1;
+        var end = -1;
+        for (var i = 0; i < Characters.Count; i++)
+        {
+            if (!Characters[i].Bounds.IntersectsWith(rect)) continue;
+            if (start < 0) start = i;
+            end = i;
+        }
+        return (start, end);
+    }
+
     public int HitTest(PointF point, bool nearest = false, float tolerance = 0)
     {
         var index = -1;
