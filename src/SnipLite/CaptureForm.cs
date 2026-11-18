@@ -30,6 +30,9 @@ internal sealed class CaptureResult
     /// copy it a second time (auto-copy hotkey path).
     /// </summary>
     public bool AlreadyCopied { get; init; }
+
+    /// <summary>The overlay already saved this capture to history (explicit save).</summary>
+    public bool HistoryRecorded { get; init; }
 }
 
 /// <summary>
@@ -105,6 +108,7 @@ internal sealed partial class CaptureForm : Form
     private bool _hasSelection;
     private bool _showMagnifier;
     private bool _finished;
+    private bool _historyRecorded; // an explicit save already added this capture to history
     private int _dragMode; // 0 = idle, 1 = new selection / drawing, 2 = move, 3+ = resize anchor
     private Rectangle _dragStartSelection;
     private Point _dragStartCursor;
@@ -133,6 +137,9 @@ internal sealed partial class CaptureForm : Form
     private bool MagnifierVisible => _showMagnifier || _dragMode >= 3 || _settings.AutoMagnifier && !_hasSelection && !_dragging;
 
     public event Action<CaptureResult?>? Done;
+
+    /// <summary>Raised the moment an explicit save succeeds, so the tray can record history.</summary>
+    public event Action<Bitmap, Rectangle>? Saved;
 
     public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null, bool autoCopy = false, bool longCapture = false)
     {
@@ -692,6 +699,7 @@ internal sealed partial class CaptureForm : Form
         _dragging = true;
         _dragMode = 1;
         _hasSelection = false;
+        _historyRecorded = false;
         _selection = Rectangle.Empty;
         _shapes.Clear();
         _undo.Clear();
@@ -1398,7 +1406,8 @@ internal sealed partial class CaptureForm : Form
         Finish(new CaptureResult
         {
             Image = RenderComposite(crop), Bounds = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height),
-            Pin = action == CaptureAction.Pin, Action = action, KeepOpen = !exit
+            Pin = action == CaptureAction.Pin, Action = action, KeepOpen = !exit,
+            HistoryRecorded = _historyRecorded
         });
     }
 
@@ -1754,7 +1763,8 @@ internal sealed partial class CaptureForm : Form
         {
             Image = RenderComposite(crop),
             Bounds = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height),
-            Pin = _resultPin
+            Pin = _resultPin,
+            HistoryRecorded = _historyRecorded
         });
     }
 
@@ -1789,6 +1799,11 @@ internal sealed partial class CaptureForm : Form
             using var image = RenderComposite(crop);
             var jpeg = dialog.FilterIndex == 2;
             Services.SaveImage(image, dialog.FileName, jpeg, _settings.JpegQuality);
+            // Record the saved capture immediately: saving is an independent exit path
+            // that never reaches the overlay's Done callback.
+            _historyRecorded = true;
+            try { Saved?.Invoke(image, new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height)); }
+            catch (Exception ex) { AppLog.Write("记录截屏历史失败", ex); }
             if (_settings.SoundOnSave) _ = Services.PlaySoundAsync(_settings.CaptureSound);
             if (_settings.RememberImageExtension) { _settings.LastImageExtension = jpeg ? ".jpg" : ".png"; _settings.Save(); }
             Toast.Show(UiText.T("已保存：") + Path.GetFileName(dialog.FileName));
@@ -1971,7 +1986,8 @@ internal sealed partial class CaptureForm : Form
             Image = RenderComposite(crop),
             Bounds = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height),
             Pin = _resultPin,
-            AlreadyCopied = alreadyCopied
+            AlreadyCopied = alreadyCopied,
+            HistoryRecorded = _historyRecorded
         });
     }
 

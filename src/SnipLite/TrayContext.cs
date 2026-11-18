@@ -131,12 +131,17 @@ internal sealed class TrayContext : ApplicationContext
                     foreach (var item in stale) item.Dispose();
                     foreach (var entry in entries)
                     {
+                        // Preserve the real screenshot aspect: wide stays wide, tall stays tall.
+                        var ratio = entry.Thumbnail.Height / (float)entry.Thumbnail.Width;
+                        var drawW = Math.Min(192, entry.Thumbnail.Width);
+                        var drawH = Math.Max(1, (int)Math.Round(drawW * ratio));
+                        if (drawH > 220) { drawH = 220; drawW = Math.Max(1, (int)Math.Round(drawH / ratio)); }
                         var row = new ThumbnailRow
                         {
                             Image = entry.Thumbnail,
                             Tag = "thumb",
                             AutoSize = false,
-                            Size = new Size(200, 120),
+                            Size = new Size(200, Math.Max(28, drawH + 10)),
                             Margin = new Padding(3, 2, 3, 2),
                             Padding = Padding.Empty
                         };
@@ -398,6 +403,12 @@ internal sealed class TrayContext : ApplicationContext
                 if (result is null || !result.KeepOpen) if (ReferenceEquals(_overlay, overlay)) _overlay = null;
                 if (result is not null) HandleResult(result, forceCopy);
             };
+            // Explicit save / save-as lives entirely inside the overlay: record it here.
+            overlay.Saved += (image, bounds) =>
+            {
+                try { _history.Add(image, bounds, _settings.HistoryImageLimit); }
+                catch (Exception ex) { AppLog.Write("记录截屏历史失败", ex); }
+            };
             overlay.FormClosed += (_, _) => { if (ReferenceEquals(_overlay, overlay)) _overlay = null; };
             overlay.Show();
         }
@@ -412,11 +423,11 @@ internal sealed class TrayContext : ApplicationContext
             // capture in history anyway, then skip the other output steps.
             if (result.AlreadyCopied && forceCopy)
             {
-                _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
+                if (!result.HistoryRecorded) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
                 AppLog.Write("截屏并自动复制：已由遮罩写入剪贴板，仅记录历史");
                 return;
             }
-            _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
+            if (!result.HistoryRecorded) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
             if (_settings.AutoSave) Services.SaveCaptureFile(result.Image, _settings, _settings.SaveDirectory);
             if (result.Pin || result.Action == CaptureAction.Pin)
             { PinImage(result.Image, result.Bounds); transferred = true; }
