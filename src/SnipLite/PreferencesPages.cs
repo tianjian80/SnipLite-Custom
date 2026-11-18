@@ -318,7 +318,9 @@ internal sealed partial class PreferencesForm
 
         FlagCell("自动检测窗口", nameof(_s.DetectWindows)); FlagCell("隐藏 1×1 提示", nameof(_s.HideOnePixelHint));
         FlagCell("自动检测界面元素", nameof(_s.DetectElements)); FlagCell("移出屏幕", nameof(_s.AllowOffscreenSelection));
-        FlagCell("捕捉鼠标指针", nameof(_s.CaptureCursor)); FlagCell("完全禁用鼠标指针捕捉", nameof(_s.DisableCursorCapture));
+        // One switch drives cursor capture; the legacy "disable" flag just mirrors it.
+        Cell((left, width) => CursorCell(left, width, height));
+        Cell((left, width) => NumberCell(left, width, height, "历史记录数", nameof(_s.HistoryImageLimit), 0, 100));
         FlagCell("其他程序窗口激活时退出截屏", nameof(_s.ExitCaptureOnDeactivate));
         FlagCell("截图后自动复制", nameof(_s.CopyAfterCapture));
         FlagCell("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy));
@@ -347,7 +349,6 @@ internal sealed partial class PreferencesForm
         var resetSound = new FluentButton(); StyleButton(resetSound, "恢复默认");
         resetSound.Click += (_, _) => sound.Clear();
         RowFill("截图音效文件", sound, play, choose, resetSound);
-        Number("截图及贴图各自的历史记录最大数", nameof(_s.HistoryImageLimit), 0, 100);
     }
 
     /// <summary>Half-width card carrying one switch, mirroring the full-width Flag look.</summary>
@@ -366,6 +367,46 @@ internal sealed partial class PreferencesForm
         };
         box.CheckedChanged += (_, _) => Set(name, box.Checked);
         card.Controls.Add(box);
+    }
+
+    /// <summary>Cursor switch: keeps the legacy "disable capture" flag in sync in both directions.</summary>
+    private void CursorCell(int left, int width, int height)
+    {
+        Value(nameof(_s.DisableCursorCapture));
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, "捕捉鼠标指针");
+        var box = new FluentToggle
+        {
+            Text = "捕捉鼠标指针",
+            AutoSize = false,
+            Bounds = new Rectangle(Px(48), Px(6), Math.Max(Px(60), width - Px(62)), height - Px(12)),
+            BackColor = AppTheme.Current.Card,
+            ForeColor = Ink,
+            Checked = (bool)Value(nameof(_s.CaptureCursor))
+        };
+        box.CheckedChanged += (_, _) =>
+        {
+            Set(nameof(_s.CaptureCursor), box.Checked);
+            Set(nameof(_s.DisableCursorCapture), !box.Checked);
+        };
+        card.Controls.Add(box);
+    }
+
+    /// <summary>Half-width card with a right-aligned numeric field.</summary>
+    private void NumberCell(int left, int width, int height, string label, string name, int min, int max)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(104), value => Set(name, value));
+        var field = new FluentInputFrame(number) { Height = FieldHeight };
+        field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
+        card.Controls.Add(field);
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
     }
 
     private void ActionRow(string label, string action, string exit)

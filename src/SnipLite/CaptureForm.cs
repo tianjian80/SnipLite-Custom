@@ -156,7 +156,7 @@ internal sealed partial class CaptureForm : Form
         using (var g = Graphics.FromImage(_screenshot))
         {
             g.CopyFromScreen(_virtual.Location, Point.Empty, _virtual.Size, CopyPixelOperation.SourceCopy);
-            if (settings.CaptureCursor && !settings.DisableCursorCapture) Win32.DrawCursor(g, _virtual.Location);
+            if (settings.CaptureCursor) Win32.DrawCursor(g, _virtual.Location);
         }
 
         FormBorderStyle = FormBorderStyle.None;
