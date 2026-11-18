@@ -577,7 +577,15 @@ internal sealed partial class PreferencesForm
             Math.Max(0, Array.IndexOf(systemLanguages, (string)Value(nameof(_s.OcrLanguage)))),
             index => Set(nameof(_s.OcrLanguage), systemLanguages[index]), 0, true, true);
         var fontButton = MakeFontButton(nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
-        GridRow("系统语言", systemLanguage, "界面字体", fontButton, leftPercent: 50);
+        var closeActions = new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit };
+        var closeAction = MakeChooser(new[] { "最小化到托盘", "直接关闭" },
+            Math.Max(0, Array.IndexOf(closeActions, Value(nameof(_s.CloseButtonAction)))),
+            index => Set(nameof(_s.CloseButtonAction), closeActions[index]), 0, true, true);
+        // Two compact cards on the first line, then the font picker spans the full row
+        // so "Microsoft YaHei UI, 13.875" can never be truncated.
+        GridRow("系统语言", systemLanguage, "关闭程序", closeAction, leftPercent: 50);
+        fontButton.Width = FillWidth();
+        Row("界面字体", fontButton);
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
@@ -601,9 +609,6 @@ internal sealed partial class PreferencesForm
             Math.Max(0, Array.IndexOf(trayStyles, trayStyle)), index => Set(nameof(_s.TrayIconStyle), trayStyles[index]),
             trayWidth, true, true), iconButton);
         Value(nameof(_s.CustomTrayIcon));
-        Choice("关闭程序", nameof(_s.CloseButtonAction),
-            new[] { "最小化到托盘", "直接关闭" },
-            new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit }, ChooserWidth, true, true);
     }
     private void MagnifierPage()
     {

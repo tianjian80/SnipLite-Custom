@@ -629,7 +629,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     }
 
     private void BuildGeneral() => GeneralPage();
-    private void BuildInterface() => SubPages(new[] { "常规", "放大镜" }, InterfacePage, MagnifierPage);
+    private void BuildInterface() => SubPages(new[] { "风格", "放大镜" }, InterfacePage, MagnifierPage);
     private void BuildCapture() => SubPages(new[] { "显示", "行为", "按键", "长截图" }, CaptureDisplayPage, CaptureBehaviorPage, CaptureKeysPage, LongCapturePage);
     private void BuildVideo() => SubPages(new[] { "录屏", "GIF动画" }, RecordPage, GifPage);
     private void BuildPin() => SubPages(new[] { "显示", "行为", "转换" }, PinDisplayPage, PinBehaviorPage, PinConversionPage);
