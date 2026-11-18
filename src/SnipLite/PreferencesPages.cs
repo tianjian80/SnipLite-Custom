@@ -76,17 +76,25 @@ internal sealed partial class PreferencesForm
     private void ColorRow(string label, string name)
     {
         var button = new FluentButton { Tag = "color-swatch" }; StyleButton(button, "选择颜色");
-        button.BackColor = Color.FromArgb((int)Value(name));
-        button.ForeColor = button.BackColor.GetBrightness() < .45 ? Color.White : Ink;
+        // Uniform accent look across every colour picker in the preferences.
+        StyleAccent(button);
         button.Click += (_, _) =>
         {
-            using var dialog = new ColorDialog { Color = button.BackColor, FullOpen = true };
+            using var dialog = new ColorDialog { Color = Color.FromArgb((int)Value(name)), FullOpen = true };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            button.BackColor = dialog.Color;
-            button.ForeColor = dialog.Color.GetBrightness() < .45 ? Color.White : Ink;
             Set(name, dialog.Color.ToArgb());
         };
         Row(label, button);
+    }
+
+    /// <summary>Painter for the fixed blue picker buttons: #0067C0 with white text.</summary>
+    private static void StyleAccent(FluentButton button)
+    {
+        var blue = Color.FromArgb(0, 103, 192);
+        button.BackColor = blue;
+        button.ForeColor = Color.White;
+        button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
+        button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
     }
     private void FontRow(string label, string family, string size)
     {
@@ -260,6 +268,7 @@ internal sealed partial class PreferencesForm
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         var iconButton = new FluentButton(); StyleButton(iconButton, "选择图标文件");
+        StyleAccent(iconButton);
         iconButton.Click += (_, _) =>
         {
             using var dialog = new OpenFileDialog { Filter = UiText.T("图标与图片|*.ico;*.png;*.bmp"), CheckFileExists = true };
