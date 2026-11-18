@@ -91,8 +91,10 @@ internal sealed class FluentInputFrame : UserControl
     private int Px(float value) => (int)Math.Round(value * DeviceDpi / 96f);
     private Rectangle StepBounds(int step)
     {
-        var size = Px(Compact ? 17 : 25);
-        var left = Width - Px(3) - (step < 0 ? size * 2 + Px(1) : size);
+        var size = Px(Compact ? 21 : 25);
+        var gap = Px(Compact ? 3 : 1);
+        var right = Px(3);
+        var left = Width - right - (step < 0 ? size * 2 + gap : size);
         return new Rectangle(left, Px(3), size, Height - Px(6));
     }
 
@@ -186,7 +188,7 @@ internal sealed class FluentInputFrame : UserControl
             }
             using var pen = new Pen(enabled ? p.Text : p.Disabled, Math.Max(1, DeviceDpi / 96f));
             var x = bounds.Left + bounds.Width / 2; var y = bounds.Top + bounds.Height / 2;
-            var arm = Compact ? Math.Max(Px(5), bounds.Width / 3) : Px(4);
+            var arm = Compact ? Math.Max(Px(6), bounds.Width / 2 - Px(2)) : Px(4);
             e.Graphics.DrawLine(pen, x - arm, y, x + arm, y);
             if (step > 0) e.Graphics.DrawLine(pen, x, y - arm, x, y + arm);
         }

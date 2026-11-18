@@ -421,7 +421,7 @@ internal sealed partial class PreferencesForm
             Set(name, value);
         }
         box.Leave += (_, _) => Commit();
-        var field = new FluentInputFrame(box) { Height = FieldHeight, SpinnerReserve = 26, Compact = true };
+        var field = new FluentInputFrame(box) { Height = FieldHeight, SpinnerReserve = 42, Compact = true };
         field.Step = delta =>
         {
             value = Math.Clamp(value + delta, min, max);
