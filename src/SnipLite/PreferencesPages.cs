@@ -320,8 +320,9 @@ internal sealed partial class PreferencesForm
         FlagCell("自动检测界面元素", nameof(_s.DetectElements)); FlagCell("移出屏幕", nameof(_s.AllowOffscreenSelection));
         FlagCell("捕捉鼠标指针", nameof(_s.CaptureCursor)); FlagCell("完全禁用鼠标指针捕捉", nameof(_s.DisableCursorCapture));
         FlagCell("其他程序窗口激活时退出截屏", nameof(_s.ExitCaptureOnDeactivate));
-        Cell((left, width) => NumberCell(left, width, height, "截图及贴图各自的历史上限", nameof(_s.HistoryImageLimit), 0, 100));
         FlagCell("截图后自动复制", nameof(_s.CopyAfterCapture));
+        FlagCell("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy));
+        FlagCell("保存截图时播放音效", nameof(_s.SoundOnSave));
         if (column != 0) { column = 0; _y += height + gap; }
 
         var sound = MakeText((string)Value(nameof(_s.CaptureSound)), 0);
@@ -346,8 +347,7 @@ internal sealed partial class PreferencesForm
         var resetSound = new FluentButton(); StyleButton(resetSound, "恢复默认");
         resetSound.Click += (_, _) => sound.Clear();
         RowFill("截图音效文件", sound, play, choose, resetSound);
-        FlagCell("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy)); FlagCell("保存截图时播放音效", nameof(_s.SoundOnSave));
-        if (column != 0) _y += height + gap;
+        Number("截图及贴图各自的历史记录最大数", nameof(_s.HistoryImageLimit), 0, 100);
     }
 
     /// <summary>Half-width card carrying one switch, mirroring the full-width Flag look.</summary>
@@ -368,22 +368,6 @@ internal sealed partial class PreferencesForm
         card.Controls.Add(box);
     }
 
-    /// <summary>Half-width card with a right-aligned numeric field.</summary>
-    private void NumberCell(int left, int width, int height, string label, string name, int min, int max)
-    {
-        var card = NewSettingRow(left, width, height);
-        AddRowIcon(card, label);
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(104), value => Set(name, value));
-        var field = new FluentInputFrame(number) { Height = FieldHeight };
-        field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
-        card.Controls.Add(field);
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
-    }
     private void ActionRow(string label, string action, string exit)
         => ActionRowCore(label, action, exit,
             new[] { "复制到剪贴板", "贴到屏幕", "快速保存", "无操作" },
