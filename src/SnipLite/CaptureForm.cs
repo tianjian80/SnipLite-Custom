@@ -1701,7 +1701,8 @@ internal sealed partial class CaptureForm : ToolWindow
     private void DrawOcrSelection(Graphics g)
     {
         if (!_ocrMode || _ocrDocument is null) return;
-        using var fill = new SolidBrush(Color.FromArgb(100, _bar.Accent));
+        using var fill = new SolidBrush(Color.FromArgb(90, 178, 24, 24));
+        using var edge = new Pen(Color.FromArgb(200, 165, 18, 18), Math.Max(1, Ui));
         using var line = new Pen(Color.FromArgb(150, _bar.Accent), Math.Max(1, Ui));
         var start = Math.Min(_ocrAnchor, _ocrEnd);
         var end = Math.Max(_ocrAnchor, _ocrEnd);
@@ -1713,6 +1714,7 @@ internal sealed partial class CaptureForm : ToolWindow
             {
                 bounds.Inflate(Math.Max(1, bounds.Height * .12f), Math.Max(1, Ui));
                 g.FillRectangle(fill, bounds);
+                g.DrawRectangle(edge, bounds.X, bounds.Y, bounds.Width, bounds.Height);
             }
             else g.DrawLine(line, bounds.Left, bounds.Bottom, bounds.Right, bounds.Bottom);
         }
