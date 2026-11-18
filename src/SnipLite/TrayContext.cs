@@ -112,9 +112,10 @@ internal sealed class TrayContext : ApplicationContext
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
+                    // No icon/check gutter: the dropdown is exactly the thumbnail column.
                     drop.ShowImageMargin = false;
                     drop.ShowCheckMargin = false;
-                    drop.Padding = new Padding(2);
+                    drop.Padding = new Padding(5);
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
                 }
@@ -131,18 +132,14 @@ internal sealed class TrayContext : ApplicationContext
                     foreach (var item in stale) item.Dispose();
                     foreach (var entry in entries)
                     {
-                        // Preserve the real screenshot aspect: wide stays wide, tall stays tall.
-                        var ratio = entry.Thumbnail.Height / (float)entry.Thumbnail.Width;
-                        var drawW = Math.Min(192, entry.Thumbnail.Width);
-                        var drawH = Math.Max(1, (int)Math.Round(drawW * ratio));
-                        if (drawH > 220) { drawH = 220; drawW = Math.Max(1, (int)Math.Round(drawH / ratio)); }
+                        // Fixed 16:9 landscape card so the dropdown is always wide, never a strip.
                         var row = new ThumbnailRow
                         {
                             Image = entry.Thumbnail,
                             Tag = "thumb",
                             AutoSize = false,
-                            Size = new Size(200, Math.Max(28, drawH + 10)),
-                            Margin = new Padding(3, 2, 3, 2),
+                            Size = new Size(198, 110),
+                            Margin = Padding.Empty,
                             Padding = Padding.Empty
                         };
                         row.Click += (_, _) => PinImage(entry.Image(), entry.Bounds);
@@ -186,19 +183,18 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Opens the compact tray menu at the cursor. A 110px right-hand gutter is always
-    /// reserved so the thumbnail history submenu can unfold to the right without flipping.
+    /// Opens the compact tray menu at the cursor, keeping exactly 216px free on the right
+    /// (210px thumbnail dropdown + 6px gap) so the history submenu ends flush with the
+    /// screen's right edge.
     /// </summary>
     private void ShowTrayMenu()
     {
         var menu = _trayMenu;
         if (menu is null) return;
         menu.AutoClose = true;
-        var screen = Screen.FromPoint(Cursor.Position);
+        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        const int gutter = 240;
-        var x = Math.Min(Cursor.Position.X, screen.Bounds.Right - width - gutter);
-        x = Math.Max(screen.Bounds.Left, x);
+        var x = Math.Max(area.Left, area.Right - width - 216);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         // A drop-down shown without a foreground owner never receives the
         // outside-click notification that closes it, so claim foreground for the

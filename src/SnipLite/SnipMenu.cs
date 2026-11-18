@@ -23,6 +23,22 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        // Uniform 16:9 landscape card: light grey canvas, fitted screenshot, hairline border.
+        if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
+        {
+            var box = new Rectangle(Point.Empty, e.Item.Size);
+            using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, box);
+            var area = new Rectangle(1, 1, Math.Max(1, e.Item.Width - 2), Math.Max(1, e.Item.Height - 2));
+            var scale = Math.Min(area.Width / (float)thumb.Width, area.Height / (float)thumb.Height);
+            var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
+            var rect = new Rectangle(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.DrawImage(thumb, rect);
+            using var border = new Pen(e.Item.Selected ? AppTheme.Current.Accent : Color.FromArgb(208, 208, 208), 1f);
+            g.DrawRectangle(border, box.X, box.Y, box.Width - 1, box.Height - 1);
+            return;
+        }
         using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));
         if (e.Item.Selected && e.Item.Enabled)
         {
@@ -34,19 +50,6 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
             // Tray rows are drawn compact: a smaller glyph keeps the slim rows balanced.
             var size = (e.ToolStrip is TrayContextMenuStrip ? 14 : 16) * (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
             FluentIcons.Draw(g, icon[7..], new RectangleF(8, (e.Item.Height - size) / 2, size, size), AppTheme.Current.Text);
-        }
-        // History rows are pure thumbnails: paint the cached bitmap centred, with a hairline border.
-        if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
-        {
-            var area = new Rectangle(2, 2, Math.Max(1, e.Item.Width - 4), Math.Max(1, e.Item.Height - 4));
-            var scale = Math.Min(area.Width / (float)thumb.Width, area.Height / (float)thumb.Height);
-            var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
-            var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-            var rect = new Rectangle(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.DrawImage(thumb, rect);
-            using var border = new Pen(Color.FromArgb(208, 208, 208), 1f);
-            g.DrawRectangle(border, rect.X - 1, rect.Y - 1, rect.Width + 1, rect.Height + 1);
         }
     }
 
