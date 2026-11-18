@@ -706,7 +706,6 @@ internal sealed partial class PreferencesForm : Form
             LinkColor = _s.Accent, BackColor = Page, Cursor = Cursors.Hand, TabStop = true };
         license.LinkClicked += (_, _) => LicenseNotices.Show(this);
         Row("开源许可证", license);
-        HintText("截图、贴图、标注、文字与二维码识别均在本机处理。");
     }
 
     private LinkLabel MakeWebLink(string url, string? text = null)
