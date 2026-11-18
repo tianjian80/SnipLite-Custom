@@ -45,6 +45,10 @@ internal sealed class FluentInputFrame : UserControl
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal bool Compact { get; set; }
 
+    /// <summary>Custom −/+ stepper for plain text fields; replaces the native numeric spinner.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal Action<int>? Step { get; set; }
+
     public FluentInputFrame(Control editor)
     {
         var editorWidth = editor.Width;
@@ -96,7 +100,8 @@ internal sealed class FluentInputFrame : UserControl
     {
         base.OnLayout(e);
         if (_editor is null || _editor.Parent != _clip || _clip.Parent != this) return;
-        var reserve = _number is not null ? Px(SpinnerReserve)
+        var hasStepper = _number is not null || Step is not null;
+        var reserve = hasStepper ? Px(SpinnerReserve)
             : Suffix is null ? 0 : TextRenderer.MeasureText(Suffix, Font).Width + Px(4);
         var editorHeight = _editor.PreferredSize.Height;
         _clip.Bounds = new Rectangle(Px(8), Math.Max(Px(3), (Height - editorHeight) / 2), Math.Max(1, Width - Px(14) - reserve), editorHeight);
@@ -119,7 +124,7 @@ internal sealed class FluentInputFrame : UserControl
     {
         base.OnMouseMove(e);
         _hover = true;
-        var step = _number is null ? 0 : StepBounds(-1).Contains(e.Location) ? -1 : StepBounds(1).Contains(e.Location) ? 1 : 0;
+        var step = _number is null && Step is null ? 0 : StepBounds(-1).Contains(e.Location) ? -1 : StepBounds(1).Contains(e.Location) ? 1 : 0;
         if (_hoverStep != step) { _hoverStep = step; Invalidate(); }
         Cursor = step == 0 ? Cursors.IBeam : Cursors.Hand;
     }
@@ -130,7 +135,15 @@ internal sealed class FluentInputFrame : UserControl
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left) return;
         _editor.Focus();
-        if (_number is null) return;
+        if (_number is null)
+        {
+            if (Step is not null)
+            {
+                if (StepBounds(-1).Contains(e.Location)) Step(-1);
+                else if (StepBounds(1).Contains(e.Location)) Step(1);
+            }
+            return;
+        }
         if (StepBounds(-1).Contains(e.Location)) _number.DownButton();
         else if (StepBounds(1).Contains(e.Location)) _number.UpButton();
     }
@@ -160,11 +173,12 @@ internal sealed class FluentInputFrame : UserControl
             e.Graphics.DrawLine(accent, Px(5), Height - Px(1), Width - Px(5), Height - Px(1));
         }
         if (Suffix is not null) PaintSuffix(e.Graphics);
-        if (_number is null) return;
+        if (_number is null && Step is null) return;
         foreach (var step in new[] { -1, 1 })
         {
             var bounds = StepBounds(step);
-            var enabled = Enabled && (step < 0 ? _number.Value > _number.Minimum : _number.Value < _number.Maximum);
+            var enabled = Enabled && (_number is null
+                || (step < 0 ? _number.Value > _number.Minimum : _number.Value < _number.Maximum));
             if (_hoverStep == step && enabled)
             {
                 using var hoverPath = FluentDrawing.Rounded(bounds, Px(3));

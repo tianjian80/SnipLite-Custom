@@ -397,14 +397,37 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        // Same total length as the "恢复默认" button above; the narrower field keeps
-        // a small spinner reserve so three-digit values still fit.
+        // Same total length as the "恢复默认" button above. A plain borderless box
+        // replaces NumericUpDown so the native ▲▼ spinner never covers the − button.
         var fieldWidth = TextRenderer.MeasureText("恢复默认", Font).Width + Px(28);
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), fieldWidth, value => Set(name, value));
-        number.Width = fieldWidth;
-        // Centred digits between the field edge and the compact +/- buttons.
-        number.TextAlign = HorizontalAlignment.Center;
-        var field = new FluentInputFrame(number) { Height = FieldHeight, SpinnerReserve = 26, Compact = true };
+        var value = Math.Clamp(Convert.ToInt32(Value(name)), min, max);
+        var box = new TextBox
+        {
+            BorderStyle = BorderStyle.None,
+            BackColor = AppTheme.Current.Field,
+            ForeColor = Ink,
+            TextAlign = HorizontalAlignment.Center,
+            Text = value.ToString(),
+            Width = fieldWidth
+        };
+        box.KeyPress += (_, e) =>
+        {
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true;
+        };
+        void Commit()
+        {
+            value = int.TryParse(box.Text, out var typed) ? Math.Clamp(typed, min, max) : value;
+            if (box.Text != value.ToString()) box.Text = value.ToString();
+            Set(name, value);
+        }
+        box.Leave += (_, _) => Commit();
+        var field = new FluentInputFrame(box) { Height = FieldHeight, SpinnerReserve = 26, Compact = true };
+        field.Step = delta =>
+        {
+            value = Math.Clamp(value + delta, min, max);
+            box.Text = value.ToString();
+            Set(name, value);
+        };
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
         card.Controls.Add(new Label
