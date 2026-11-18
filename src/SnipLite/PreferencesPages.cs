@@ -293,13 +293,78 @@ internal sealed partial class PreferencesForm
     }
     private void CaptureDisplayPage()
     {
-        Number("边框宽度", nameof(_s.CaptureBorderWidth), 1, 10, "像素");
-        ColorRow("遮罩颜色", nameof(_s.CaptureMaskColor));
-        Number("遮罩不透明度", nameof(_s.MaskOpacity), 0, 200, "/ 255");
-        Flag("显示锚点", nameof(_s.CaptureAnchors)); ColorRow("锚点描边颜色", nameof(_s.CaptureAnchorColor));
-        Flag("放大镜中显示遮罩", nameof(_s.MagnifierMask)); Flag("放大镜中显示边框", nameof(_s.MagnifierBorder));
-        Flag("放大镜中显示锚点", nameof(_s.MagnifierAnchors));
-        Flag("显示全屏十字线", nameof(_s.ShowCrosshair)); Flag("显示快捷键提示", nameof(_s.CaptureShortcutHints));
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var column = 0;
+
+        // Five rows of two equal cards; every caption stays on one line.
+        void Cell(Action<int, int> place)
+        {
+            place(_labelX + column * (cardWidth + gap), cardWidth);
+            if (++column == 2) { column = 0; _y += height + gap; }
+        }
+        void FlagCell(string label, string name) => Cell((left, width) => CheckCell(left, width, height, label, name));
+        void ColorCell(string label, string name) => Cell((left, width) => ColorChoiceCell(left, width, height, label, name));
+        void UnitCell(string label, string name, int min, int max, string unit)
+            => Cell((left, width) => NumberUnitCell(left, width, height, label, name, min, max, unit));
+
+        ColorCell("遮罩颜色", nameof(_s.CaptureMaskColor)); UnitCell("遮罩不透明度", nameof(_s.MaskOpacity), 0, 200, "/ 255");
+        FlagCell("显示锚点", nameof(_s.CaptureAnchors)); ColorCell("锚点描边颜色", nameof(_s.CaptureAnchorColor));
+        UnitCell("边框宽度", nameof(_s.CaptureBorderWidth), 1, 10, "像素"); FlagCell("放大镜中显示遮罩", nameof(_s.MagnifierMask));
+        FlagCell("放大镜中显示边框", nameof(_s.MagnifierBorder)); FlagCell("放大镜中显示锚点", nameof(_s.MagnifierAnchors));
+        FlagCell("显示全屏十字线", nameof(_s.ShowCrosshair)); FlagCell("显示快捷键提示", nameof(_s.CaptureShortcutHints));
+    }
+
+    /// <summary>Half-width card with a "选择颜色" swatch button hugging the right edge.</summary>
+    private void ColorChoiceCell(int left, int width, int height, string label, string name)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var button = new FluentButton { Tag = "color-swatch" };
+        StyleButton(button, "选择颜色");
+        button.BackColor = Color.FromArgb((int)Value(name));
+        button.ForeColor = button.BackColor.GetBrightness() < .45 ? Color.White : Ink;
+        button.SetBounds(width - Px(14) - button.Width, Math.Max(0, (height - button.Height) / 2), button.Width, button.Height);
+        button.Click += (_, _) =>
+        {
+            using var dialog = new ColorDialog { Color = button.BackColor, FullOpen = true };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            button.BackColor = dialog.Color;
+            button.ForeColor = dialog.Color.GetBrightness() < .45 ? Color.White : Ink;
+            Set(name, dialog.Color.ToArgb());
+        };
+        card.Controls.Add(button);
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), button.Left - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
+    }
+
+    /// <summary>Half-width card with a right-aligned number field and its unit caption.</summary>
+    private void NumberUnitCell(int left, int width, int height, string label, string name, int min, int max, string unit)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var caption = new Label
+        {
+            Text = unit, AutoSize = true, ForeColor = AppTheme.Current.Muted, BackColor = Color.Transparent
+        };
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), 76, value => Set(name, value));
+        var field = new FluentInputFrame(number) { Height = FieldHeight };
+        var unitLeft = width - Px(14) - caption.PreferredWidth;
+        caption.Location = new Point(unitLeft, (height - caption.PreferredHeight) / 2);
+        field.SetBounds(unitLeft - Px(6) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
+        card.Controls.Add(field);
+        card.Controls.Add(caption);
+        card.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
     }
     private void CaptureBehaviorPage()
     {
