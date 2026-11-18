@@ -140,15 +140,15 @@ internal sealed partial class PreferencesForm
             .Concat(Localization.LanguageService.Languages.Select(l => (object)l.Code)).ToArray();
         var languageChooser = MakeChooser(languageLabels,
             Math.Max(0, Array.IndexOf(languageValues, Value(nameof(_s.DisplayLanguage)))),
-            index => Set(nameof(_s.DisplayLanguage), languageValues[index]), chooserWidth, true);
+            index => Set(nameof(_s.DisplayLanguage), languageValues[index]), chooserWidth, true, true);
         var engineValues = new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows };
         var engineChooser = MakeChooser(new[] { "本地增强 (自动识别)", "Windows 系统识别" },
             Math.Max(0, Array.IndexOf(engineValues, Value(nameof(_s.OcrEngine)))),
-            index => Set(nameof(_s.OcrEngine), engineValues[index]), chooserWidth, true);
+            index => Set(nameof(_s.OcrEngine), engineValues[index]), chooserWidth, true, true);
         // Two pickers share the first line; the grid gives each card the room its
         // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
         GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
-        Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true);
+        Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true, true);
         var translationServices = TranslationProviders.Choices.Select(choice => choice.Kind).ToArray();
         var translationLabels = TranslationProviders.Choices.Select(choice => choice.Label).ToArray();
         int CurrentServiceIndex() => Math.Max(0, Array.IndexOf(translationServices, _s.TranslationProvider));
@@ -171,7 +171,7 @@ internal sealed partial class PreferencesForm
                 Set(nameof(_s.TranslationProvider), requested);
                 if (!translationService.IsDisposed) translationService.Text = UiText.T(translationLabels[index]);
             });
-        }, chooserWidth, true);
+        }, chooserWidth, true, true);
         var configureTranslator = new FluentButton();
         StyleButton(configureTranslator, "配置微软密钥");
         configureTranslator.Click += (_, _) =>
@@ -346,7 +346,7 @@ internal sealed partial class PreferencesForm
     }
     private void MagnifierPage()
     {
-        Choice("颜色值", nameof(_s.ColorHex), new[] { "RGB", "HEX" }, new object[] { false, true });
+        Choice("颜色值", nameof(_s.ColorHex), new[] { "RGB", "HEX" }, new object[] { false, true }, 0, true, true);
         Flag("隐藏 HEX 颜色值开头的 #", nameof(_s.ColorHideHash)); Flag("Hex 颜色值大写", nameof(_s.ColorUppercase));
         Flag("显示操作提示", nameof(_s.MagnifierHints));
         Flag("选区前自动显示放大镜", nameof(_s.AutoMagnifier));
