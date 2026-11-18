@@ -23,6 +23,16 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ThemeMonitor _themeMonitor = new();
     private readonly Localization.LanguageMonitor _languageMonitor;
     private readonly CaptureHistory _history = new();
+    /// <summary>History row that draws a cached thumbnail; never disposes that shared bitmap.</summary>
+    private sealed class ThumbnailRow : ToolStripMenuItem
+    {
+        public ThumbnailRow() : base(string.Empty) { }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) Image = null;
+            base.Dispose(disposing);
+        }
+    }
     private CaptureForm? _overlay;
     private PreferencesForm? _prefs;
     private bool _editingHotkey;
@@ -65,11 +75,13 @@ internal sealed class TrayContext : ApplicationContext
 
     private ContextMenuStrip BuildMenu()
     {
-        var menu = SnipMenu.CreateTray(); menu.Font = _settings.CreateInterfaceFont();
+        // Compact tray panel: 8.5pt rows, thin padding and small glyphs (roughly 40% smaller).
+        var menu = SnipMenu.CreateTray(compact: true);
+        menu.Font = new Font(menu.Font.FontFamily, 8.5f);
         // Entries are added through the per-item flags from 首选项 → 布局 → 托盘菜单.
         void Add(bool visible, string text, Action action, string key = "")
         {
-            if (visible) menu.Items.Add(SnipMenu.Item(text, action, key));
+            if (visible) menu.Items.Add(SnipMenu.Item(text, action, key, verticalPadding: 3));
         }
         // An unbound hotkey shows nothing on the right instead of a "未设置" label.
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
@@ -95,26 +107,40 @@ internal sealed class TrayContext : ApplicationContext
             {
                 var history = new ToolStripMenuItem(UiText.T("截屏历史"))
                 {
-                    // Open towards the right of the tray menu, not over it.
+                    // Always unfold to the right of the tray panel.
                     DropDownDirection = ToolStripDropDownDirection.Right
                 };
-                // Fill from the in-memory metadata cache while the parent menu opens,
-                // so the very first hover shows instantly with no disk or image work.
+                if (history.DropDown is ToolStripDropDownMenu drop)
+                {
+                    drop.ShowImageMargin = false;
+                    drop.ShowCheckMargin = false;
+                    drop.Padding = new Padding(2);
+                    drop.Font = menu.Font;
+                    drop.Renderer = menu.Renderer;
+                }
+                // Fill from the in-memory thumbnail cache while the parent menu opens:
+                // hovering later never touches disk or decodes a full screenshot.
                 menu.Opening += (_, _) =>
                 {
                     var entries = _history.Entries;
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
                     if (history.Tag as string == signature) return;
                     history.Tag = signature;
-                    // Replace the rows; disposing after Clear keeps the drop-down stable.
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
                     history.DropDownItems.Clear();
                     foreach (var item in stale) item.Dispose();
                     foreach (var entry in entries)
                     {
-                        var row = SnipMenu.Item(entry.Label, () => PinImage(entry.Image(), entry.Bounds));
-                        // Time-only rows: no leading glyph, so the text stays clean.
-                        row.Tag = null;
+                        var row = new ThumbnailRow
+                        {
+                            Image = entry.Thumbnail,
+                            Tag = "thumb",
+                            AutoSize = false,
+                            Size = new Size(88, 44),
+                            Margin = new Padding(2, 1, 2, 1),
+                            Padding = Padding.Empty
+                        };
+                        row.Click += (_, _) => PinImage(entry.Image(), entry.Bounds);
                         history.DropDownItems.Add(row);
                     }
                     if (history.DropDownItems.Count == 0)
@@ -125,7 +151,7 @@ internal sealed class TrayContext : ApplicationContext
             Add(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
         }
         menu.Items.Add(new ToolStripSeparator());
-        var disable = SnipMenu.Item("禁用快捷键", () => { _settings.HotkeysEnabled = !_settings.HotkeysEnabled; _settings.Save(); ApplySettings(); });
+        var disable = SnipMenu.Item("禁用快捷键", () => { _settings.HotkeysEnabled = !_settings.HotkeysEnabled; _settings.Save(); ApplySettings(); }, verticalPadding: 3);
         if (_settings.TrayItemDisableHotkeys)
         {
             menu.Items.Add(disable);
@@ -138,7 +164,7 @@ internal sealed class TrayContext : ApplicationContext
         Add(_settings.TrayItemPreferences, "首选项…", () => ShowPreferences(0), Key(_settings.PreferencesHotkey));
         Add(_settings.TrayItemAbout, "关于", () => ShowPreferences(9));
         Add(_settings.TrayItemRestart, "重新启动", Restart);
-        menu.Items.Add(SnipMenu.Item("退出", Exit));
+        menu.Items.Add(SnipMenu.Item("退出", Exit, verticalPadding: 3));
         TrimSeparators(menu.Items);
         UiText.Apply(menu, _settings.DisplayLanguage);
         return menu;
@@ -155,10 +181,8 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Opens the tray menu to the upper right of the cursor. WinForms normally
-    /// flips a menu left when the cursor is in the right half of the screen; here
-    /// the left edge stays at the cursor and only shifts when the right border
-    /// would otherwise be crossed.
+    /// Opens the compact tray menu at the cursor. A 110px right-hand gutter is always
+    /// reserved so the thumbnail history submenu can unfold to the right without flipping.
     /// </summary>
     private void ShowTrayMenu()
     {
@@ -167,8 +191,9 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var screen = Screen.FromPoint(Cursor.Position);
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        var x = Cursor.Position.X;
-        if (x + width > screen.Bounds.Right) x = screen.Bounds.Right - width;
+        const int gutter = 110;
+        var x = Math.Min(Cursor.Position.X, screen.Bounds.Right - width - gutter);
+        x = Math.Max(screen.Bounds.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         // A drop-down shown without a foreground owner never receives the
         // outside-click notification that closes it, so claim foreground for the
@@ -328,6 +353,8 @@ internal sealed class TrayContext : ApplicationContext
                 if (_settings.CaptureCursor) Win32.DrawCursor(g, bounds.Location);
             }
 
+            // Every full-screen capture is its own history record too.
+            _history.Add(image, bounds, _settings.HistoryImageLimit);
             var path = Services.SaveCaptureFile(image, _settings, _settings.QuickSaveDirectory);
             var mode = !_settings.SmartFullScreenCapture ? "全屏（含任务栏）"
                 : bounds == screen.Bounds ? "全屏应用" : "桌面工作区";
@@ -381,12 +408,12 @@ internal sealed class TrayContext : ApplicationContext
         var transferred = false;
         try
         {
-            // The auto-copy overlay already wrote the bitmap to the clipboard, so the
-            // tray must not touch history or auto-save (those could fail and used to
-            // abort the whole result handling). Just dispose the bitmap.
+            // The auto-copy overlay already wrote the bitmap to the clipboard; record the
+            // capture in history anyway, then skip the other output steps.
             if (result.AlreadyCopied && forceCopy)
             {
-                AppLog.Write("截屏并自动复制：已由遮罩写入剪贴板，跳过历史与自动保存");
+                _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);
+                AppLog.Write("截屏并自动复制：已由遮罩写入剪贴板，仅记录历史");
                 return;
             }
             _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit);

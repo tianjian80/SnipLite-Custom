@@ -31,9 +31,30 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
         }
         if (e.Item is ToolStripMenuItem { Checked: false, Tag: string icon } && icon.StartsWith("fluent:", StringComparison.Ordinal))
         {
-            var size = 16 * (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
+            // Tray rows are drawn compact: a smaller glyph keeps the 40% slimmer rows balanced.
+            var size = (e.ToolStrip is TrayContextMenuStrip ? 12 : 16) * (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
             FluentIcons.Draw(g, icon[7..], new RectangleF(8, (e.Item.Height - size) / 2, size, size), AppTheme.Current.Text);
         }
+        // History rows are pure thumbnails: paint the cached bitmap centred, with a hairline border.
+        if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
+        {
+            var area = new Rectangle(2, 2, Math.Max(1, e.Item.Width - 4), Math.Max(1, e.Item.Height - 4));
+            var scale = Math.Min(area.Width / (float)thumb.Width, area.Height / (float)thumb.Height);
+            var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
+            var rect = new Rectangle(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.DrawImage(thumb, rect);
+            using var border = new Pen(Color.FromArgb(208, 208, 208), 1f);
+            g.DrawRectangle(border, rect.X - 1, rect.Y - 1, rect.Width + 1, rect.Height + 1);
+        }
+    }
+
+    protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+    {
+        // Thumbnails are composed in OnRenderMenuItemBackground, not in the image margin.
+        if (e.Item?.Tag is "thumb") return;
+        base.OnRenderItemImage(e);
     }
 
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
@@ -229,24 +250,25 @@ internal static class SnipMenu
 {
     public static ContextMenuStrip Create() => Build(combo: false);
 
-    /// <summary>Tray menu: same look, but its window never gets a taskbar button.</summary>
-    public static ContextMenuStrip CreateTray() => Build(combo: false, toolWindow: true);
+    /// <summary>Tray menu: same look, but compact rows and no taskbar button.</summary>
+    public static ContextMenuStrip CreateTray(bool compact = false) => Build(combo: false, toolWindow: true, compact: compact);
 
     /// <summary>Drop-down list for a settings picker: centered options, no icon column.</summary>
     public static ContextMenuStrip CreateComboPopup(bool centeredRows = false, string? standaloneCentered = null)
         => Build(combo: true, centeredRows: centeredRows, standaloneCentered: standaloneCentered);
 
-    private static ContextMenuStrip Build(bool combo, bool toolWindow = false, bool centeredRows = false, string? standaloneCentered = null)
+    private static ContextMenuStrip Build(bool combo, bool toolWindow = false, bool centeredRows = false, string? standaloneCentered = null, bool compact = false)
     {
         ContextMenuStrip menu = toolWindow ? new TrayContextMenuStrip() : new ContextMenuStrip();
-        menu.Font = new Font("Microsoft YaHei UI", 9f);
+        menu.Font = new Font("Microsoft YaHei UI", compact ? 8.5f : 9f);
         menu.BackColor = SnipMenuRenderer.Back;
         menu.ForeColor = AppTheme.Current.Text;
         menu.ShowImageMargin = false;
         menu.ShowCheckMargin = !combo;
         menu.DropShadowEnabled = true;
         menu.Renderer = combo ? new ComboPopupRenderer(centeredRows, standaloneCentered) : new SnipMenuRenderer();
-        menu.Padding = new Padding(4);
+        menu.Padding = new Padding(compact ? 2 : 4);
+        if (compact) menu.ImageScalingSize = new Size(12, 12);
         void ApplyTheme() { if (!menu.IsDisposed) { menu.BackColor = SnipMenuRenderer.Back; menu.ForeColor = AppTheme.Current.Text; menu.Invalidate(true); } }
         AppTheme.Changed += ApplyTheme;
         menu.Disposed += (_, _) => AppTheme.Changed -= ApplyTheme;
@@ -254,7 +276,7 @@ internal static class SnipMenu
         return menu;
     }
 
-    public static ToolStripMenuItem Item(string text, Action action, string shortcut = "", bool check = false)
+    public static ToolStripMenuItem Item(string text, Action action, string shortcut = "", bool check = false, int verticalPadding = 5)
     {
         var item = new ToolStripMenuItem(text)
         {
@@ -262,7 +284,7 @@ internal static class SnipMenu
             Checked = check,
             TextAlign = ContentAlignment.MiddleLeft,
             Tag = "fluent:" + FluentIcons.ForLabel(text),
-            Padding = new Padding(0, 5, 0, 5)
+            Padding = new Padding(0, verticalPadding, 0, verticalPadding)
         };
 
         if (shortcut.Length > 0)
