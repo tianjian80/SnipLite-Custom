@@ -23,17 +23,27 @@ internal static class TranslationLanguages
 
 internal sealed record TranslationResult(string Text, string? DetectedLanguage);
 
-internal enum TranslationProviderKind { Google, Microsoft, Bing, MyMemory }
+internal enum TranslationProviderKind { Google, Microsoft, Bing, MyMemory, Baidu }
 
 internal static class TranslationProviders
 {
-    public static readonly (TranslationProviderKind Kind, string Label)[] Choices =
+    /// <summary>Key-free engines, listed in their own preferences card.</summary>
+    public static readonly (TranslationProviderKind Kind, string Label)[] FreeChoices =
     {
         (TranslationProviderKind.Bing, "必应网页翻译"),
-        (TranslationProviderKind.Google, "Google"),
-        (TranslationProviderKind.MyMemory, "MyMemory"),
-        (TranslationProviderKind.Microsoft, "Microsoft Azure")
+        (TranslationProviderKind.Google, "谷歌翻译"),
+        (TranslationProviderKind.MyMemory, "翻译记忆")
     };
+
+    /// <summary>Credentialed engines, listed in the dedicated paid card.</summary>
+    public static readonly (TranslationProviderKind Kind, string Label)[] PaidChoices =
+    {
+        (TranslationProviderKind.Microsoft, "微软翻译"),
+        (TranslationProviderKind.Baidu, "百度翻译")
+    };
+
+    public static readonly (TranslationProviderKind Kind, string Label)[] Choices =
+        FreeChoices.Concat(PaidChoices).ToArray();
 
     public static string Label(TranslationProviderKind kind)
         => UiText.T(Choices.FirstOrDefault(choice => choice.Kind == kind).Label ?? Choices[0].Label);
@@ -43,6 +53,7 @@ internal static class TranslationProviders
         TranslationProviderKind.Google => new GooglePublicTranslationProvider(),
         TranslationProviderKind.Microsoft => new MicrosoftTranslationProvider(),
         TranslationProviderKind.MyMemory => new MyMemoryTranslationProvider(),
+        TranslationProviderKind.Baidu => new BaiduTranslationProvider(),
         _ => BingWebTranslationProvider.Shared
     };
 }

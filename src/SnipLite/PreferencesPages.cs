@@ -148,8 +148,8 @@ internal sealed partial class PreferencesForm
     private void GeneralPage()
     {
         // Keep all four pickers identical in width, but leave enough room for the
-        // "配置微软密钥" button on the translation row so its label never truncates.
-        var configureWidth = TextRenderer.MeasureText(UiText.T("配置微软密钥"), Font).Width + Px(28);
+        // "配置密钥" button on the paid translation row so its label never truncates.
+        var configureWidth = TextRenderer.MeasureText(UiText.T("配置密钥"), Font).Width + Px(28);
         var chooserWidth = Math.Min(ChooserWidth, Math.Max(Px(200), FillWidth() - configureWidth - Px(ControlGap)));
         Section("语言与识别", () => { });
         var languageLabels = new[] { UiText.T("跟随系统") }
@@ -167,38 +167,72 @@ internal sealed partial class PreferencesForm
         // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
         GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
         Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true, true);
-        var translationServices = TranslationProviders.Choices.Select(choice => choice.Kind).ToArray();
-        var translationLabels = TranslationProviders.Choices.Select(choice => choice.Label).ToArray();
-        int CurrentServiceIndex() => Math.Max(0, Array.IndexOf(translationServices, _s.TranslationProvider));
+        // Free engines and credentialed engines live on two separate cards, so the
+        // key-free services can never be confused with the ones that need a key.
+        var freeKinds = TranslationProviders.FreeChoices.Select(choice => choice.Kind).ToArray();
+        var freeLabels = TranslationProviders.FreeChoices.Select(choice => choice.Label).ToArray();
+        var paidKinds = TranslationProviders.PaidChoices.Select(choice => choice.Kind).ToArray();
+        var paidLabels = TranslationProviders.PaidChoices.Select(choice => choice.Label).ToArray();
         Value(nameof(_s.TranslationProvider));
-        Button translationService = null!;
-        translationService = MakeChooser(translationLabels, CurrentServiceIndex(), index =>
+        int IndexOf(TranslationProviderKind[] kinds) => Math.Max(0, Array.IndexOf(kinds, _s.TranslationProvider));
+        Button freeChooser = null!;
+        Button paidChooser = null!;
+        void SyncTranslationRows()
         {
-            var requested = translationServices[index];
-            if (requested != TranslationProviderKind.Microsoft || MicrosoftTranslatorCredentials.HasKey())
+            var paid = paidKinds.Contains(_s.TranslationProvider);
+            // While a keyed engine is active the free card is disabled; it comes back
+            // as soon as the paid key is cleared or a free engine is selected.
+            freeChooser.Enabled = !paid;
+            if (!paidChooser.IsDisposed)
+                paidChooser.Text = UiText.T(paid ? TranslationProviders.Label(_s.TranslationProvider) : "未启用");
+        }
+        freeChooser = MakeChooser(freeLabels, IndexOf(freeKinds), index =>
+        {
+            Set(nameof(_s.TranslationProvider), freeKinds[index]);
+            SyncTranslationRows();
+        }, FillWidth(), true, true);
+        void UsePaid(TranslationProviderKind kind)
+        {
+            var configured = kind == TranslationProviderKind.Baidu
+                ? BaiduTranslatorCredentials.HasKey()
+                : MicrosoftTranslatorCredentials.HasKey();
+            if (configured)
             {
-                Set(nameof(_s.TranslationProvider), requested);
+                Set(nameof(_s.TranslationProvider), kind);
+                SyncTranslationRows();
                 return;
             }
-
-            translationService.Text = UiText.T(translationLabels[CurrentServiceIndex()]);
+            SyncTranslationRows();
             // The dropdown must finish closing before a modal dialog opens.
             BeginInvoke(() =>
             {
-                if (translationService.IsDisposed || ConfigureMicrosoftTranslator(requireKey: true) != true) return;
-                Set(nameof(_s.TranslationProvider), requested);
-                if (!translationService.IsDisposed) translationService.Text = UiText.T(translationLabels[index]);
+                if (IsDisposed) return;
+                var saved = kind == TranslationProviderKind.Baidu
+                    ? ConfigureBaiduTranslator(requireKey: true)
+                    : ConfigureMicrosoftTranslator(requireKey: true);
+                if (saved == true) Set(nameof(_s.TranslationProvider), kind);
+                if (!IsDisposed) SyncTranslationRows();
             });
-        }, chooserWidth, true, true);
+        }
+        paidChooser = MakeChooser(paidLabels, IndexOf(paidKinds), index => UsePaid(paidKinds[index]), chooserWidth, true, true);
         var configureTranslator = new FluentButton();
-        StyleButton(configureTranslator, "配置微软密钥");
+        StyleButton(configureTranslator, "配置密钥");
         configureTranslator.Click += (_, _) =>
         {
-            if (ConfigureMicrosoftTranslator() != false || _s.TranslationProvider != TranslationProviderKind.Microsoft) return;
-            Set(nameof(_s.TranslationProvider), TranslationProviderKind.Bing);
-            if (!translationService.IsDisposed) translationService.Text = UiText.T(translationLabels[0]);
+            var kind = _s.TranslationProvider == TranslationProviderKind.Baidu
+                ? TranslationProviderKind.Baidu
+                : TranslationProviderKind.Microsoft;
+            var result = kind == TranslationProviderKind.Baidu
+                ? ConfigureBaiduTranslator()
+                : ConfigureMicrosoftTranslator();
+            // Clearing every field removes the credentials and falls back to a free engine.
+            if (result == false) Set(nameof(_s.TranslationProvider), TranslationProviderKind.Bing);
+            else if (result == true) Set(nameof(_s.TranslationProvider), kind);
+            SyncTranslationRows();
         };
-        Row("翻译服务", translationService, configureTranslator);
+        Row("免费翻译", freeChooser);
+        Row("专业翻译", paidChooser, configureTranslator);
+        SyncTranslationRows();
         Section("启动配置与日志", () => { });
         Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator));
         var gap = Px(10);
@@ -383,6 +417,118 @@ internal sealed partial class PreferencesForm
         AppTheme.Apply(dialog);
         dialog.HandleCreated += (_, _) => AppTheme.ApplyWindow(dialog);
         return dialog.ShowDialog(this) == DialogResult.OK ? !string.IsNullOrWhiteSpace(key.Text) : null;
+    }
+
+    /// <summary>Same fluent layout as the Microsoft dialog, for the Baidu open platform.</summary>
+    private bool? ConfigureBaiduTranslator(bool requireKey = false)
+    {
+        BaiduTranslatorCredentials? current = null;
+        try { current = BaiduTranslatorCredentials.Load(); }
+        catch (InvalidOperationException ex) { Toast.Error(ex.Message); }
+
+        using var dialog = new Form
+        {
+            Text = "百度翻译开放平台",
+            Font = Font,
+            AutoScaleMode = AutoScaleMode.None,
+            ClientSize = new Size(480, 300),
+            FormBorderStyle = FormBorderStyle.Sizable,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false
+        };
+        var appIdLabel = new Label
+        {
+            Text = "APP ID", TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var secretLabel = new Label
+        {
+            Text = UiText.T("密钥 (Secret Key)"), TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var appId = new TextBox
+        {
+            BorderStyle = BorderStyle.None,
+            Text = current?.AppId ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var secret = new TextBox
+        {
+            BorderStyle = BorderStyle.None, UseSystemPasswordChar = true,
+            Text = current?.Secret ?? "", Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var appIdField = new FluentInputFrame(appId) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var secretField = new FluentInputFrame(secret) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var hint = new Label
+        {
+            Text = "在百度翻译开放平台申请通用文本翻译的 APP ID 与密钥；留空并保存可清除配置。",
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = AppTheme.Current.Muted,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var save = new FluentButton
+        {
+            Text = UiText.T("确定"),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+            Enabled = !requireKey || (appId.Text.Trim().Length > 0 && secret.Text.Length > 0)
+        };
+        save.Tag = "accent-button";
+        StyleAccent(save);
+        if (requireKey) secret.TextChanged += (_, _) =>
+            save.Enabled = appId.Text.Trim().Length > 0 && secret.Text.Length > 0;
+        var cancel = new FluentButton
+        {
+            Text = UiText.T("取消"),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right, DialogResult = DialogResult.Cancel
+        };
+        dialog.Controls.AddRange(new Control[] { appIdLabel, appIdField, secretLabel, secretField, hint, save, cancel });
+        dialog.Load += (_, _) =>
+        {
+            var scale = dialog.DeviceDpi / 96f;
+            int S(int value) => (int)Math.Round(value * scale);
+            dialog.MinimumSize = new Size(S(420), S(290));
+            dialog.ClientSize = new Size(S(480), S(300));
+            const int margin = 18, labelHeight = 24, fieldHeight = 34, gap = 12;
+            var x = S(margin);
+            var width = dialog.ClientSize.Width - S(margin) * 2;
+            var y = S(16);
+            appIdLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
+            y += S(labelHeight) + S(4);
+            appIdField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
+            y += S(fieldHeight) + S(gap);
+            secretLabel.Bounds = new Rectangle(x, y, width, S(labelHeight));
+            y += S(labelHeight) + S(4);
+            secretField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
+            y += S(fieldHeight) + S(gap);
+            hint.Bounds = new Rectangle(x, y, width, S(22));
+            var buttonWidth = S(84);
+            var buttonHeight = S(34);
+            var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;
+            cancel.Bounds = new Rectangle(dialog.ClientSize.Width - S(margin) - buttonWidth, buttonTop, buttonWidth, buttonHeight);
+            save.Bounds = new Rectangle(cancel.Left - S(10) - buttonWidth, buttonTop, buttonWidth, buttonHeight);
+        };
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                BaiduTranslatorCredentials.Save(appId.Text.Trim(), secret.Text);
+                dialog.DialogResult = DialogResult.OK;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+            {
+                MessageBox.Show(dialog, UiText.T("无法保存百度翻译密钥，请检查本地目录权限后重试。"), dialog.Text,
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        };
+        dialog.AcceptButton = save;
+        dialog.CancelButton = cancel;
+        UiText.Apply(dialog);
+        AppTheme.Apply(dialog);
+        dialog.HandleCreated += (_, _) => AppTheme.ApplyWindow(dialog);
+        return dialog.ShowDialog(this) == DialogResult.OK
+            ? appId.Text.Trim().Length > 0 && secret.Text.Length > 0
+            : null;
     }
 
     private void InterfacePage()

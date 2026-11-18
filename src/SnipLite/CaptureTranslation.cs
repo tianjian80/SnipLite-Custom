@@ -49,6 +49,11 @@ internal sealed partial class CaptureForm
             panel.SetStatus(() => UiText.T("请在首选项 → 常规 → 配置微软密钥"));
             return;
         }
+        if (provider == TranslationProviderKind.Baidu && !BaiduTranslatorCredentials.HasKey())
+        {
+            panel.SetStatus(() => UiText.T("请在首选项 → 常规 → 专业翻译中配置百度翻译密钥"));
+            return;
+        }
         _translationProvider = TranslationProviders.Create(provider);
         panel.SetProvider(provider);
         _translationCache.Clear();
