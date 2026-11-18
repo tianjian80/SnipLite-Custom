@@ -42,10 +42,10 @@ internal sealed partial class PreferencesForm
     private void Flag(string label, string name) => Check(label, (bool)Value(name), value => Set(name, value));
     private void Number(string label, string name, int min, int max, string suffix = "")
         => Row(label, MakeNumber(min, max, Convert.ToInt32(Value(name)), 140, value => Set(name, value)), MakeStatic(suffix));
-    private void Choice(string label, string name, string[] labels, object[] values, int width = 0, bool center = false)
+    private void Choice(string label, string name, string[] labels, object[] values, int width = 0, bool center = false, bool centeredRows = false)
     {
         var value = Value(name);
-        Row(label, MakeChooser(labels, Math.Max(0, Array.IndexOf(values, value)), index => Set(name, values[index]), width, center));
+        Row(label, MakeChooser(labels, Math.Max(0, Array.IndexOf(values, value)), index => Set(name, values[index]), width, center, centeredRows));
     }
     /// <summary>Left/right slider with a live percentage readout, e.g. 100%.</summary>
     private void PercentSlider(string label, string name, int min, int max)
@@ -338,11 +338,11 @@ internal sealed partial class PreferencesForm
         var trayWidth = Math.Min(ChooserWidth, Math.Max(Px(150), FillWidth() - iconButton.Width - Px(ControlGap)));
         Row("托盘图标", MakeChooser(new[] { "自动", "彩色", "自定义" },
             Math.Max(0, Array.IndexOf(trayStyles, trayStyle)), index => Set(nameof(_s.TrayIconStyle), trayStyles[index]),
-            trayWidth, true), iconButton);
+            trayWidth, true, true), iconButton);
         Value(nameof(_s.CustomTrayIcon));
         Choice("关闭程序", nameof(_s.CloseButtonAction),
             new[] { "最小化到托盘", "直接关闭" },
-            new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit }, ChooserWidth, true);
+            new object[] { CloseButtonAction.MinimizeToTray, CloseButtonAction.Exit }, ChooserWidth, true, true);
     }
     private void MagnifierPage()
     {
