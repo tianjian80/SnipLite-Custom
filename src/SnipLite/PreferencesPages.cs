@@ -105,14 +105,27 @@ internal sealed partial class PreferencesForm
         Row(label, button);
     }
 
-    /// <summary>Painter for the fixed blue picker buttons: #0067C0 with white text.</summary>
+    /// <summary>Fixed blue picker buttons: #0067C0 with white text, gold on hover.</summary>
     private static void StyleAccent(FluentButton button)
     {
         var blue = Color.FromArgb(0, 103, 192);
+        var gold = Color.FromArgb(245, 184, 0);
         button.BackColor = blue;
         button.ForeColor = Color.White;
-        button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
-        button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
+        button.Cursor = Cursors.Hand;
+        button.FlatAppearance.MouseOverBackColor = gold;
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(214, 158, 0);
+        button.MouseEnter += (_, _) =>
+        {
+            if (!button.Enabled) return;
+            button.BackColor = gold;
+            button.ForeColor = Color.FromArgb(26, 26, 26);
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            button.BackColor = blue;
+            button.ForeColor = Color.White;
+        };
     }
     /// <summary>Blue, clickable second line of a dialog hint; opens the page in the default browser.</summary>
     private static LinkLabel HelpLink(string url)
@@ -649,14 +662,10 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var blue = Color.FromArgb(0, 103, 192);
         var button = new FluentButton { Tag = "color-swatch" };
         StyleButton(button, "选择颜色");
         // Uniform accent look regardless of the stored colour.
-        button.BackColor = blue;
-        button.ForeColor = Color.White;
-        button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
-        button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
+        StyleAccent(button);
         button.SetBounds(width - Px(14) - button.Width, Math.Max(0, (height - button.Height) / 2), button.Width, button.Height);
         button.Click += (_, _) =>
         {

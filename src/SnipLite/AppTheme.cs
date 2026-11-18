@@ -91,8 +91,17 @@ internal static class AppTheme
         if (control is Button button)
         {
             button.FlatAppearance.BorderColor = p.Border;
-            button.FlatAppearance.MouseOverBackColor = p.Hover;
-            button.FlatAppearance.MouseDownBackColor = p.AccentSoft;
+            // Fixed accent buttons keep their own gold hover instead of the neutral one.
+            if (accent)
+            {
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(245, 184, 0);
+                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(214, 158, 0);
+            }
+            else
+            {
+                button.FlatAppearance.MouseOverBackColor = p.Hover;
+                button.FlatAppearance.MouseDownBackColor = p.AccentSoft;
+            }
         }
         if (control.IsHandleCreated && control is TextBoxBase or UpDownBase or ScrollableControl)
             SetWindowTheme(control.Handle, p.Dark && !p.HighContrast ? "DarkMode_Explorer" : "Explorer", null);
