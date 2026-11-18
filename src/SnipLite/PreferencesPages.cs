@@ -117,10 +117,11 @@ internal sealed partial class PreferencesForm
     /// <summary>Blue, clickable second line of a dialog hint; opens the page in the default browser.</summary>
     private static LinkLabel HelpLink(string url)
     {
-        var link = new LinkLabel
+        var link = new FluentLinkLabel
         {
             Text = url,
             AutoSize = false,
+            TabStop = false,
             TextAlign = ContentAlignment.MiddleLeft,
             LinkColor = Color.FromArgb(0, 103, 192),
             ActiveLinkColor = Color.FromArgb(0, 82, 155),
@@ -168,10 +169,8 @@ internal sealed partial class PreferencesForm
     }
     private void GeneralPage()
     {
-        // Keep all four pickers identical in width, but leave enough room for the
-        // "配置密钥" button on the paid translation row so its label never truncates.
-        var configureWidth = TextRenderer.MeasureText(UiText.T("配置密钥"), Font).Width + Px(28);
-        var chooserWidth = Math.Min(ChooserWidth, Math.Max(Px(200), FillWidth() - configureWidth - Px(ControlGap)));
+        // Keep the pickers identical in width on the single-control rows.
+        var chooserWidth = ChooserWidth;
         Section("语言与识别", () => { });
         var languageLabels = new[] { UiText.T("跟随系统") }
             .Concat(Localization.LanguageService.Languages.Select(l => l.NativeName)).ToArray();
@@ -188,71 +187,64 @@ internal sealed partial class PreferencesForm
         // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
         GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
         Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true, true);
-        // Free engines and credentialed engines live on two separate cards, so the
-        // key-free services can never be confused with the ones that need a key.
+        // Free engines and credentialed engines share one compact line: the two cards
+        // are equal width, and the paid picker owns the credential dialogs.
         var freeKinds = TranslationProviders.FreeChoices.Select(choice => choice.Kind).ToArray();
         var freeLabels = TranslationProviders.FreeChoices.Select(choice => choice.Label).ToArray();
         var paidKinds = TranslationProviders.PaidChoices.Select(choice => choice.Kind).ToArray();
-        var paidLabels = TranslationProviders.PaidChoices.Select(choice => choice.Label).ToArray();
+        // Index 0 is the explicit "not enabled" state that hands control back to the
+        // free card, so a paid engine never traps the user.
+        var paidLabels = new[] { "未启用" }.Concat(TranslationProviders.PaidChoices.Select(choice => choice.Label)).ToArray();
         Value(nameof(_s.TranslationProvider));
-        int IndexOf(TranslationProviderKind[] kinds) => Math.Max(0, Array.IndexOf(kinds, _s.TranslationProvider));
+        int FreeIndex() => Math.Max(0, Array.IndexOf(freeKinds, _s.TranslationProvider));
+        int PaidIndex()
+        {
+            var index = Array.IndexOf(paidKinds, _s.TranslationProvider);
+            return index < 0 ? 0 : index + 1;
+        }
         Button freeChooser = null!;
         Button paidChooser = null!;
         void SyncTranslationRows()
         {
             var paid = paidKinds.Contains(_s.TranslationProvider);
-            // While a keyed engine is active the free card is disabled; it comes back
-            // as soon as the paid key is cleared or a free engine is selected.
+            // While a keyed engine is active the free card is disabled; choosing
+            // "未启用" (or clearing the key) brings it straight back.
             freeChooser.Enabled = !paid;
             if (!paidChooser.IsDisposed)
                 paidChooser.Text = UiText.T(paid ? TranslationProviders.Label(_s.TranslationProvider) : "未启用");
         }
-        freeChooser = MakeChooser(freeLabels, IndexOf(freeKinds), index =>
+        freeChooser = MakeChooser(freeLabels, FreeIndex(), index =>
         {
             Set(nameof(_s.TranslationProvider), freeKinds[index]);
             SyncTranslationRows();
-        }, FillWidth(), true, true);
-        void UsePaid(TranslationProviderKind kind)
+        }, 0, true, true);
+        void ChoosePaid(int index)
         {
-            var configured = kind == TranslationProviderKind.Baidu
-                ? BaiduTranslatorCredentials.HasKey()
-                : MicrosoftTranslatorCredentials.HasKey();
-            if (configured)
+            if (index == 0)
             {
-                Set(nameof(_s.TranslationProvider), kind);
+                Set(nameof(_s.TranslationProvider), TranslationProviderKind.Bing);
                 SyncTranslationRows();
                 return;
             }
+            var kind = paidKinds[index - 1];
             SyncTranslationRows();
-            // The dropdown must finish closing before a modal dialog opens.
+            // Picking an engine always opens its key dialog, so credentials can be
+            // reviewed as well as entered. The dropdown closes first.
             BeginInvoke(() =>
             {
                 if (IsDisposed) return;
                 var saved = kind == TranslationProviderKind.Baidu
-                    ? ConfigureBaiduTranslator(requireKey: true)
-                    : ConfigureMicrosoftTranslator(requireKey: true);
+                    ? ConfigureBaiduTranslator()
+                    : ConfigureMicrosoftTranslator();
+                // OK enables the engine; clearing every field deletes the credentials
+                // and falls back to the first free engine.
                 if (saved == true) Set(nameof(_s.TranslationProvider), kind);
+                else if (saved == false) Set(nameof(_s.TranslationProvider), TranslationProviderKind.Bing);
                 if (!IsDisposed) SyncTranslationRows();
             });
         }
-        paidChooser = MakeChooser(paidLabels, IndexOf(paidKinds), index => UsePaid(paidKinds[index]), chooserWidth, true, true);
-        var configureTranslator = new FluentButton();
-        StyleButton(configureTranslator, "配置密钥");
-        configureTranslator.Click += (_, _) =>
-        {
-            var kind = _s.TranslationProvider == TranslationProviderKind.Baidu
-                ? TranslationProviderKind.Baidu
-                : TranslationProviderKind.Microsoft;
-            var result = kind == TranslationProviderKind.Baidu
-                ? ConfigureBaiduTranslator()
-                : ConfigureMicrosoftTranslator();
-            // Clearing every field removes the credentials and falls back to a free engine.
-            if (result == false) Set(nameof(_s.TranslationProvider), TranslationProviderKind.Bing);
-            else if (result == true) Set(nameof(_s.TranslationProvider), kind);
-            SyncTranslationRows();
-        };
-        Row("免费翻译", freeChooser);
-        Row("专业翻译", paidChooser, configureTranslator);
+        paidChooser = MakeChooser(paidLabels, PaidIndex(), ChoosePaid, 0, true, true);
+        GridRow("免费翻译", freeChooser, "专业翻译", paidChooser, leftPercent: 50);
         SyncTranslationRows();
         Section("启动配置与日志", () => { });
         Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator));
@@ -372,7 +364,7 @@ internal sealed partial class PreferencesForm
         var regionField = new FluentInputFrame(region) { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         var hint = new Label
         {
-            Text = requireKey ? "请输入微软翻译密钥，全局资源可留空区域。" : "在微软翻译开放平台申请区域和密钥",
+            Text = "在微软翻译开放平台申请区域和密钥",
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -415,7 +407,7 @@ internal sealed partial class PreferencesForm
             regionField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
             y += S(fieldHeight) + S(gap);
             hint.Bounds = new Rectangle(x, y, width, S(22));
-            help.Bounds = new Rectangle(x, y + S(22), width, S(22));
+            help.Bounds = new Rectangle(x, y + S(30), width, S(22));
             var buttonWidth = S(84);
             var buttonHeight = S(34);
             var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;
@@ -530,7 +522,7 @@ internal sealed partial class PreferencesForm
             secretField.Bounds = new Rectangle(x, y, width, S(fieldHeight));
             y += S(fieldHeight) + S(gap);
             hint.Bounds = new Rectangle(x, y, width, S(22));
-            help.Bounds = new Rectangle(x, y + S(22), width, S(22));
+            help.Bounds = new Rectangle(x, y + S(30), width, S(22));
             var buttonWidth = S(84);
             var buttonHeight = S(34);
             var buttonTop = dialog.ClientSize.Height - S(margin) - buttonHeight;

@@ -257,6 +257,12 @@ internal sealed class FluentButton : Button
     }
 }
 
+/// <summary>Link label that never paints the dotted focus rectangle around its text.</summary>
+internal sealed class FluentLinkLabel : LinkLabel
+{
+    protected override bool ShowFocusCues => false;
+}
+
 /// <summary>
 /// Outer rounded capsule that supplies the single outline for a pair of borderless
 /// cells, so a picker plus a numeric field read as one box that is exactly as wide as
