@@ -813,57 +813,13 @@ internal sealed partial class PreferencesForm
     {
         Flag("文字转图片", nameof(_s.TextToImage)); Flag("总是忽略 HTML 格式", nameof(_s.IgnoreHtml));
         Flag("不把文件路径转化成贴图", nameof(_s.IgnoreFilePaths));
-        Number("页边距", nameof(_s.TextImageMargin), 0, 200, "像素"); Number("图片最大宽度", nameof(_s.TextImageMaxWidth), 100, 12000, "像素");
+        Number("页边距", nameof(_s.TextImageMargin), 0, 200); Number("图片最大宽度", nameof(_s.TextImageMaxWidth), 100, 12000);
         FontRow("字体", nameof(_s.TextImageFont), nameof(_s.TextImageFontSize));
-        BlueColorRow("背景颜色", nameof(_s.TextImageBackground));
-        BlueColorRow("文本颜色", nameof(_s.TextImageForeground), "预览文字贴图", () =>
-        {
-            using var image = TextImageRenderer.Render("预览\nAaOo012", null, _s);
-            using var preview = new Form { Text = UiText.T("文字贴图预览"), ClientSize = image.Size, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false };
-            preview.Controls.Add(new PictureBox { Image = image, Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom }); preview.ShowDialog(this);
-        });
-    }
-
-    /// <summary>
-    /// Full-width row whose colour button uses the fixed accent look, with an optional
-    /// extra button sitting to its left inside the same card.
-    /// </summary>
-    private void BlueColorRow(string label, string name, string? actionText = null, Action? action = null)
-    {
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
         var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
-        var card = NewSettingRow(height);
-        AddRowIcon(card, label);
-        var blue = Color.FromArgb(0, 103, 192);
-        var swatch = new FluentButton { Tag = "color-swatch" };
-        StyleButton(swatch, "选择颜色");
-        swatch.BackColor = blue;
-        swatch.ForeColor = Color.White;
-        swatch.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
-        swatch.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
-        swatch.Click += (_, _) =>
-        {
-            using var dialog = new ColorDialog { Color = Color.FromArgb((int)Value(name)), FullOpen = true };
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            Set(name, dialog.Color.ToArgb());
-        };
-        var right = card.Width - Px(14);
-        if (actionText is not null && action is not null)
-        {
-            var extra = new FluentButton();
-            StyleButton(extra, actionText);
-            extra.SetBounds(right - extra.Width, Math.Max(0, (height - extra.Height) / 2), extra.Width, extra.Height);
-            extra.Click += (_, _) => action();
-            right = extra.Left - Px(8);
-            card.Controls.Add(extra);
-        }
-        swatch.SetBounds(right - swatch.Width, Math.Max(0, (height - swatch.Height) / 2), swatch.Width, swatch.Height);
-        card.Controls.Add(swatch);
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), swatch.Left - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        ColorChoiceCell(_labelX, cardWidth, height, "背景颜色", nameof(_s.TextImageBackground));
+        ColorChoiceCell(_labelX + cardWidth + gap, cardWidth, height, "文本颜色", nameof(_s.TextImageForeground));
         _y += height + Px(6);
     }
 
