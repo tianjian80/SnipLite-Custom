@@ -136,11 +136,19 @@ internal sealed partial class PreferencesForm
         return link;
     }
 
-    private void FontRow(string label, string family, string size)
+    /// <summary>Centres a dialog on the screen that currently holds the mouse cursor.</summary>
+    private static void CenterOnScreen(Form dialog)
+    {
+        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
+        dialog.Location = new Point(
+            area.Left + (area.Width - dialog.Width) / 2,
+            area.Top + (area.Height - dialog.Height) / 2);
+    }
+
+    private FluentButton MakeFontButton(string family, string size)
     {
         Value(family); Value(size);
         var button = new FluentButton(); StyleButton(button, $"{Value(family)}, {Value(size)}");
-        button.Width = Math.Min(Px(320), FillWidth());
         button.Click += (_, _) =>
         {
             using var initial = new Font((string)Value(family), Convert.ToSingle(Value(size)));
@@ -152,6 +160,12 @@ internal sealed partial class PreferencesForm
             button.Text = $"{dialog.Font.Name}, {dialog.Font.SizeInPoints:0.#}";
             Persist();
         };
+        return button;
+    }
+    private void FontRow(string label, string family, string size)
+    {
+        var button = MakeFontButton(family, size);
+        button.Width = Math.Min(Px(320), FillWidth());
         Row(label, button);
     }
     private void FolderRow(string label, string name)
@@ -186,7 +200,6 @@ internal sealed partial class PreferencesForm
         // Two pickers share the first line; the grid gives each card the room its
         // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
         GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
-        Choice("系统识别语言", nameof(_s.OcrLanguage), new[] { "简体中文", "English", "跟随系统" }, new object[] { "zh-Hans", "en-US", "" }, chooserWidth, true, true);
         // Free engines and credentialed engines share one compact line: the two cards
         // are equal width, and the paid picker owns the credential dialogs.
         var freeKinds = TranslationProviders.FreeChoices.Select(choice => choice.Kind).ToArray();
@@ -335,7 +348,7 @@ internal sealed partial class PreferencesForm
             AutoScaleMode = AutoScaleMode.None,
             ClientSize = new Size(480, 300),
             FormBorderStyle = FormBorderStyle.Sizable,
-            StartPosition = FormStartPosition.CenterParent,
+            StartPosition = FormStartPosition.Manual,
             MinimizeBox = false,
             MaximizeBox = false,
             ShowInTaskbar = false
@@ -365,11 +378,12 @@ internal sealed partial class PreferencesForm
         var hint = new Label
         {
             Text = "在微软翻译开放平台申请区域和密钥",
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var help = HelpLink("https://www.microsoft.com/zh-cn/translator/");
+        help.TextAlign = ContentAlignment.MiddleCenter;
         var save = new FluentButton
         {
             Text = UiText.T("确定"),
@@ -391,6 +405,7 @@ internal sealed partial class PreferencesForm
             int S(int value) => (int)Math.Round(value * scale);
             dialog.MinimumSize = new Size(S(420), S(290));
             dialog.ClientSize = new Size(S(480), S(300));
+            CenterOnScreen(dialog);
             const int margin = 18, labelHeight = 24, fieldHeight = 34, gap = 12;
             var x = S(margin);
             var width = dialog.ClientSize.Width - S(margin) * 2;
@@ -449,7 +464,7 @@ internal sealed partial class PreferencesForm
             AutoScaleMode = AutoScaleMode.None,
             ClientSize = new Size(480, 300),
             FormBorderStyle = FormBorderStyle.Sizable,
-            StartPosition = FormStartPosition.CenterParent,
+            StartPosition = FormStartPosition.Manual,
             MinimizeBox = false,
             MaximizeBox = false,
             ShowInTaskbar = false
@@ -479,11 +494,12 @@ internal sealed partial class PreferencesForm
         var hint = new Label
         {
             Text = "在百度翻译开放平台申请通用文本翻译ID与密钥",
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = AppTheme.Current.Muted,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var help = HelpLink("https://fanyi-api.baidu.com/?fr=simultaneous");
+        help.TextAlign = ContentAlignment.MiddleCenter;
         var save = new FluentButton
         {
             Text = UiText.T("确定"),
@@ -506,6 +522,7 @@ internal sealed partial class PreferencesForm
             int S(int value) => (int)Math.Round(value * scale);
             dialog.MinimumSize = new Size(S(420), S(290));
             dialog.ClientSize = new Size(S(480), S(300));
+            CenterOnScreen(dialog);
             const int margin = 18, labelHeight = 24, fieldHeight = 34, gap = 12;
             var x = S(margin);
             var width = dialog.ClientSize.Width - S(margin) * 2;
@@ -555,7 +572,12 @@ internal sealed partial class PreferencesForm
     private void InterfacePage()
     {
         HintText("界面与图标跟随 Windows 浅色 / 深色模式，切换后即时生效。");
-        FontRow("界面字体", nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
+        var systemLanguages = new object[] { "zh-Hans", "en-US", "" };
+        var systemLanguage = MakeChooser(new[] { "简体中文", "English", "跟随系统" },
+            Math.Max(0, Array.IndexOf(systemLanguages, (string)Value(nameof(_s.OcrLanguage)))),
+            index => Set(nameof(_s.OcrLanguage), systemLanguages[index]), 0, true, true);
+        var fontButton = MakeFontButton(nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
+        GridRow("系统语言", systemLanguage, "界面字体", fontButton, leftPercent: 50);
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
