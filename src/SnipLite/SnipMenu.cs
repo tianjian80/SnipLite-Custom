@@ -31,8 +31,8 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
         }
         if (e.Item is ToolStripMenuItem { Checked: false, Tag: string icon } && icon.StartsWith("fluent:", StringComparison.Ordinal))
         {
-            // Tray rows are drawn compact: a smaller glyph keeps the 40% slimmer rows balanced.
-            var size = (e.ToolStrip is TrayContextMenuStrip ? 12 : 16) * (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
+            // Tray rows are drawn compact: a smaller glyph keeps the slim rows balanced.
+            var size = (e.ToolStrip is TrayContextMenuStrip ? 14 : 16) * (e.ToolStrip?.DeviceDpi ?? 96) / 96f;
             FluentIcons.Draw(g, icon[7..], new RectangleF(8, (e.Item.Height - size) / 2, size, size), AppTheme.Current.Text);
         }
         // History rows are pure thumbnails: paint the cached bitmap centred, with a hairline border.
@@ -260,15 +260,15 @@ internal static class SnipMenu
     private static ContextMenuStrip Build(bool combo, bool toolWindow = false, bool centeredRows = false, string? standaloneCentered = null, bool compact = false)
     {
         ContextMenuStrip menu = toolWindow ? new TrayContextMenuStrip() : new ContextMenuStrip();
-        menu.Font = new Font("Microsoft YaHei UI", compact ? 8.5f : 9f);
+        menu.Font = new Font("Microsoft YaHei UI", compact ? 9.75f : 9f);
         menu.BackColor = SnipMenuRenderer.Back;
         menu.ForeColor = AppTheme.Current.Text;
         menu.ShowImageMargin = false;
         menu.ShowCheckMargin = !combo;
         menu.DropShadowEnabled = true;
         menu.Renderer = combo ? new ComboPopupRenderer(centeredRows, standaloneCentered) : new SnipMenuRenderer();
-        menu.Padding = new Padding(compact ? 2 : 4);
-        if (compact) menu.ImageScalingSize = new Size(12, 12);
+        menu.Padding = new Padding(compact ? 3 : 4);
+        if (compact) menu.ImageScalingSize = new Size(14, 14);
         void ApplyTheme() { if (!menu.IsDisposed) { menu.BackColor = SnipMenuRenderer.Back; menu.ForeColor = AppTheme.Current.Text; menu.Invalidate(true); } }
         AppTheme.Changed += ApplyTheme;
         menu.Disposed += (_, _) => AppTheme.Changed -= ApplyTheme;

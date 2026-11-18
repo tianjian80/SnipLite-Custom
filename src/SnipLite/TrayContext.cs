@@ -75,9 +75,9 @@ internal sealed class TrayContext : ApplicationContext
 
     private ContextMenuStrip BuildMenu()
     {
-        // Compact tray panel: 8.5pt rows, thin padding and small glyphs (roughly 40% smaller).
+        // Compact tray panel: 9.75pt rows, thin padding and small glyphs.
         var menu = SnipMenu.CreateTray(compact: true);
-        menu.Font = new Font(menu.Font.FontFamily, 8.5f);
+        menu.Font = new Font(menu.Font.FontFamily, 9.75f);
         // Entries are added through the per-item flags from 首选项 → 布局 → 托盘菜单.
         void Add(bool visible, string text, Action action, string key = "")
         {
@@ -136,8 +136,8 @@ internal sealed class TrayContext : ApplicationContext
                             Image = entry.Thumbnail,
                             Tag = "thumb",
                             AutoSize = false,
-                            Size = new Size(88, 44),
-                            Margin = new Padding(2, 1, 2, 1),
+                            Size = new Size(200, 120),
+                            Margin = new Padding(3, 2, 3, 2),
                             Padding = Padding.Empty
                         };
                         row.Click += (_, _) => PinImage(entry.Image(), entry.Bounds);
@@ -191,7 +191,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var screen = Screen.FromPoint(Cursor.Position);
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        const int gutter = 110;
+        const int gutter = 240;
         var x = Math.Min(Cursor.Position.X, screen.Bounds.Right - width - gutter);
         x = Math.Max(screen.Bounds.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
