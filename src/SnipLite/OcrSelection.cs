@@ -77,7 +77,10 @@ internal sealed class OcrDocument
         for (var i = 0; i < Characters.Count; i++)
         {
             var bounds = Characters[i].Bounds;
-            if (bounds.Contains(point)) return i;
+            // A small horizontal slack keeps clicks on the first/last glyph from falling
+            // outside the character box in mixed Chinese/Latin text.
+            if (point.Y >= bounds.Top && point.Y <= bounds.Bottom
+                && point.X >= bounds.Left - 2 && point.X <= bounds.Right + 2) return i;
             var dx = Math.Max(bounds.Left - point.X, Math.Max(0, point.X - bounds.Right));
             var dy = Math.Max(bounds.Top - point.Y, Math.Max(0, point.Y - bounds.Bottom));
             var candidate = dx * dx + dy * dy;

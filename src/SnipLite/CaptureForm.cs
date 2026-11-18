@@ -1702,7 +1702,6 @@ internal sealed partial class CaptureForm : ToolWindow
     {
         if (!_ocrMode || _ocrDocument is null) return;
         using var fill = new SolidBrush(Color.FromArgb(90, 0, 103, 192));
-        using var edge = new Pen(Color.FromArgb(0, 103, 192), Math.Max(1.5f, 1.5f * Ui));
         using var line = new Pen(Color.FromArgb(150, _bar.Accent), Math.Max(1, Ui));
         var start = Math.Min(_ocrAnchor, _ocrEnd);
         var end = Math.Max(_ocrAnchor, _ocrEnd);
@@ -1715,7 +1714,9 @@ internal sealed partial class CaptureForm : ToolWindow
             bounds.Offset(_ocrCrop.Location);
             if (start >= 0 && i >= start && i <= end)
             {
-                if (blocks.Count > 0 && bounds.Top < blocks[^1].Bottom && bounds.Bottom > blocks[^1].Top)
+                var center = (bounds.Top + bounds.Bottom) / 2;
+                var previousCenter = blocks.Count > 0 ? (blocks[^1].Top + blocks[^1].Bottom) / 2 : float.MaxValue;
+                if (blocks.Count > 0 && Math.Abs(center - previousCenter) < bounds.Height * .5f)
                     blocks[^1] = RectangleF.Union(blocks[^1], bounds);
                 else blocks.Add(bounds);
                 continue;
@@ -1724,9 +1725,11 @@ internal sealed partial class CaptureForm : ToolWindow
         }
         foreach (var block in blocks)
         {
-            var rect = RectangleF.Inflate(block, 1f, Math.Max(1, Ui));
+            // One seamless block per line, with a couple of pixels of horizontal slack so
+            // the first and last glyphs are never clipped in half.
+            var slack = Math.Max(2f, 2.5f * Ui);
+            var rect = RectangleF.Inflate(block, slack, 0);
             g.FillRectangle(fill, rect);
-            g.DrawRectangle(edge, rect.X, rect.Y, rect.Width, rect.Height);
         }
     }
 
