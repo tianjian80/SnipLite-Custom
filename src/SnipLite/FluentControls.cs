@@ -243,14 +243,19 @@ internal sealed class FluentButton : Button
             if (DropDown) FluentIcons.Draw(g, "chevron", new RectangleF(Width - 21 * s, (Height - 16 * s) / 2, 16 * s, 16 * s), p.Muted);
             return;
         }
-        var surface = Selected ? p.AccentSoft : _hover ? p.Hover : BackColor;
+        // Accent buttons (colour pickers, icon picker, dialog OK) light up gold on hover;
+        // painting them here is mandatory because OnPaint ignores FlatAppearance.
+        var accent = Tag as string is "color-swatch" or "accent-button";
+        var onGold = accent && _hover && Enabled;
+        var surface = Selected ? p.AccentSoft : _hover ? (accent ? Color.FromArgb(245, 184, 0) : p.Hover) : BackColor;
         using var path = FluentDrawing.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), 5 * s);
         using var fill = new SolidBrush(surface); g.FillPath(fill, path);
         using var edge = new Pen(Selected ? p.Accent : p.Border); g.DrawPath(edge, path);
         var text = Rectangle.Inflate(ClientRectangle, -(int)(9 * s), 0);
         if (DropDown) text.Width -= (int)(20 * s);
         var alignment = TextAlign == ContentAlignment.MiddleLeft ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter;
-        TextRenderer.DrawText(g, Text, Font, text, Enabled ? Selected ? p.Accent : ForeColor : p.Disabled,
+        var ink = onGold ? Color.FromArgb(26, 26, 26) : ForeColor;
+        TextRenderer.DrawText(g, Text, Font, text, Enabled ? Selected ? p.Accent : ink : p.Disabled,
             alignment | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (DropDown) FluentIcons.Draw(g, "chevron", new RectangleF(Width - 23 * s, (Height - 16 * s) / 2, 16 * s, 16 * s), p.Muted);
         if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(ClientRectangle, -4, -4), p.Text, surface);
