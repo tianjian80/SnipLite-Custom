@@ -63,6 +63,33 @@ internal class ToolWindow : Form
 
     private void RemoveTaskbarButton()
     {
-        try { Shell?.DeleteTab(Handle); } catch { }
+        HideTaskbarTab(Handle);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    /// <summary>
+    /// Strips the taskbar button from any window, including WinForms drop-downs that
+    /// are not ToolWindow instances. Safe to call repeatedly.
+    /// </summary>
+    internal static void HideTaskbarTab(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return;
+        try
+        {
+            const int GwlExstyle = -20;
+            const int WsExToolWindow = 0x80;
+            const int WsExAppWindow = 0x40000;
+            var style = GetWindowLong(handle, GwlExstyle);
+            style |= WsExToolWindow;
+            style &= ~WsExAppWindow;
+            SetWindowLong(handle, GwlExstyle, style);
+        }
+        catch { }
+        try { Shell?.DeleteTab(handle); } catch { }
     }
 }

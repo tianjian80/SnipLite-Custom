@@ -208,6 +208,9 @@ internal sealed class TrayContext : ApplicationContext
                     drop.Padding = Padding.Empty;
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
+                    // The thumbnail popup is a plain drop-down, not a Form: strip its
+                    // taskbar button at the window level as soon as it exists.
+                    drop.HandleCreated += (_, _) => ToolWindow.HideTaskbarTab(drop.Handle);
                 }
                 // Size the column to the real gap between the open tray menu and the
                 // right screen edge; the panel scrolls instead of growing off-screen.
@@ -269,6 +272,7 @@ internal sealed class TrayContext : ApplicationContext
                 {
                     var dropDown = history.DropDown;
                     if (dropDown is null) return;
+                    ToolWindow.HideTaskbarTab(dropDown.Handle);
                     var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
                     var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
                     dropDown.Location = new Point(menu.Bounds.Right, top);
@@ -322,6 +326,7 @@ internal sealed class TrayContext : ApplicationContext
         var x = Math.Min(Cursor.Position.X, area.Right - width - 240);
         x = Math.Max(area.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
+        if (menu.IsHandleCreated) ToolWindow.HideTaskbarTab(menu.Handle);
         // A drop-down shown without a foreground owner never receives the
         // outside-click notification that closes it, so claim foreground for the
         // menu itself once its handle exists.
