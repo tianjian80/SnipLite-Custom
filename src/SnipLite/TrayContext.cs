@@ -228,7 +228,8 @@ internal sealed class TrayContext : ApplicationContext
                     var cardHeight = Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0));
                     var entries = _history.Entries;
                     var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
-                    var maxHeight = Math.Max(cardHeight + 12, screen.Height - 16);
+                    // At most five cards are visible; the rest scroll with the wheel.
+                    var maxHeight = Math.Min(5 * cardHeight + 36, screen.Height - 16);
                     var height = Math.Min(contentHeight, maxHeight);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
                     var key = $"{signature}@{available}x{cardHeight}";
@@ -262,6 +263,16 @@ internal sealed class TrayContext : ApplicationContext
                 // Re-check right after showing: the real menu bounds and screen gap are
                 // known then, so the submenu always ends flush with the screen edge.
                 history.DropDownOpening += (_, _) => FitHistory();
+                // Bottom-align the panel with the tray menu (it grows upwards) and keep
+                // its right edge exactly on the screen edge.
+                history.DropDownOpened += (_, _) =>
+                {
+                    var dropDown = history.DropDown;
+                    if (dropDown is null) return;
+                    var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
+                    var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
+                    dropDown.Location = new Point(menu.Bounds.Right, top);
+                };
                 menu.Items.Add(history);
             }
             Add(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
