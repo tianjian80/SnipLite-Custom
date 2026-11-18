@@ -1043,14 +1043,12 @@ internal sealed partial class PreferencesForm
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 };
                 card.Controls.Add(nameLabel);
-                // Left edge lines up with the row-3 grid capsule; the right edge runs
-                // ~50 px past the page centre so the wide combo is centred in a fuller
-                // capsule that bridges the two grid columns below.
+                // Left edge lines up with the row-3 grid capsule; PlaceCaption then
+                // stretches the right edge up to 16 px before the switch caption.
                 var gridWidth = (ContentWidth() - gap) / 2;
                 var gridBoxWidth = Math.Max(Px(96), Math.Min(Px(156), gridWidth / 3 + Px(36)));
                 var boxLeft = gridWidth - Px(12) - gridBoxWidth;
-                var wide = Math.Max(gridBoxWidth, ContentWidth() / 2 + Px(50) - boxLeft);
-                box.SetBounds(boxLeft, Math.Max(0, (cardHeight - box.Height) / 2), wide, box.Height);
+                box.SetBounds(boxLeft, Math.Max(0, (cardHeight - box.Height) / 2), gridBoxWidth, box.Height);
                 card.Controls.Add(box);
 
                 var smart = new FluentToggle
@@ -1081,6 +1079,9 @@ internal sealed partial class PreferencesForm
                     caption.Height = caption.PreferredHeight;
                     caption.Left = smart.Left - caption.Width - Px(8);
                     caption.Top = (cardHeight - caption.Height) / 2;
+                    // Fill the gap: the capsule ends 16 px before the switch caption,
+                    // so the centred combo sits over the two-column seam below.
+                    box.Width = Math.Max(gridBoxWidth, caption.Left - Px(16) - box.Left);
                     nameLabel.Width = Math.Max(Px(60), box.Left - Px(14) - Px(10));
                 }
                 PlaceCaption();
