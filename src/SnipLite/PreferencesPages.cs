@@ -306,32 +306,40 @@ internal sealed partial class PreferencesForm
         }
         void FlagCell(string label, string name) => Cell((left, width) => CheckCell(left, width, height, label, name));
         void ColorCell(string label, string name) => Cell((left, width) => ColorChoiceCell(left, width, height, label, name));
-        void UnitCell(string label, string name, int min, int max, string unit)
-            => Cell((left, width) => NumberUnitCell(left, width, height, label, name, min, max, unit));
+        void UnitCell(string label, string name, int min, int max)
+            => Cell((left, width) => NumberRightCell(left, width, height, label, name, min, max));
 
-        ColorCell("遮罩颜色", nameof(_s.CaptureMaskColor)); UnitCell("遮罩不透明度", nameof(_s.MaskOpacity), 0, 200, "/ 255");
+        ColorCell("遮罩颜色", nameof(_s.CaptureMaskColor)); UnitCell("遮罩不透明度", nameof(_s.MaskOpacity), 0, 200);
         FlagCell("显示锚点", nameof(_s.CaptureAnchors)); ColorCell("锚点描边颜色", nameof(_s.CaptureAnchorColor));
-        UnitCell("边框宽度", nameof(_s.CaptureBorderWidth), 1, 10, "像素"); FlagCell("放大镜中显示遮罩", nameof(_s.MagnifierMask));
+        UnitCell("边框宽度", nameof(_s.CaptureBorderWidth), 1, 10); FlagCell("放大镜中显示遮罩", nameof(_s.MagnifierMask));
         FlagCell("放大镜中显示边框", nameof(_s.MagnifierBorder)); FlagCell("放大镜中显示锚点", nameof(_s.MagnifierAnchors));
         FlagCell("显示全屏十字线", nameof(_s.ShowCrosshair)); FlagCell("显示快捷键提示", nameof(_s.CaptureShortcutHints));
     }
 
-    /// <summary>Half-width card with a "选择颜色" swatch button hugging the right edge.</summary>
+    /// <summary>Half-width card with a fixed blue swatch button plus a live colour dot.</summary>
     private void ColorChoiceCell(int left, int width, int height, string label, string name)
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
+        var blue = Color.FromArgb(0, 82, 155);
         var button = new FluentButton { Tag = "color-swatch" };
         StyleButton(button, "选择颜色");
-        button.BackColor = Color.FromArgb((int)Value(name));
-        button.ForeColor = button.BackColor.GetBrightness() < .45 ? Color.White : Ink;
+        // Uniform accent look: the chosen colour lives in the dot, not the whole button.
+        button.BackColor = blue;
+        button.ForeColor = Color.White;
+        button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
+        button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
+        var dot = new Panel { Size = new Size(Px(10), Px(10)), BackColor = Color.FromArgb((int)Value(name)) };
+        using (var circle = FluentDrawing.Rounded(new RectangleF(0, 0, dot.Width, dot.Height), dot.Width / 2f))
+            dot.Region = new Region(circle);
+        dot.Location = new Point(Px(9), Math.Max(0, (button.Height - dot.Height) / 2));
+        button.Controls.Add(dot);
         button.SetBounds(width - Px(14) - button.Width, Math.Max(0, (height - button.Height) / 2), button.Width, button.Height);
         button.Click += (_, _) =>
         {
-            using var dialog = new ColorDialog { Color = button.BackColor, FullOpen = true };
+            using var dialog = new ColorDialog { Color = dot.BackColor, FullOpen = true };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            button.BackColor = dialog.Color;
-            button.ForeColor = dialog.Color.GetBrightness() < .45 ? Color.White : Ink;
+            dot.BackColor = dialog.Color;
             Set(name, dialog.Color.ToArgb());
         };
         card.Controls.Add(button);
@@ -343,22 +351,15 @@ internal sealed partial class PreferencesForm
         });
     }
 
-    /// <summary>Half-width card with a right-aligned number field and its unit caption.</summary>
-    private void NumberUnitCell(int left, int width, int height, string label, string name, int min, int max, string unit)
+    /// <summary>Half-width card with a right-aligned number field, no unit caption.</summary>
+    private void NumberRightCell(int left, int width, int height, string label, string name, int min, int max)
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var caption = new Label
-        {
-            Text = unit, AutoSize = true, ForeColor = AppTheme.Current.Muted, BackColor = Color.Transparent
-        };
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), 76, value => Set(name, value));
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), 96, value => Set(name, value));
         var field = new FluentInputFrame(number) { Height = FieldHeight };
-        var unitLeft = width - Px(14) - caption.PreferredWidth;
-        caption.Location = new Point(unitLeft, (height - caption.PreferredHeight) / 2);
-        field.SetBounds(unitLeft - Px(6) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
+        field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
-        card.Controls.Add(caption);
         card.Controls.Add(new Label
         {
             Text = label, AutoSize = false, AutoEllipsis = true,
