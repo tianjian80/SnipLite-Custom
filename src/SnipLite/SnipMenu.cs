@@ -26,17 +26,21 @@ internal class SnipMenuRenderer : ToolStripProfessionalRenderer
         // Uniform 16:9 landscape card: light grey canvas, fitted screenshot, hairline border.
         if (e.Item is ToolStripMenuItem { Tag: "thumb", Image: Bitmap thumb })
         {
-            var box = new Rectangle(Point.Empty, e.Item.Size);
-            using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, box);
-            var area = new Rectangle(1, 1, Math.Max(1, e.Item.Width - 2), Math.Max(1, e.Item.Height - 2));
-            var scale = Math.Min(area.Width / (float)thumb.Width, area.Height / (float)thumb.Height);
+            using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));
+            // Fixed 198 × 110 preview area, centred inside the 210 × 118 row.
+            var areaWidth = Math.Min(198, Math.Max(1, e.Item.Width - 2));
+            var areaHeight = Math.Min(110, Math.Max(1, e.Item.Height - 2));
+            var area = new Rectangle((e.Item.Width - areaWidth) / 2, (e.Item.Height - areaHeight) / 2, areaWidth, areaHeight);
+            using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, area);
+            var inner = new Rectangle(area.X + 1, area.Y + 1, Math.Max(1, area.Width - 2), Math.Max(1, area.Height - 2));
+            var scale = Math.Min(inner.Width / (float)thumb.Width, inner.Height / (float)thumb.Height);
             var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
             var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-            var rect = new Rectangle(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
+            var rect = new Rectangle(inner.X + (inner.Width - width) / 2, inner.Y + (inner.Height - height) / 2, width, height);
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             g.DrawImage(thumb, rect);
             using var border = new Pen(e.Item.Selected ? AppTheme.Current.Accent : Color.FromArgb(208, 208, 208), 1f);
-            g.DrawRectangle(border, box.X, box.Y, box.Width - 1, box.Height - 1);
+            g.DrawRectangle(border, area.X, area.Y, area.Width - 1, area.Height - 1);
             return;
         }
         using (var background = new SolidBrush(Back)) g.FillRectangle(background, new Rectangle(Point.Empty, e.Item.Size));

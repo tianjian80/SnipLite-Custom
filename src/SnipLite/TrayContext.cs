@@ -112,10 +112,11 @@ internal sealed class TrayContext : ApplicationContext
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
-                    // No icon/check gutter: the dropdown is exactly the thumbnail column.
+                    // No icon/check gutter and no auto shrinking: the column is exactly 218px.
+                    drop.AutoSize = false;
                     drop.ShowImageMargin = false;
                     drop.ShowCheckMargin = false;
-                    drop.Padding = new Padding(5);
+                    drop.Padding = new Padding(4);
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
                 }
@@ -130,23 +131,29 @@ internal sealed class TrayContext : ApplicationContext
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
                     history.DropDownItems.Clear();
                     foreach (var item in stale) item.Dispose();
-                    foreach (var entry in entries)
+                    var maxRows = Math.Max(1, (Screen.FromPoint(Cursor.Position).WorkingArea.Height - 48) / 118);
+                    var shown = Math.Min(entries.Count, maxRows);
+                    for (var index = 0; index < shown; index++)
                     {
+                        var entry = entries[index];
                         // Fixed 16:9 landscape card so the dropdown is always wide, never a strip.
                         var row = new ThumbnailRow
                         {
                             Image = entry.Thumbnail,
                             Tag = "thumb",
                             AutoSize = false,
-                            Size = new Size(198, 110),
+                            Size = new Size(210, 118),
                             Margin = Padding.Empty,
                             Padding = Padding.Empty
                         };
                         row.Click += (_, _) => PinImage(entry.Image(), entry.Bounds);
                         history.DropDownItems.Add(row);
                     }
-                    if (history.DropDownItems.Count == 0)
+                    var empty = shown == 0;
+                    if (empty)
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
+                    if (history.DropDown is ToolStripDropDownMenu sized)
+                        sized.Size = new Size(218, empty ? 34 : 8 + shown * 118);
                 };
                 menu.Items.Add(history);
             }
@@ -183,9 +190,9 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Opens the compact tray menu at the cursor, keeping exactly 216px free on the right
-    /// (210px thumbnail dropdown + 6px gap) so the history submenu ends flush with the
-    /// screen's right edge.
+    /// Tray-icon menu only: positions the panel near the cursor but keeps 220px free on the
+    /// right (218px thumbnail dropdown + gap) so the history submenu ends at the screen edge.
+    /// Ordinary right-click menus are never repositioned.
     /// </summary>
     private void ShowTrayMenu()
     {
@@ -194,7 +201,8 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        var x = Math.Max(area.Left, area.Right - width - 216);
+        var x = Math.Min(Cursor.Position.X, area.Right - width - 220);
+        x = Math.Max(area.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         // A drop-down shown without a foreground owner never receives the
         // outside-click notification that closes it, so claim foreground for the
