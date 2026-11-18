@@ -133,6 +133,7 @@ internal sealed partial class CaptureForm : ToolWindow
     private bool _selectingText;
     private PointF _ocrDragStart;
     private Rectangle _ocrCrop;
+    private Size _ocrSourceSize;
     private string? _qrText;
     private Rectangle _lastMagnifierBounds;
     private bool MagnifierVisible => _showMagnifier || _dragMode >= 3 || _settings.AutoMagnifier && !_hasSelection && !_dragging;
@@ -567,7 +568,7 @@ internal sealed partial class CaptureForm : ToolWindow
             if (command is not null) { ExitRecognition(); Command(command); return; }
             if (_recognitionBusy) return;
             if (_bar.Bounds.Contains(p)) return;
-            _ocrDragStart = new PointF(p.X - _ocrCrop.X, p.Y - _ocrCrop.Y);
+            _ocrDragStart = OcrToLocal(p);
             _ocrAnchor = _ocrDocument?.HitTest(_ocrDragStart, tolerance: 16 * Ui) ?? -1;
             _ocrEnd = _ocrAnchor;
             _bar.ResultCopied = false;
@@ -757,7 +758,7 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             if (_selectingText && _ocrDocument is not null)
             {
-                var current = new PointF(_cursor.X - _ocrCrop.X, _cursor.Y - _ocrCrop.Y);
+                var current = OcrToLocal(_cursor);
                 var moved = Math.Abs(current.X - _ocrDragStart.X) >= 2f || Math.Abs(current.Y - _ocrDragStart.Y) >= 2f;
                 if (_ocrAnchor >= 0 || moved)
                 {
@@ -1619,6 +1620,9 @@ internal sealed partial class CaptureForm : ToolWindow
         _recognitionBusy = true;
         _ocrMode = ocr;
         _ocrCrop = crop;
+        // Remember what was actually handed to the OCR engine: its bounding boxes
+        // are in those pixels, and the overlay draws in selection pixels.
+        _ocrSourceSize = image.Size;
         _ocrDocument = null;
         _ocrAnchor = _ocrEnd = -1;
         _showMagnifier = false;
@@ -1735,8 +1739,7 @@ internal sealed partial class CaptureForm : ToolWindow
         var blocks = new List<RectangleF>();
         for (var i = 0; i < _ocrDocument.Characters.Count; i++)
         {
-            var bounds = _ocrDocument.Characters[i].Bounds;
-            bounds.Offset(_ocrCrop.Location);
+            var bounds = OcrToScreen(_ocrDocument.Characters[i].Bounds);
             if (start >= 0 && i >= start && i <= end)
             {
                 var center = (bounds.Top + bounds.Bottom) / 2;
@@ -1751,9 +1754,10 @@ internal sealed partial class CaptureForm : ToolWindow
         foreach (var block in blocks)
         {
             // One seamless block per line, with 4 px of horizontal breathing room on
-            // both ends so the first and last glyphs are wrapped completely.
+            // both ends so the first and last glyphs are wrapped completely. The
+            // overlay may paint past the crop edge, so only the window bounds clamp.
             var slack = Math.Max(4f, 4f * Ui);
-            var left = Math.Max(_ocrCrop.Left, block.Left - slack);
+            var left = Math.Max(0f, block.Left - slack);
             var right = block.Right + slack;
             var rect = RectangleF.FromLTRB(left, block.Top, right, block.Bottom);
             g.FillRectangle(fill, rect);
@@ -1777,6 +1781,22 @@ internal sealed partial class CaptureForm : ToolWindow
 
     private Rectangle Crop =>
         Rectangle.Intersect(_selection, new Rectangle(0, 0, _virtual.Width, _virtual.Height));
+
+    // OCR boxes are expressed in the pixels of the bitmap that was recognised; the
+    // overlay paints in selection pixels. A selection can be bigger or smaller than
+    // that bitmap (preprocessing, DPI scaling), so always map through the ratio.
+    private float OcrScaleX => _ocrSourceSize.Width > 0 ? (float)_ocrCrop.Width / _ocrSourceSize.Width : 1f;
+    private float OcrScaleY => _ocrSourceSize.Height > 0 ? (float)_ocrCrop.Height / _ocrSourceSize.Height : 1f;
+
+    private RectangleF OcrToScreen(RectangleF bounds) => new(
+        _ocrCrop.Left + bounds.X * OcrScaleX,
+        _ocrCrop.Top + bounds.Y * OcrScaleY,
+        bounds.Width * OcrScaleX,
+        bounds.Height * OcrScaleY);
+
+    private PointF OcrToLocal(Point point) => new(
+        (point.X - _ocrCrop.Left) / OcrScaleX,
+        (point.Y - _ocrCrop.Top) / OcrScaleY);
 
     private Bitmap RenderComposite(Rectangle crop)
     {
@@ -2525,7 +2545,7 @@ internal sealed partial class CaptureForm : ToolWindow
         if (_ocrMode)
         {
             Cursor = _bar.Bounds.Contains(_cursor) ? Cursors.Hand
-                : _ocrDocument?.HitTest(new PointF(_cursor.X - _ocrCrop.X, _cursor.Y - _ocrCrop.Y), tolerance: 16 * Ui) >= 0
+                : _ocrDocument?.HitTest(OcrToLocal(_cursor), tolerance: 16 * Ui) >= 0
                     ? Cursors.IBeam : Cursors.Default;
             return;
         }
