@@ -74,9 +74,9 @@ internal static class AppTheme
     public static void Apply(Control control)
     {
         var p = Current;
-        var swatch = control.Tag as string == "color-swatch";
-        if (!swatch) control.ForeColor = p.Text;
-        if (!swatch) control.BackColor = control switch
+        var accent = control.Tag as string is "color-swatch" or "accent-button";
+        if (!accent) control.ForeColor = p.Text;
+        if (!accent) control.BackColor = control switch
         {
             FluentSettingRow => p.Card,
             FluentInputFrame => p.Field,

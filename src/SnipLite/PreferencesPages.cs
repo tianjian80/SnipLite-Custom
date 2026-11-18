@@ -267,7 +267,8 @@ internal sealed partial class PreferencesForm
         FontRow("界面字体", nameof(_s.InterfaceFont), nameof(_s.InterfaceFontSize));
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
-        var iconButton = new FluentButton(); StyleButton(iconButton, "选择图标文件");
+        // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
+        var iconButton = new FluentButton { Tag = "accent-button" }; StyleButton(iconButton, "选择图标文件");
         StyleAccent(iconButton);
         iconButton.Click += (_, _) =>
         {
