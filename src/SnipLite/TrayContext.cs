@@ -196,10 +196,8 @@ internal sealed class TrayContext : ApplicationContext
             {
                 var history = new ToolStripMenuItem(UiText.T("截屏历史"))
                 {
-                    // Open upwards first: near the screen bottom that avoids the manager's
-                    // height clamp (and its ▲ / ▼ overflow bars). DropDownOpened then
-                    // re-aligns the panel with the tray menu's bottom edge.
-                    DropDownDirection = ToolStripDropDownDirection.AboveRight
+                    // Always unfold to the right of the tray panel.
+                    DropDownDirection = ToolStripDropDownDirection.Right
                 };
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
@@ -222,16 +220,15 @@ internal sealed class TrayContext : ApplicationContext
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
-                    // Five cards must stay inside 75% of the working area, so the panel
-                    // never pushes against the top of the screen.
-                    var maxCardHeight = Math.Max(68, (int)((screen.Height * 0.75 - 36) / 5));
-                    var panelWidth = Math.Min(240, Math.Max(160, (int)Math.Round(maxCardHeight * 16 / 9.0) + 12));
-                    if (menu.Visible)
-                        menu.Left = Math.Max(screen.Left, screen.Right - menu.Width - panelWidth);
-                    var available = menu.Visible ? screen.Right - menu.Bounds.Right : panelWidth;
-                    available = Math.Clamp(available, 160, panelWidth);
+                    var available = menu.Bounds.Width > 0 ? screen.Right - menu.Bounds.Right : 240;
+                    if (menu.Visible && available < 220)
+                    {
+                        menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
+                        available = screen.Right - menu.Bounds.Right;
+                    }
+                    available = Math.Max(160, available);
                     var cardWidth = Math.Max(120, available - 12);
-                    var cardHeight = Math.Min(maxCardHeight, Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0)));
+                    var cardHeight = Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0));
                     var entries = _history.Entries;
                     var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
                     // At most five cards are visible; the rest scroll with the wheel.
@@ -247,7 +244,7 @@ internal sealed class TrayContext : ApplicationContext
                     if (entries.Count == 0)
                     {
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
-                        dropMenu.Size = new Size(available, 40 + 4);
+                        dropMenu.Size = new Size(available, 40);
                         return;
                     }
                     var panel = new HistoryPanel(entries, new Size(available, height), cardWidth, cardHeight, entry =>
@@ -263,9 +260,7 @@ internal sealed class TrayContext : ApplicationContext
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    // A couple of extra pixels keep the hosted panel shorter than the
-                    // drop-down client area, so WinForms never adds its ▲ / ▼ overflow bars.
-                    dropMenu.Size = new Size(available, height + 4);
+                    dropMenu.Size = new Size(available, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Re-check right after showing: the real menu bounds and screen gap are
@@ -280,9 +275,7 @@ internal sealed class TrayContext : ApplicationContext
                     ToolWindow.HideTaskbarTab(dropDown.Handle);
                     var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
                     var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
-                    // Pin it to the right of the tray menu; WinForms' own placement is
-                    // unreliable for custom-sized drop-downs near the screen edge.
-                    ToolWindow.PlaceWindow(dropDown.Handle, menu.Bounds.Right, top);
+                    dropDown.Location = new Point(menu.Bounds.Right, top);
                 };
                 menu.Items.Add(history);
             }
@@ -330,11 +323,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.AutoClose = true;
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         var width = menu.GetPreferredSize(Size.Empty).Width;
-        // Reserve exactly the history panel's width on the right, so it opens flush
-        // against the screen edge without ever covering the tray menu.
-        var maxCardHeight = Math.Max(68, (int)((area.Height * 0.75 - 36) / 5));
-        var panelWidth = Math.Min(240, Math.Max(160, (int)Math.Round(maxCardHeight * 16 / 9.0) + 12));
-        var x = Math.Min(Cursor.Position.X, area.Right - width - panelWidth);
+        var x = Math.Min(Cursor.Position.X, area.Right - width - 240);
         x = Math.Max(area.Left, x);
         menu.Show(new Point(x, Cursor.Position.Y), ToolStripDropDownDirection.AboveRight);
         if (menu.IsHandleCreated) ToolWindow.HideTaskbarTab(menu.Handle);
