@@ -598,7 +598,7 @@ internal sealed partial class PreferencesForm
         {
             Set(action, values[i]);
             check.Enabled = exitEnabled(values[i]);
-        });
+        }, 0, true, true);
         check.Enabled = exitEnabled(Value(action));
 
         var height = AdaptiveRowHeight(Math.Max(TextHeight, Math.Max(FieldHeight, check.Height)));
