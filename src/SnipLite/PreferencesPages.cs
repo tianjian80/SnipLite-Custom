@@ -316,30 +316,24 @@ internal sealed partial class PreferencesForm
         FlagCell("显示全屏十字线", nameof(_s.ShowCrosshair)); FlagCell("显示快捷键提示", nameof(_s.CaptureShortcutHints));
     }
 
-    /// <summary>Half-width card with a fixed blue swatch button plus a live colour dot.</summary>
+    /// <summary>Half-width card with a fixed blue swatch button.</summary>
     private void ColorChoiceCell(int left, int width, int height, string label, string name)
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var blue = Color.FromArgb(0, 82, 155);
+        var blue = Color.FromArgb(0, 103, 192);
         var button = new FluentButton { Tag = "color-swatch" };
         StyleButton(button, "选择颜色");
-        // Uniform accent look: the chosen colour lives in the dot, not the whole button.
+        // Uniform accent look regardless of the stored colour.
         button.BackColor = blue;
         button.ForeColor = Color.White;
         button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(blue, .12f);
         button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(blue, .08f);
-        var dot = new Panel { Size = new Size(Px(10), Px(10)), BackColor = Color.FromArgb((int)Value(name)) };
-        using (var circle = FluentDrawing.Rounded(new RectangleF(0, 0, dot.Width, dot.Height), dot.Width / 2f))
-            dot.Region = new Region(circle);
-        dot.Location = new Point(Px(9), Math.Max(0, (button.Height - dot.Height) / 2));
-        button.Controls.Add(dot);
         button.SetBounds(width - Px(14) - button.Width, Math.Max(0, (height - button.Height) / 2), button.Width, button.Height);
         button.Click += (_, _) =>
         {
-            using var dialog = new ColorDialog { Color = dot.BackColor, FullOpen = true };
+            using var dialog = new ColorDialog { Color = Color.FromArgb((int)Value(name)), FullOpen = true };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            dot.BackColor = dialog.Color;
             Set(name, dialog.Color.ToArgb());
         };
         card.Controls.Add(button);
@@ -356,8 +350,9 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), 96, value => Set(name, value));
-        var field = new FluentInputFrame(number) { Height = FieldHeight };
+        // Pixel-identical width to the "选择颜色" button on the neighbouring rows.
+        var fieldWidth = TextRenderer.MeasureText("选择颜色", Font).Width + Px(28);
+        var field = MakeCompactNumber(Convert.ToInt32(Value(name)), min, max, fieldWidth, value => Set(name, value));
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
         card.Controls.Add(new Label
@@ -366,6 +361,43 @@ internal sealed partial class PreferencesForm
             Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
         });
+    }
+
+    /// <summary>
+    /// Narrow numeric field: a plain centred text box plus the frame's custom −/+ steppers.
+    /// The native spinner is dropped so nothing covers the minus button or clips digits.
+    /// </summary>
+    private FluentInputFrame MakeCompactNumber(int value, int min, int max, int width, Action<int> onChange)
+    {
+        value = Math.Clamp(value, min, max);
+        var box = new TextBox
+        {
+            BorderStyle = BorderStyle.None,
+            BackColor = AppTheme.Current.Field,
+            ForeColor = Ink,
+            TextAlign = HorizontalAlignment.Center,
+            Text = value.ToString(),
+            Width = width
+        };
+        box.KeyPress += (_, e) =>
+        {
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true;
+        };
+        void Commit()
+        {
+            value = int.TryParse(box.Text, out var typed) ? Math.Clamp(typed, min, max) : value;
+            if (box.Text != value.ToString()) box.Text = value.ToString();
+            onChange(value);
+        }
+        box.Leave += (_, _) => Commit();
+        var field = new FluentInputFrame(box) { Height = FieldHeight, SpinnerReserve = 42, Compact = true };
+        field.Step = delta =>
+        {
+            value = Math.Clamp(value + delta, min, max);
+            box.Text = value.ToString();
+            onChange(value);
+        };
+        return field;
     }
     private void CaptureBehaviorPage()
     {
@@ -463,37 +495,9 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        // Same total length as the "恢复默认" button above. A plain borderless box
-        // replaces NumericUpDown so the native ▲▼ spinner never covers the − button.
+        // Same total length as the "恢复默认" button above.
         var fieldWidth = TextRenderer.MeasureText("恢复默认", Font).Width + Px(28);
-        var value = Math.Clamp(Convert.ToInt32(Value(name)), min, max);
-        var box = new TextBox
-        {
-            BorderStyle = BorderStyle.None,
-            BackColor = AppTheme.Current.Field,
-            ForeColor = Ink,
-            TextAlign = HorizontalAlignment.Center,
-            Text = value.ToString(),
-            Width = fieldWidth
-        };
-        box.KeyPress += (_, e) =>
-        {
-            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true;
-        };
-        void Commit()
-        {
-            value = int.TryParse(box.Text, out var typed) ? Math.Clamp(typed, min, max) : value;
-            if (box.Text != value.ToString()) box.Text = value.ToString();
-            Set(name, value);
-        }
-        box.Leave += (_, _) => Commit();
-        var field = new FluentInputFrame(box) { Height = FieldHeight, SpinnerReserve = 42, Compact = true };
-        field.Step = delta =>
-        {
-            value = Math.Clamp(value + delta, min, max);
-            box.Text = value.ToString();
-            Set(name, value);
-        };
+        var field = MakeCompactNumber(Convert.ToInt32(Value(name)), min, max, fieldWidth, value => Set(name, value));
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
         card.Controls.Add(new Label
