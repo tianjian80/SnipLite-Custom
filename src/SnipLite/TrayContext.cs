@@ -303,7 +303,10 @@ internal sealed class TrayContext : ApplicationContext
                 ? screen.WorkingArea : screen.Bounds;
             using var image = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
             using (var g = Graphics.FromImage(image))
+            {
                 g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
+                if (_settings.CaptureCursor) Win32.DrawCursor(g, bounds.Location);
+            }
 
             var path = Services.SaveCaptureFile(image, _settings, _settings.QuickSaveDirectory);
             var mode = !_settings.SmartFullScreenCapture ? "全屏（含任务栏）"

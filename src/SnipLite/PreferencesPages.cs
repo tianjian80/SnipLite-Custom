@@ -320,11 +320,11 @@ internal sealed partial class PreferencesForm
         FlagCell("自动检测界面元素", nameof(_s.DetectElements)); FlagCell("移出屏幕", nameof(_s.AllowOffscreenSelection));
         // One switch drives cursor capture; the legacy "disable" flag just mirrors it.
         Cell((left, width) => CursorCell(left, width, height));
-        Cell((left, width) => NumberCell(left, width, height, "历史记录数", nameof(_s.HistoryImageLimit), 0, 100));
         FlagCell("其他程序窗口激活时退出截屏", nameof(_s.ExitCaptureOnDeactivate));
         FlagCell("截图后自动复制", nameof(_s.CopyAfterCapture));
         FlagCell("复制到剪贴板时播放音效", nameof(_s.SoundOnCopy));
         FlagCell("保存截图时播放音效", nameof(_s.SoundOnSave));
+        Cell((left, width) => NumberCell(left, width, height, "历史记录数", nameof(_s.HistoryImageLimit), 0, 100));
         if (column != 0) { column = 0; _y += height + gap; }
 
         var sound = MakeText((string)Value(nameof(_s.CaptureSound)), 0);
@@ -397,7 +397,7 @@ internal sealed partial class PreferencesForm
     {
         var card = NewSettingRow(left, width, height);
         AddRowIcon(card, label);
-        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(104), value => Set(name, value));
+        var number = MakeNumber(min, max, Convert.ToInt32(Value(name)), Px(96), value => Set(name, value));
         var field = new FluentInputFrame(number) { Height = FieldHeight };
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
