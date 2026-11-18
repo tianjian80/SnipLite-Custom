@@ -1070,9 +1070,12 @@ internal sealed partial class PreferencesForm : Form
         return host;
     }
 
-    private FluentSettingRow NewSettingRow(int height)
+    private FluentSettingRow NewSettingRow(int height) => NewSettingRow(_labelX, ContentWidth(), height);
+
+    /// <summary>A card at an explicit column position, used by the two-column grids.</summary>
+    private FluentSettingRow NewSettingRow(int x, int width, int height)
     {
-        var row = new FluentSettingRow { Bounds = new Rectangle(_labelX, _y, ContentWidth(), height) };
+        var row = new FluentSettingRow { Bounds = new Rectangle(x, _y, width, height) };
         _page.Controls.Add(row);
         return row;
     }

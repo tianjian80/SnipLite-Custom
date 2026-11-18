@@ -629,6 +629,19 @@ internal sealed partial class PreferencesForm
     private void HotkeysPage()
     {
         Flag("启用全局快捷键", nameof(_s.HotkeysEnabled));
+
+        // Two equal cards per row keep the whole hotkey list on one screen.
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var cardHeight = AdaptiveRowHeight(Math.Max(Px(38), TextHeight));
+        var column = 0;
+        void FinishRow()
+        {
+            if (column == 0) return;
+            _y += cardHeight + gap;
+            column = 0;
+        }
+
         foreach (var (label, name) in HotkeyDefinitions.Items)
         {
             var binding = (Keys)Value(name);
@@ -715,10 +728,12 @@ internal sealed partial class PreferencesForm
             };
             if (name == nameof(AppSettings.CustomCaptureHotkey))
             {
-                // Custom row: the toggle is pinned to the card's right edge so its
-                // Right matches the "启用全局快捷键" toggle exactly, and the caption
-                // sits immediately to its left without ever being ellipsized.
-                var height = AdaptiveRowHeight(Math.Max(Px(38), TextHeight));
+                // This row carries an extra switch, so it keeps the full width: the
+                // toggle is pinned to the card's right edge so its Right matches the
+                // "启用全局快捷键" toggle exactly, and the caption sits immediately
+                // to its left without ever being ellipsized.
+                FinishRow();
+                var height = cardHeight;
                 var card = NewSettingRow(height);
                 AddRowIcon(card, label);
                 card.Controls.Add(new Label
@@ -768,11 +783,34 @@ internal sealed partial class PreferencesForm
                 }
                 PlaceCaption();
                 card.Resize += (_, _) => PlaceCaption();
-                _y += height + Px(6);
+                _y += height + gap;
                 continue;
             }
-            Row(label, change, current);
+
+            // Compact half-width card: icon + name on the left, [更改] and the
+            // binding text hugged to the right edge.
+            var half = NewSettingRow(column == 0 ? _labelX : _labelX + cardWidth + gap, cardWidth, cardHeight);
+            AddRowIcon(half, label);
+            var right = cardWidth - Px(12);
+            var valueWidth = Math.Max(Px(70), Math.Min(Px(104), cardWidth / 3));
+            current.AutoSize = false;
+            current.SetBounds(right - valueWidth, 0, valueWidth, cardHeight);
+            if (current is Label value) value.TextAlign = ContentAlignment.MiddleRight;
+            var changeWidth = change.Width;
+            change.SetBounds(right - valueWidth - Px(8) - changeWidth, Math.Max(0, (cardHeight - change.Height) / 2), changeWidth, change.Height);
+            half.Controls.Add(new Label
+            {
+                Text = label, AutoSize = false, AutoEllipsis = true,
+                Bounds = new Rectangle(Px(36), 0, Math.Max(Px(40), change.Left - Px(36) - Px(8)), cardHeight),
+                TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+            });
+            half.Controls.Add(change);
+            half.Controls.Add(current);
+
+            column = 1 - column;
+            if (column == 0) _y += cardHeight + gap;
         }
+        FinishRow();
         HintText("点击「更改」录入快捷键，确认后生效。");
     }
     private void ModifierRow(string label, string property)
