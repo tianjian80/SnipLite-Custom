@@ -174,22 +174,64 @@ internal sealed partial class PreferencesForm
         Row("翻译服务", translationService, configureTranslator);
         Section("启动与运行", () => { });
         Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator));
-        Check("开机启动", _s.StartWithWindows, async value =>
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var column = 0;
+
+        // Two equal cards per row: the four run options fit on two compact lines.
+        void Cell(Action<int, int> place)
         {
-            if (await ApplyStartupAsync(value, _s.StartAsAdministrator)) Set(nameof(_s.StartWithWindows), value);
-            else if (!IsDisposed) ShowTab(_selected);
-        });
-        Check("以管理员身份开机启动", _s.StartAsAdministrator, async value =>
+            place(_labelX + column * (cardWidth + gap), cardWidth);
+            if (++column == 2) { column = 0; _y += height + gap; }
+        }
+        void FlagCell(string label, string name) => Cell((left, width) => CheckCell(left, width, height, label, name));
+        void StartupCell(string label, bool initial, Func<bool, Task<bool>> apply)
         {
-            if (!_s.StartWithWindows || await ApplyStartupAsync(true, value)) Set(nameof(_s.StartAsAdministrator), value);
-            else if (!IsDisposed) ShowTab(_selected);
+            Cell((left, width) =>
+            {
+                var card = NewSettingRow(left, width, height);
+                AddRowIcon(card, label);
+                var box = new FluentToggle
+                {
+                    Text = label,
+                    AutoSize = false,
+                    Bounds = new Rectangle(Px(48), Px(6), Math.Max(Px(60), width - Px(62)), height - Px(12)),
+                    BackColor = AppTheme.Current.Card,
+                    ForeColor = Ink,
+                    Checked = initial
+                };
+                box.CheckedChanged += async (_, _) =>
+                {
+                    if (!await apply(box.Checked) && !IsDisposed) ShowTab(_selected);
+                };
+                card.Controls.Add(box);
+            });
+        }
+
+        StartupCell("开机启动", _s.StartWithWindows, async value =>
+        {
+            if (!await ApplyStartupAsync(value, _s.StartAsAdministrator)) return false;
+            Set(nameof(_s.StartWithWindows), value);
+            return true;
         });
-        Flag("自动备份配置文件", nameof(_s.AutoBackup));
-        Flag("保持快速响应", nameof(_s.KeepResponsive));
-        Flag("增强版托盘菜单", nameof(_s.EnhancedTrayMenu));
+        StartupCell("以管理员身份开机启动", _s.StartAsAdministrator, async value =>
+        {
+            if (_s.StartWithWindows && !await ApplyStartupAsync(true, value)) return false;
+            Set(nameof(_s.StartAsAdministrator), value);
+            return true;
+        });
+        FlagCell("自动备份配置文件", nameof(_s.AutoBackup));
+        FlagCell("保持快速响应", nameof(_s.KeepResponsive));
+        if (column != 0) { column = 0; _y += height + gap; }
         Section("配置与日志", () => { });
-        Choice("日志级别", nameof(_s.LogLevel), new[] { "关闭", "仅错误", "普通", "调试" }, new object[] { "Off", "Error", "Normal", "Debug" });
-        AddButton(_controlX, "打开日志文件", () => OpenFile(AppLog.FilePath));
+        var logLevels = new[] { "Off", "Error", "Normal", "Debug" };
+        var logChooser = MakeChooser(new[] { "关闭", "仅错误", "普通", "调试" },
+            Math.Max(0, Array.IndexOf(logLevels, (string)Value(nameof(_s.LogLevel)))),
+            index => Set(nameof(_s.LogLevel), logLevels[index]));
+        var openLog = new FluentButton(); StyleButton(openLog, "打开日志文件");
+        openLog.Click += (_, _) => OpenFile(AppLog.FilePath);
+        Row("日志级别", logChooser, openLog);
         var path = MakeText(AppSettings.FilePath, FillWidth()); path.ReadOnly = true;
         Row("配置文件", path);
         var openFolder = new FluentButton(); StyleButton(openFolder, "打开所在文件夹"); openFolder.Click += (_, _) => Open(AppSettings.FilePath, true);
