@@ -41,6 +41,10 @@ internal sealed class FluentInputFrame : UserControl
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal int SpinnerReserve { get; set; } = 54;
 
+    /// <summary>Narrow variant: hides the native spinner and draws compact +/- buttons instead.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal bool Compact { get; set; }
+
     public FluentInputFrame(Control editor)
     {
         var editorWidth = editor.Width;
@@ -81,7 +85,12 @@ internal sealed class FluentInputFrame : UserControl
     private void EditorMouseLeave(object? sender, EventArgs e) { _hover = false; Invalidate(); }
     private void EditorFontChanged(object? sender, EventArgs e) => PerformLayout();
     private int Px(float value) => (int)Math.Round(value * DeviceDpi / 96f);
-    private Rectangle StepBounds(int step) => new(Width - Px(step < 0 ? 54 : 28), Px(3), Px(25), Height - Px(6));
+    private Rectangle StepBounds(int step)
+    {
+        var size = Px(Compact ? 17 : 25);
+        var left = Width - Px(3) - (step < 0 ? size * 2 + Px(1) : size);
+        return new Rectangle(left, Px(3), size, Height - Px(6));
+    }
 
     protected override void OnLayout(LayoutEventArgs e)
     {
@@ -92,7 +101,8 @@ internal sealed class FluentInputFrame : UserControl
         var editorHeight = _editor.PreferredSize.Height;
         _clip.Bounds = new Rectangle(Px(8), Math.Max(Px(3), (Height - editorHeight) / 2), Math.Max(1, Width - Px(14) - reserve), editorHeight);
         // Clip the native spinner; the editor still handles typing, arrows, wheel and validation.
-        var spinner = _number?.Controls.Cast<Control>().FirstOrDefault(c => c is not TextBoxBase)?.Width ?? 0;
+        var spinner = Compact ? 0
+            : _number?.Controls.Cast<Control>().FirstOrDefault(c => c is not TextBoxBase)?.Width ?? 0;
         _editor.Bounds = new Rectangle(0, 0, _clip.Width + spinner, editorHeight);
     }
 
@@ -162,8 +172,9 @@ internal sealed class FluentInputFrame : UserControl
             }
             using var pen = new Pen(enabled ? p.Text : p.Disabled, Math.Max(1, DeviceDpi / 96f));
             var x = bounds.Left + bounds.Width / 2; var y = bounds.Top + bounds.Height / 2;
-            e.Graphics.DrawLine(pen, x - Px(4), y, x + Px(4), y);
-            if (step > 0) e.Graphics.DrawLine(pen, x, y - Px(4), x, y + Px(4));
+            var arm = Compact ? Math.Max(Px(5), bounds.Width / 3) : Px(4);
+            e.Graphics.DrawLine(pen, x - arm, y, x + arm, y);
+            if (step > 0) e.Graphics.DrawLine(pen, x, y - arm, x, y + arm);
         }
     }
 
