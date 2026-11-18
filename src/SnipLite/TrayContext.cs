@@ -194,6 +194,15 @@ internal sealed class TrayContext : ApplicationContext
         {
             if (visible) menu.Items.Add(SnipMenu.Item(text, action, key, verticalPadding: 3));
         }
+        // Same as Add, but hands the item back so its Enabled state can follow the
+        // history list (e.g. grey out 清空截屏历史 when there is nothing to clear).
+        ToolStripMenuItem? AddItem(bool visible, string text, Action action)
+        {
+            if (!visible) return null;
+            var item = SnipMenu.Item(text, action, verticalPadding: 3);
+            menu.Items.Add(item);
+            return item;
+        }
         // An unbound hotkey shows nothing on the right instead of a "未设置" label.
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
@@ -214,6 +223,7 @@ internal sealed class TrayContext : ApplicationContext
             Add(_settings.TrayItemSwitchGroup, "切换到另一贴图分组", PinForm.SwitchGroup, Key(_settings.SwitchGroupHotkey));
             Add(_settings.TrayItemRestorePins, "恢复历史贴图", () => PinForm.RestoreLast(_settings));
             Add(_settings.TrayItemClosePins, "关闭全部贴图", PinForm.CloseAll);
+            ToolStripMenuItem? clearHistory = null;
             if (_settings.TrayItemHistory)
             {
                 var history = new ToolStripMenuItem(UiText.T("截屏历史"))
@@ -303,9 +313,21 @@ internal sealed class TrayContext : ApplicationContext
                     dropMenu.Size = new Size(available, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
+                // Grey out both history entries when nothing is left: a disabled item
+                // never opens its drop-down, so no empty box / stray arrow appears.
+                menu.Opening += (_, _) =>
+                {
+                    var any = _history.Entries.Count > 0;
+                    history.Enabled = any;
+                    if (clearHistory is not null) clearHistory.Enabled = any;
+                };
                 // Re-check right after showing: the real menu bounds and screen gap are
                 // known then, so the submenu always ends flush with the screen edge.
-                history.DropDownOpening += (_, _) => FitHistory();
+                history.DropDownOpening += (_, _) =>
+                {
+                    FitHistory();
+                    if (_history.Entries.Count == 0) history.Enabled = false;
+                };
                 // Bottom-align the panel with the tray menu (it grows upwards) and keep
                 // its right edge exactly on the screen edge.
                 history.DropDownOpened += (_, _) =>
@@ -320,7 +342,7 @@ internal sealed class TrayContext : ApplicationContext
                 };
                 menu.Items.Add(history);
             }
-            Add(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
+            clearHistory = AddItem(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
         }
         menu.Items.Add(new ToolStripSeparator());
         var disable = SnipMenu.Item("禁用快捷键", () => { _settings.HotkeysEnabled = !_settings.HotkeysEnabled; _settings.Save(); ApplySettings(); }, verticalPadding: 3);
