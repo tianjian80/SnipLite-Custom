@@ -789,13 +789,24 @@ internal sealed partial class PreferencesForm
     }
     private void PinBehaviorPage()
     {
-        Flag("使用截屏时的位置", nameof(_s.PinAtCapturePosition));
-        Flag("使用鼠标滚轮缩放", nameof(_s.PinWheelZoom)); Flag("以鼠标指针为中心缩放", nameof(_s.PinZoomAtCursor));
-        Flag("平滑缩放", nameof(_s.PinSmoothScaling)); Flag("缩略图接受重置操作", nameof(_s.ThumbnailAcceptReset));
-        Flag("边框闪烁时使窗口半透明", nameof(_s.PinTranslucentFlash));
-        Flag("切换分组时自动闪烁贴图", nameof(_s.FlashOnGroupSwitch));
-        Flag("拖放操作时保留原始图", nameof(_s.KeepOriginalOnDrag));
-        Flag("贴出新图片时闪烁", nameof(_s.FlashNewPin)); Flag("贴出新图片时激活", nameof(_s.ActivateNewPin));
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var column = 0;
+        void Cell(string label, string name)
+        {
+            CheckCell(_labelX + column * (cardWidth + gap), cardWidth, height, label, name);
+            if (++column == 2) { column = 0; _y += height + gap; }
+        }
+
+        Cell("使用截屏时的位置", nameof(_s.PinAtCapturePosition));
+        Cell("使用鼠标滚轮缩放", nameof(_s.PinWheelZoom)); Cell("以鼠标指针为中心缩放", nameof(_s.PinZoomAtCursor));
+        Cell("平滑缩放", nameof(_s.PinSmoothScaling)); Cell("缩略图接受重置操作", nameof(_s.ThumbnailAcceptReset));
+        Cell("边框闪烁时使窗口半透明", nameof(_s.PinTranslucentFlash));
+        Cell("切换分组时自动闪烁贴图", nameof(_s.FlashOnGroupSwitch));
+        Cell("拖放操作时保留原始图", nameof(_s.KeepOriginalOnDrag));
+        Cell("贴出新图片时闪烁", nameof(_s.FlashNewPin)); Cell("贴出新图片时激活", nameof(_s.ActivateNewPin));
+        if (column != 0) _y += height + gap;
         HintText("Alt+拖动可将图片拖到其他应用；右键可切换分组、缩略图和鼠标穿透。");
     }
     private void PinConversionPage()
