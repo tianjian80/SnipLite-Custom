@@ -56,11 +56,15 @@ internal sealed class CaptureHistory
         var width = Math.Max(1, (int)Math.Round(image.Width * scale));
         var height = Math.Max(1, (int)Math.Round(image.Height * scale));
         var thumb = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+        thumb.SetResolution(96, 96);
         using (var g = Graphics.FromImage(thumb))
         {
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-            g.DrawImage(image, new Rectangle(0, 0, width, height));
+            // Explicit pixel-space source: passing only a destination rectangle lets a
+            // high-DPI capture keep its own resolution and overflow/clip the right edge.
+            g.DrawImage(image, new Rectangle(0, 0, width, height),
+                0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
         }
         return thumb;
     }

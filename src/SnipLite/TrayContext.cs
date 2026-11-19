@@ -137,7 +137,8 @@ internal sealed class TrayContext : ApplicationContext
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
                 var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
                 var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
-                g.DrawImage(thumb, rect);
+                // Whole source in pixel units, so no edge (close button / clock) is cut.
+                g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
                 // No card frame: only a hover outline hugging the thumbnail itself,
                 // so no grey rules run across the popup between entries.
                 if (index == _hover)
