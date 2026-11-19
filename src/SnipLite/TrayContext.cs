@@ -197,9 +197,9 @@ internal sealed class TrayContext : ApplicationContext
             CloseHistoryPreview();
             var screen = Screen.FromControl(menu).WorkingArea;
             var menuRight = bounds.Right;
-            // Right limit: 4 px frame (2 px each side) plus a 4 px safety gap, so the
-            // popup only ever touches the screen edge and never flips to the left.
-            var maxRightW = Math.Max(80, screen.Right - menuRight - 8);
+            // Right limit: 12 px popup padding (6 px each side) plus a 4 px safety gap,
+            // so the popup only ever touches the screen edge and never flips left.
+            var maxRightW = Math.Max(80, screen.Right - menuRight - 16);
             var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
             var finalW = Math.Min(requested, maxRightW);
             var canvas = new HistoryCanvasControl(entries, finalW, screen.Height - 16, entry =>

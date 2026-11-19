@@ -5,20 +5,18 @@ namespace SnipLite;
 /// native <see cref="ToolStripDropDown"/>. Living inside the menu family keeps the
 /// tray menu's mouse capture intact (no focus loss, no instant close) while the
 /// plain drop-down can be positioned at an explicit screen point, so it never
-/// flips to the left of the tray menu. The canvas itself is the only frame: a
-/// 2 px symmetric border, no title bar, no scroll arrows.
+/// flips to the left of the tray menu. Every thumbnail keeps its own aspect ratio
+/// and is centred inside a uniform card, so no picture is ever blown up or cropped.
 /// </summary>
 internal sealed class HistoryCanvasControl : Control
 {
-    /// <summary>2 px thin frame on all four sides.</summary>
-    private const int Pad = 2;
-    /// <summary>3 px gap between two pictures.</summary>
-    private const int Gap = 3;
+    private const int Pad = 6;
+    private const int Gap = 6;
     private static readonly Color HoverEdge = Color.FromArgb(0, 103, 192);
 
     private readonly IReadOnlyList<CaptureHistory.Entry> _entries;
-    private readonly int[] _heights;
-    private readonly int _drawWidth;
+    private readonly int _cardWidth;
+    private readonly int _cardHeight;
     private readonly Action<CaptureHistory.Entry> _click;
     private long _shownAt;
     private int _offset;
@@ -26,48 +24,50 @@ internal sealed class HistoryCanvasControl : Control
     private int _pressed = -1;
     private long _pressedAt;
 
-    public HistoryCanvasControl(IReadOnlyList<CaptureHistory.Entry> entries, int drawWidth, int maxHeight, Action<CaptureHistory.Entry> click)
+    public HistoryCanvasControl(IReadOnlyList<CaptureHistory.Entry> entries, int cardWidth, int maxHeight, Action<CaptureHistory.Entry> click)
     {
         _entries = entries;
-        _drawWidth = drawWidth;
+        _cardWidth = cardWidth;
+        _cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
         _click = click;
         _shownAt = Environment.TickCount64;
-        // Height follows each source ratio so every picture is complete.
-        _heights = entries
-            .Select(entry => Math.Max(20, (int)Math.Round((double)entry.Thumbnail.Height * drawWidth / entry.Thumbnail.Width)))
-            .ToArray();
 
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
             | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
         DoubleBuffered = true;
         BackColor = SnipMenuRenderer.Back;
         TabStop = false;
-        // Whole popup: pictures plus 2 px of frame on each side.
-        Width = entries.Count == 0 ? Math.Max(180, drawWidth) + 4 : drawWidth + 4;
-        Height = entries.Count == 0 ? 40 : Math.Min(ContentHeight, Math.Max(40, maxHeight));
+        Width = cardWidth + Pad * 2;
+        // At most five cards are visible; the rest scroll with the wheel.
+        var visible = Math.Min(ContentHeight, 5 * _cardHeight + 36);
+        Height = entries.Count == 0 ? 40 : Math.Min(visible, Math.Max(40, maxHeight));
     }
 
-    /// <summary>Pictures plus their 3 px gaps, framed by 2 px top and bottom.</summary>
-    private int ContentHeight => Pad * 2 + _heights.Sum() + Math.Max(0, _entries.Count - 1) * Gap;
+    private int ContentHeight => Pad * 2 + _entries.Count * _cardHeight + Math.Max(0, _entries.Count - 1) * Gap;
 
-    private int TopOf(int index)
+    /// <summary>
+    /// Effective card height: the 16:9 height of the column, capped so the visible
+    /// cards fit the hosted client area exactly.
+    /// </summary>
+    private int CardHeight
     {
-        var top = Pad - _offset;
-        for (var i = 0; i < index; i++) top += _heights[i] + Gap;
-        return top;
+        get
+        {
+            var count = Math.Max(1, Math.Min(_entries.Count, 5));
+            var fit = (Height - Pad * 2 - (count - 1) * Gap) / count;
+            return Math.Min(_cardHeight, Math.Max(24, fit));
+        }
     }
+
+    private int Stride => CardHeight + Gap;
 
     private int IndexAt(int y)
     {
-        var cursor = y + _offset - Pad;
-        if (cursor < 0) return -1;
-        var offset = 0;
-        for (var i = 0; i < _heights.Length; i++)
-        {
-            if (cursor < offset + _heights[i]) return i;
-            offset += _heights[i] + Gap;
-        }
-        return -1;
+        y += _offset - Pad;
+        if (y < 0) return -1;
+        var index = y / Stride;
+        if (index >= _entries.Count || y % Stride >= CardHeight) return -1;
+        return index;
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -99,21 +99,23 @@ internal sealed class HistoryCanvasControl : Control
             return;
         }
 
+        var cardHeight = CardHeight;
         for (var index = 0; index < _entries.Count; index++)
         {
-            var top = TopOf(index);
-            if (top + _heights[index] < 0) continue;
-            if (top > ClientSize.Height) break;
+            var top = Pad + index * Stride - _offset;
+            if (top + cardHeight < 0) continue;
+            if (top > Height) break;
+            var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
             var thumb = _entries[index].Thumbnail;
             // Force 96 DPI: a high-DPI source would otherwise be scaled by GDI+ and
             // overflow the destination rectangle, cutting the right edge away.
             if (Math.Abs(thumb.HorizontalResolution - 96f) > 0.1f) thumb.SetResolution(96f, 96f);
-            var card = new Rectangle(Pad, top, _drawWidth, _heights[index]);
+            // Aspect-fit inside the card: the whole picture, never cropped, never
+            // stretched, and the same scale for every entry.
             var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
             var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
             var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
             var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
-            // Pixel source rectangle: the whole picture, never a cropped edge.
             g.DrawImage(thumb, rect, 0, 0, thumb.Width, thumb.Height, GraphicsUnit.Pixel);
             if (index != _hover) continue;
             using var pen = new Pen(HoverEdge, 2f);
@@ -143,7 +145,7 @@ internal sealed class HistoryCanvasControl : Control
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
-        var max = Math.Max(0, ContentHeight - ClientSize.Height);
+        var max = Math.Max(0, ContentHeight - Height);
         var next = Math.Clamp(_offset - e.Delta / 2, 0, max);
         if (next == _offset) return;
         _offset = next;
