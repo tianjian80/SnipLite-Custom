@@ -43,9 +43,12 @@ internal sealed class PinForm : ToolWindow
     public static int OpenCount => Open.Count;
     public static int RecoverableCount => History.Count(entry => !Open.Any(pin => pin._historyEntry == entry));
 
-    public PinForm(Bitmap image, Point? screenPoint = null, int opacityPercent = 100, AppSettings? settings = null)
+    public PinForm(Bitmap image, Point? screenPoint = null, int opacityPercent = 100, AppSettings? settings = null, bool disableContextMenu = false)
     {
         _image = image; _settings = settings ?? AppSettings.Load(); _pinGroup = _group;
+        // Set before the menu binding below: a history-restored pin must never own a
+        // context menu, not even for the very first right-click.
+        DisableContextMenu = disableContextMenu;
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual;
         // Paint straight into the double buffer so the first frame shown already is
         // the image: no white/black erase frame flashes at the default position.
@@ -60,7 +63,8 @@ internal sealed class PinForm : ToolWindow
         // Final geometry is applied before the window is ever shown; nothing moves or
         // resizes in Load/Shown, which is what used to cause the jump-flash.
         Bounds = new Rectangle(_location, _windowSize);
-        ContextMenuStrip = BuildMenu(); Open.Add(this);
+        // No menu object at all for history-restored pins.
+        ContextMenuStrip = DisableContextMenu ? null : BuildMenu(); Open.Add(this);
         if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
         _zoomBadgeTimer.Tick += (_, _) => { _zoomBadgeTimer.Stop(); Invalidate(); };
         VisibleChanged += (_, _) =>
@@ -77,7 +81,8 @@ internal sealed class PinForm : ToolWindow
         {
             pin.Text = UiText.T("SnipLite 贴图");
             pin.Font = pin._settings.CreateInterfaceFont(); pin.UpdateShadow(); pin.Invalidate();
-            var previous = pin.ContextMenuStrip; pin.ContextMenuStrip = pin.BuildMenu();
+            var previous = pin.ContextMenuStrip;
+            pin.ContextMenuStrip = pin.DisableContextMenu ? null : pin.BuildMenu();
             if (previous is not null) SynchronizationContext.Current?.Post(_ => previous.Dispose(), null);
         }
     }

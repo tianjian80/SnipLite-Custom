@@ -956,9 +956,8 @@ internal sealed class TrayContext : ApplicationContext
             point = _settings.PinAtCapturePosition && bounds is Rectangle r ? new Point(r.X + r.Width / 2, r.Y + r.Height / 2) : null;
             opacity = _settings.PinOpacityPercent;
         }
-        var pin = new PinForm(image, point, opacity, _settings);
-        // Restored from 截屏历史: both mouse buttons must not open the pin menu.
-        if (exact) pin.DisableContextMenu = true;
+        // Restored from 截屏历史 (exact): the pin is created without any context menu.
+        var pin = new PinForm(image, point, opacity, _settings, disableContextMenu: exact);
         if (stagger) pin.ShowBesideExisting(); else pin.Show();
     }
     private void PasteFromClipboard()
