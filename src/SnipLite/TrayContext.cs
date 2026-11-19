@@ -914,8 +914,10 @@ internal sealed class TrayContext : ApplicationContext
             string? savedPath = null;
             if (_settings.AutoSave)
                 savedPath = Services.SaveCaptureFile(result.Image, _settings, _settings.SaveDirectory);
-            if (!result.HistoryRecorded) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit, savedPath);
-            if (result.Pin || result.Action == CaptureAction.Pin)
+            // Pinning is a display action, not a saved capture: it never enters history.
+            var pinning = result.Pin || result.Action == CaptureAction.Pin;
+            if (!result.HistoryRecorded && !pinning) _history.Add(result.Image, result.Bounds, _settings.HistoryImageLimit, savedPath);
+            if (pinning)
             { PinImage(result.Image, result.Bounds); transferred = true; }
             else if (result.Action == CaptureAction.QuickSave)
             {
