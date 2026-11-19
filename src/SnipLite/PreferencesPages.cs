@@ -601,6 +601,14 @@ internal sealed partial class PreferencesForm
         GridRow("皮肤", skinChooser, "托盘图标颜色", accentButton,
             leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true, leftWidth: closeWidth);
 
+        // Two full-width sliders: the long travel makes them comfortable to drag.
+        SliderCard("托盘字体大小", 50, 250, 5, (int)Math.Round((double)Value(nameof(_s.TrayFontSize)) * 10),
+            value => $"{value / 10d:0.#} pt",
+            value => Set(nameof(_s.TrayFontSize), value / 10d));
+        SliderCard("历史缩略图大小", 30, 300, 5, (int)Value(nameof(_s.HistoryThumbSize)),
+            value => value + " px",
+            value => Set(nameof(_s.HistoryThumbSize), value));
+
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
         var iconButton = new FluentButton { Tag = "accent-button" }; StyleButton(iconButton, "选择图标文件");

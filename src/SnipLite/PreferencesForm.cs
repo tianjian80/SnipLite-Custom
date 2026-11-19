@@ -1228,6 +1228,45 @@ internal sealed partial class PreferencesForm : ToolWindow
         _y += height + Px(2);
     }
 
+    /// <summary>Full-width row: blue slider on the left, live numeric readout on the right.</summary>
+    private void SliderCard(string label, int min, int max, int step, int value, Func<int, string> format, Action<int> apply)
+    {
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var card = NewSettingRow(height);
+        AddRowIcon(card, FluentIcons.ForLabel(label));
+        card.Controls.Add(CardLabel(label, Px(42), Px(LabelW - 42), height));
+
+        var readout = MakeStatic(format(0)) as Label;
+        if (readout is not null)
+        {
+            readout.AutoSize = false;
+            readout.Width = Px(88); readout.Height = height;
+            readout.TextAlign = ContentAlignment.MiddleRight;
+            readout.Location = new Point(card.Width - Px(16) - readout.Width, 0);
+        }
+
+        var slider = new FluentSlider
+        {
+            Minimum = min, Maximum = max, Step = step, Value = Math.Clamp(value, min, max),
+            BackColor = AppTheme.Current.Card
+        };
+        var left = Px(LabelW + ControlGap);
+        var readoutWidth = readout?.Width ?? Px(88);
+        slider.Width = Math.Max(Px(140), card.Width - left - Px(16) - readoutWidth - Px(10));
+        slider.Height = Px(26);
+        slider.Location = new Point(left, (height - slider.Height) / 2);
+        if (readout is not null) readout.Text = format(slider.Value);
+        slider.ValueChanged += (_, _) =>
+        {
+            if (readout is not null) readout.Text = format(slider.Value);
+            apply(slider.Value);
+        };
+
+        card.Controls.Add(slider);
+        if (readout is not null) card.Controls.Add(readout);
+        _y += height + Px(6);
+    }
+
     private static Control MakeStatic(string text) => new Label
     {
         Text = text,

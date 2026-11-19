@@ -205,21 +205,23 @@ internal sealed class TrayContext : ApplicationContext
 
     private ContextMenuStrip BuildMenu()
     {
-        // Compact tray panel: 9.5pt rows, thin padding and small glyphs. The font is
-        // pinned so a large 界面字体 preference never inflates the context menu.
+        // Compact tray panel sized by 界面 → 风格 → 托盘字体大小, which is independent
+        // of the preferences' 界面字体.
+        var menuFontSize = (float)Math.Clamp(_settings.TrayFontSize, 5, 25);
         var menu = SnipMenu.CreateTray(compact: true);
-        menu.Font = new Font("Microsoft YaHei UI", 9.5f);
+        menu.Font = new Font("Microsoft YaHei UI", menuFontSize);
+        var rowPad = Math.Max(2, (int)Math.Round(menuFontSize * 0.35));
         // Entries are added through the per-item flags from 首选项 → 布局 → 托盘菜单.
         void Add(bool visible, string text, Action action, string key = "")
         {
-            if (visible) menu.Items.Add(SnipMenu.Item(text, action, key, verticalPadding: 3));
+            if (visible) menu.Items.Add(SnipMenu.Item(text, action, key, verticalPadding: rowPad));
         }
         // Same as Add, but hands the item back so its Enabled state can follow the
         // history list (e.g. grey out 清空截屏历史 when there is nothing to clear).
         ToolStripMenuItem? AddItem(bool visible, string text, Action action)
         {
             if (!visible) return null;
-            var item = SnipMenu.Item(text, action, verticalPadding: 3);
+            var item = SnipMenu.Item(text, action, verticalPadding: rowPad);
             menu.Items.Add(item);
             return item;
         }
@@ -285,8 +287,9 @@ internal sealed class TrayContext : ApplicationContext
                         available = screen.Right - menu.Bounds.Right;
                     }
                     available = Math.Max(160, available);
-                    var cardWidth = Math.Max(120, available - 12);
-                    var cardHeight = Math.Max(68, (int)Math.Round(cardWidth * 9 / 16.0));
+                    var requested = Math.Clamp(_settings.HistoryThumbSize, 30, 300);
+                    var cardWidth = Math.Max(60, Math.Min(requested, available - 12));
+                    var cardHeight = Math.Max(34, (int)Math.Round(cardWidth * 9 / 16.0));
                     var entries = _history.Entries;
                     var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
                     // At most five cards are visible; the rest scroll with the wheel.
@@ -365,7 +368,7 @@ internal sealed class TrayContext : ApplicationContext
             clearHistory = AddItem(_settings.TrayItemClearHistory, "清空截屏历史", _history.Clear);
         }
         menu.Items.Add(new ToolStripSeparator());
-        var disable = SnipMenu.Item("禁用快捷键", () => { _settings.HotkeysEnabled = !_settings.HotkeysEnabled; _settings.Save(); ApplySettings(); }, verticalPadding: 3);
+        var disable = SnipMenu.Item("禁用快捷键", () => { _settings.HotkeysEnabled = !_settings.HotkeysEnabled; _settings.Save(); ApplySettings(); }, verticalPadding: rowPad);
         if (_settings.TrayItemDisableHotkeys)
         {
             menu.Items.Add(disable);
@@ -378,7 +381,7 @@ internal sealed class TrayContext : ApplicationContext
         Add(_settings.TrayItemPreferences, "首选项…", () => ShowPreferences(0), Key(_settings.PreferencesHotkey));
         Add(_settings.TrayItemAbout, "关于", () => ShowPreferences(9));
         Add(_settings.TrayItemRestart, "重新启动", Restart);
-        menu.Items.Add(SnipMenu.Item("退出", Exit, verticalPadding: 3));
+        menu.Items.Add(SnipMenu.Item("退出", Exit, verticalPadding: rowPad));
         TrimSeparators(menu.Items);
         UiText.Apply(menu, _settings.DisplayLanguage);
         return menu;
@@ -552,7 +555,7 @@ internal sealed class TrayContext : ApplicationContext
         // Tooltip is just the product name and version; hotkeys live in the menu.
         _tray.Text = $"{AppInfo.ProductName}{AppInfo.Version}";
         _tray.Visible = !_settings.HideTrayIcon;
-        var signature = $"{_settings.EnhancedTrayMenu}|{Localization.LanguageService.CurrentLanguage}|{_settings.InterfaceFont}|{_settings.InterfaceFontSize}|" + string.Join(',', HotkeyDefinitions.Items.Select(item => typeof(AppSettings).GetProperty(item.Name)!.GetValue(_settings)))
+        var signature = $"{_settings.EnhancedTrayMenu}|{Localization.LanguageService.CurrentLanguage}|{_settings.InterfaceFont}|{_settings.InterfaceFontSize}|{_settings.TrayFontSize}|" + string.Join(',', HotkeyDefinitions.Items.Select(item => typeof(AppSettings).GetProperty(item.Name)!.GetValue(_settings)))
             + "|" + string.Join(',', typeof(AppSettings).GetProperties().Where(p => p.Name.StartsWith("TrayItem", StringComparison.Ordinal)).OrderBy(p => p.Name).Select(p => p.GetValue(_settings)));
         if (_menuSignature != signature)
         {

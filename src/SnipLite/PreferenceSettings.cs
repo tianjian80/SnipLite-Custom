@@ -48,6 +48,10 @@ internal sealed partial class AppSettings
     public string LogLevel { get; set; } = "Normal";
     public string InterfaceFont { get; set; } = "Microsoft YaHei UI";
     public float InterfaceFontSize { get; set; } = 9;
+    /// <summary>Tray context-menu font size in points, fully independent of 界面字体.</summary>
+    public double TrayFontSize { get; set; } = 10;
+    /// <summary>Base longest edge (px) of a 截屏历史 thumbnail.</summary>
+    public int HistoryThumbSize { get; set; } = 150;
     public string TrayIconStyle { get; set; } = "Auto";
     public string CustomTrayIcon { get; set; } = "";
     /// <summary>What the title-bar close button does: hide to tray or quit the app.</summary>

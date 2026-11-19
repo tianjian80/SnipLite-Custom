@@ -355,6 +355,114 @@ internal sealed class FluentToggle : CheckBox
     }
 }
 
+/// <summary>Blue-accent slider: rounded track, filled left half and a round thumb.</summary>
+internal sealed class FluentSlider : Control
+{
+    private int _min, _max = 100, _value, _step = 1;
+    private bool _drag;
+
+    public FluentSlider()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
+            | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+        BackColor = AppTheme.Current.Card;
+        Cursor = Cursors.Hand;
+        TabStop = true;
+        Height = 26;
+    }
+
+    public event EventHandler? ValueChanged;
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Minimum { get => _min; set { _min = value; if (_max <= _min) _max = _min + 1; Value = _value; Invalidate(); } }
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Maximum { get => _max; set { _max = Math.Max(value, _min + 1); Value = _value; Invalidate(); } }
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Step { get => _step; set => _step = Math.Max(1, value); }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Value
+    {
+        get => _value;
+        set
+        {
+            var next = Math.Clamp(Snap(value), _min, _max);
+            if (next == _value) return;
+            _value = next;
+            Invalidate();
+            ValueChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private int Snap(int value) => _step <= 1 ? value : (int)Math.Round(value / (double)_step) * _step;
+
+    private int Dpi => Math.Max(1, DeviceDpi / 96);
+    private Rectangle Track => new(Px(9), Height / 2 - Px(2), Math.Max(1, Width - Px(18)), Px(4));
+    private int ThumbX => Track.Left + (int)Math.Round(Track.Width * ((_value - _min) / (double)Math.Max(1, _max - _min)));
+
+    private int Px(int value) => (int)Math.Round((double)(value * Dpi));
+
+    private void SetFromX(int x)
+    {
+        var track = Track;
+        var ratio = Math.Clamp((x - track.Left) / (double)Math.Max(1, track.Width), 0, 1);
+        Value = _min + (int)Math.Round((_max - _min) * ratio);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(BackColor);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        var accent = AppTheme.Current.Accent;
+        var track = Track;
+        using (var back = new SolidBrush(AppTheme.Current.Border)) Fill(g, back, track);
+        var fill = new Rectangle(track.X, track.Y, Math.Max(0, ThumbX - track.X), track.Height);
+        if (fill.Width > 0) using (var brush = new SolidBrush(accent)) Fill(g, brush, fill);
+        var size = Px(15);
+        var thumb = new Rectangle(ThumbX - size / 2, Height / 2 - size / 2, size, size);
+        using (var brush = new SolidBrush(Color.White)) g.FillEllipse(brush, thumb);
+        using (var pen = new Pen(accent, Math.Max(2f, Px(2)))) g.DrawEllipse(pen, thumb);
+    }
+
+    private static void Fill(Graphics g, Brush brush, Rectangle rect)
+    {
+        using var path = FluentDrawing.Rounded(rect, rect.Height / 2f);
+        g.FillPath(brush, path);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Left) return;
+        _drag = true; Focus(); SetFromX(e.X);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (_drag) SetFromX(e.X);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e); _drag = false;
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        Value += e.Delta > 0 ? _step : -_step;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Left or Keys.Down) { Value -= _step; e.Handled = true; }
+        else if (e.KeyCode is Keys.Right or Keys.Up) { Value += _step; e.Handled = true; }
+    }
+}
+
 internal sealed class FluentSettingRow : Panel
 {
     public FluentSettingRow() { DoubleBuffered = true; ResizeRedraw = true; BackColor = AppTheme.Current.Card; }
