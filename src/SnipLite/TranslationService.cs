@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -73,36 +74,67 @@ internal sealed class GooglePublicTranslationProvider : ITranslationProvider
     private readonly HttpClient _client;
     public GooglePublicTranslationProvider(HttpClient? client = null) => _client = client ?? SharedClient;
 
+    private const string BrowserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
     public async Task<TranslationResult> TranslateAsync(string text, string source, string target, CancellationToken cancellationToken)
+        => (await TranslateBatchAsync(new[] { text }, source, target, cancellationToken).ConfigureAwait(false))[0];
+
+    public async Task<IReadOnlyList<TranslationResult>> TranslateBatchAsync(IReadOnlyList<string> texts,
+        string source, string target, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException(UiText.T("没有识别到可翻译的文字，请调整选区后重试。"));
-        if (text.Length > 12_000) throw new InvalidOperationException(UiText.T("文字较多，请缩小截图选区后翻译（最多 12000 字符）。"));
+        if (texts.Count == 0) return Array.Empty<TranslationResult>();
+        if (texts.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException(UiText.T("没有识别到可翻译的文字，请调整选区后重试。"));
+        if (texts.Sum(text => text.Length) > 12_000) throw new InvalidOperationException(UiText.T("文字较多，请缩小截图选区后翻译（最多 12000 字符）。"));
         source = TranslationLanguages.Normalize(source, true, "en");
         target = TranslationLanguages.Normalize(target, false, "zh-CN");
         cancellationToken.ThrowIfCancellationRequested();
-        if (source == target) return new(text, source);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(35));
+        if (source == target) return texts.Select(text => new TranslationResult(text, source)).ToArray();
+
+        var marker = CreateBatchMarker(texts);
+        var merged = texts.Count == 1 ? texts[0] : string.Join($"\n\n{marker}\n\n", texts);
         try
         {
-            var translated = new StringBuilder();
-            string? detected = null;
-            foreach (var (chunk, separator) in SplitText(text))
+            var result = await TranslateGoogleOnceAsync(merged, source, target, cancellationToken).ConfigureAwait(false);
+            return SplitBatchResult(result, marker, texts.Count);
+        }
+        catch (InvalidOperationException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Do not retry Google line by line after throttling; degrade to the existing free Bing channel.
+            try
             {
-                if (string.IsNullOrWhiteSpace(chunk)) { translated.Append(separator); continue; }
-                var url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&ie=UTF-8&oe=UTF-8"
-                    + $"&sl={Uri.EscapeDataString(source)}&tl={Uri.EscapeDataString(target)}&q={Uri.EscapeDataString(chunk)}";
-                using var response = await _client.GetAsync(url, timeout.Token).ConfigureAwait(false);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                    throw new InvalidOperationException(UiText.T("翻译请求过于频繁，请稍后重试。"));
-                if (!response.IsSuccessStatusCode)
-                    throw new InvalidOperationException(UiText.T("翻译服务暂时不可用，请稍后重试。"));
-                var json = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
-                var result = ParseResponse(json);
-                translated.Append(result.Text).Append(separator);
-                detected ??= result.DetectedLanguage;
+                var fallback = await BingWebTranslationProvider.Shared.TranslateAsync(merged, source, target, cancellationToken).ConfigureAwait(false);
+                return SplitBatchResult(fallback, marker, texts.Count);
             }
-            return new(translated.ToString(), detected);
+            catch (InvalidOperationException error)
+            {
+                throw new InvalidOperationException(UiText.T("谷歌翻译暂时不可用，备用翻译也未能完成，请稍后重试。"), error);
+            }
+        }
+    }
+
+    private async Task<TranslationResult> TranslateGoogleOnceAsync(string text, string source, string target, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(35));
+        var url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&ie=UTF-8&oe=UTF-8"
+            + $"&sl={Uri.EscapeDataString(source)}&tl={Uri.EscapeDataString(target)}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["q"] = text })
+        };
+        request.Headers.TryAddWithoutValidation("User-Agent", BrowserUserAgent);
+        request.Headers.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7");
+        request.Headers.Referrer = new Uri("https://translate.google.com/");
+        try
+        {
+            using var response = await _client.SendAsync(request, timeout.Token).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new InvalidOperationException(UiText.T("翻译请求过于频繁，请稍后重试。"));
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(UiText.T("翻译服务暂时不可用，请稍后重试。"));
+            var json = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
+            return ParseResponse(json);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         { throw new InvalidOperationException(UiText.T("翻译请求超时，请检查网络后重试。")); }
@@ -110,6 +142,25 @@ internal sealed class GooglePublicTranslationProvider : ITranslationProvider
         { throw new InvalidOperationException(UiText.T("无法连接翻译服务，请检查网络后重试。")); }
         catch (JsonException)
         { throw new InvalidOperationException(UiText.T("翻译服务返回了无法读取的结果，请稍后重试。")); }
+    }
+
+    private static string CreateBatchMarker(IReadOnlyList<string> texts)
+    {
+        if (texts.Count == 1) return "";
+        var input = string.Concat(texts);
+        string marker;
+        do { marker = Random.Shared.NextInt64(10_000_000_000, 100_000_000_000).ToString(CultureInfo.InvariantCulture); }
+        while (input.Contains(marker, StringComparison.Ordinal));
+        return marker;
+    }
+
+    private static IReadOnlyList<TranslationResult> SplitBatchResult(TranslationResult merged, string marker, int count)
+    {
+        if (count == 1) return new[] { merged };
+        var parts = merged.Text.Split(marker, StringSplitOptions.TrimEntries);
+        if (parts.Length != count || parts.Any(string.IsNullOrWhiteSpace))
+            throw new InvalidOperationException(UiText.T("翻译服务返回了无法拆分的结果，请稍后重试。"));
+        return parts.Select(part => new TranslationResult(part, merged.DetectedLanguage)).ToArray();
     }
 
     internal static TranslationResult ParseResponse(string json)

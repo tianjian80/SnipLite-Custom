@@ -114,33 +114,63 @@ internal sealed partial class CaptureForm
         {
             if (_translationInput.Length > 12_000 || blocks.Count > 80)
                 throw new InvalidOperationException(UiText.T("文字较多，请缩小选区后翻译。"));
-            using var workers = new SemaphoreSlim(2, 2);
-            var completed = 0;
-            var results = await Task.WhenAll(blocks.Select(async block =>
+            TranslationResult[] results;
+            if (provider is GooglePublicTranslationProvider google)
             {
-                await workers.WaitAsync(cancellation.Token);
-                try
+                // One screenshot is one merged Google request, including screenshots with many OCR blocks.
+                results = new TranslationResult[blocks.Count];
+                var pending = new List<int>();
+                for (var i = 0; i < blocks.Count; i++)
                 {
-                    var key = (block.Text, source, target);
-                    if (force || !_translationCache.TryGetValue(key, out var result))
+                    var key = (blocks[i].Text, source, target);
+                    if (!force && _translationCache.TryGetValue(key, out var cached)) results[i] = cached;
+                    else pending.Add(i);
+                }
+                if (pending.Count > 0)
+                {
+                    var translated = await google.TranslateBatchAsync(pending.Select(i => blocks[i].Text).ToArray(), source, target, cancellation.Token);
+                    for (var i = 0; i < pending.Count; i++)
                     {
-                        result = await provider.TranslateAsync(block.Text, source, target, cancellation.Token);
                         cancellation.Token.ThrowIfCancellationRequested();
+                        var index = pending[i];
                         if (_translationCache.Count >= 80) _translationCache.Clear();
-                        _translationCache[key] = result;
+                        _translationCache[(blocks[index].Text, source, target)] = translated[i];
+                        results[index] = translated[i];
                     }
-                    completed++;
-                    if (!IsDisposed && TranslationVisible && request == _translationRequest) _translationPanel.SetProgress(completed, blocks.Count);
-                    return result;
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                if (!IsDisposed && TranslationVisible && request == _translationRequest)
+                    _translationPanel.SetProgress(blocks.Count, blocks.Count);
+            }
+            else
+            {
+                using var workers = new SemaphoreSlim(2, 2);
+                var completed = 0;
+                results = await Task.WhenAll(blocks.Select(async block =>
                 {
-                    firstFailure ??= ex;
-                    cancellation.Cancel();
-                    throw;
-                }
-                finally { workers.Release(); }
-            }));
+                    await workers.WaitAsync(cancellation.Token);
+                    try
+                    {
+                        var key = (block.Text, source, target);
+                        if (force || !_translationCache.TryGetValue(key, out var result))
+                        {
+                            result = await provider.TranslateAsync(block.Text, source, target, cancellation.Token);
+                            cancellation.Token.ThrowIfCancellationRequested();
+                            if (_translationCache.Count >= 80) _translationCache.Clear();
+                            _translationCache[key] = result;
+                        }
+                        completed++;
+                        if (!IsDisposed && TranslationVisible && request == _translationRequest) _translationPanel.SetProgress(completed, blocks.Count);
+                        return result;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        firstFailure ??= ex;
+                        cancellation.Cancel();
+                        throw;
+                    }
+                    finally { workers.Release(); }
+                }));
+            }
             if (IsDisposed || !TranslationVisible || request != _translationRequest || cancellation.IsCancellationRequested) return;
             if (_translationSnapshot is not null)
             {
