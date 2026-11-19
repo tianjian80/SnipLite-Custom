@@ -46,12 +46,22 @@ internal sealed class PinForm : ToolWindow
     {
         _image = image; _settings = settings ?? AppSettings.Load(); _pinGroup = _group;
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual;
+        // Paint straight into the double buffer so the first frame shown already is
+        // the image: no white/black erase frame flashes at the default position.
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
         TopMost = true; DoubleBuffered = true; BackColor = Color.Black; KeyPreview = true; Text = UiText.T("SnipLite 贴图");
         Font = _settings.CreateInterfaceFont(); _opacity = Math.Clamp(opacityPercent, 10, 100) / 100d; Opacity = _opacity;
         var anchor = screenPoint ?? Win32.CursorPosition();
         _scale = Math.Min(1, _settings.PinMaxSize / (float)Math.Max(image.Width, image.Height));
+        // Oversized images start at 80% of the working area at most, so the pin never
+        // pops up as a full-screen sheet before any manual zoom.
+        var work = Screen.FromPoint(anchor).WorkingArea;
+        _scale = Math.Min(_scale, Math.Min(work.Width * .8f / image.Width, work.Height * .8f / image.Height));
         _windowSize = new Size(Math.Max(1, (int)(image.Width * _scale)), Math.Max(1, (int)(image.Height * _scale)));
         _location = new Point(anchor.X - _windowSize.Width / 2, anchor.Y - _windowSize.Height / 2); ClampIntoVirtualScreen();
+        // Final geometry is applied before the window is ever shown; nothing moves or
+        // resizes in Load/Shown, which is what used to cause the jump-flash.
+        Bounds = new Rectangle(_location, _windowSize);
         ContextMenuStrip = BuildMenu(); Open.Add(this);
         if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
         _flashTimer.Tick += (_, _) =>
@@ -171,6 +181,8 @@ internal sealed class PinForm : ToolWindow
                 Math.Clamp(origin.X + offset, area.Left, Math.Max(area.Left, area.Right - _windowSize.Width)),
                 Math.Clamp(origin.Y + offset, area.Top, Math.Max(area.Top, area.Bottom - _windowSize.Height)));
         }
+        // Move the (still hidden) window to its final spot before the first Show.
+        Bounds = new Rectangle(_location, _windowSize);
         Show();
     }
     public static void ResetAllScale() { foreach (var pin in Open.ToArray()) pin.Reset(); }
