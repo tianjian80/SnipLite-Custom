@@ -107,10 +107,10 @@ internal static class AppTheme
         {
             FluentSettingRow => p.Card,
             FluentInputFrame => p.Field,
-            TextBoxBase or UpDownBase => p.Field,
+            TextBoxBase or UpDownBase => ThemeManager.GlassField,
             Button => p.Field,
             Label => Color.Transparent,
-            _ when control.Parent is FluentInputFrame => p.Field,
+            _ when control.Parent is FluentInputFrame => ThemeManager.GlassField,
             _ when control.Parent is FluentSettingRow => p.Card,
             _ => p.Window
         };

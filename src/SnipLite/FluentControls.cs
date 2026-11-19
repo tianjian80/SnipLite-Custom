@@ -153,7 +153,9 @@ internal sealed class FluentInputFrame : UserControl
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         var p = AppTheme.Current;
-        e.Graphics.Clear(Parent?.BackColor ?? p.Card);
+        var glass = GlassPaint.UnderWallpaper(this);
+        if (glass && !Bare) GlassPaint.PaintBackdrop(this, e.Graphics, ClientRectangle);
+        else e.Graphics.Clear(Parent?.BackColor ?? p.Card);
         if (Bare)
         {
             // Frame is drawn by the surrounding capsule.
@@ -168,8 +170,8 @@ internal sealed class FluentInputFrame : UserControl
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         // Inset a full pixel so the 1 px rounded edge stays inside the client area.
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), Px(5));
-        using var fill = new SolidBrush(p.Field); e.Graphics.FillPath(fill, path);
-        using var edge = new Pen(ContainsFocus ? p.Accent : _hover ? p.Muted : p.Border); e.Graphics.DrawPath(edge, path);
+        using var fill = new SolidBrush(glass ? ThemeManager.GlassTint : p.Field); e.Graphics.FillPath(fill, path);
+        using var edge = new Pen(ContainsFocus ? p.Accent : glass ? (_hover ? p.Accent : ThemeManager.GlassEdge) : _hover ? p.Muted : p.Border); e.Graphics.DrawPath(edge, path);
         if (ContainsFocus)
         {
             using var accent = new Pen(p.Accent, Math.Max(1, Px(2)));
@@ -234,7 +236,10 @@ internal sealed class FluentButton : Button
     protected override void OnPaint(PaintEventArgs e)
     {
         var p = AppTheme.Current; var s = DeviceDpi / 96f; var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? p.Window); g.SmoothingMode = SmoothingMode.AntiAlias;
+        var glass = !Segment && GlassPaint.UnderWallpaper(this);
+        if (glass) GlassPaint.PaintBackdrop(this, g, ClientRectangle);
+        else g.Clear(Parent?.BackColor ?? p.Window);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
         if (Segment)
         {
             var caption = new Rectangle((int)(9 * s), 0, Math.Max(1, Width - (int)(29 * s)), Height);
@@ -248,10 +253,13 @@ internal sealed class FluentButton : Button
         // painting them here is mandatory because OnPaint ignores FlatAppearance.
         var accent = Tag as string is "color-swatch" or "accent-button";
         var onGold = accent && _hover && Enabled;
-        var surface = Selected ? p.AccentSoft : _hover ? (accent ? Color.FromArgb(245, 184, 0) : p.Hover) : BackColor;
+        Color? glassFill = glass ? (_hover ? Color.FromArgb(150, 255, 255, 255) : ThemeManager.GlassTint) : null;
+        var surface = Selected ? p.AccentSoft
+            : _hover ? (accent ? Color.FromArgb(245, 184, 0) : glassFill!.Value)
+            : glassFill ?? BackColor;
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), 5 * s);
         using var fill = new SolidBrush(surface); g.FillPath(fill, path);
-        using var edge = new Pen(Selected ? p.Accent : p.Border); g.DrawPath(edge, path);
+        using var edge = new Pen(Selected || (glass && _hover) ? p.Accent : glass ? ThemeManager.GlassEdge : p.Border); g.DrawPath(edge, path);
         var text = Rectangle.Inflate(ClientRectangle, -(int)(9 * s), 0);
         if (DropDown) text.Width -= (int)(20 * s);
         var alignment = TextAlign == ContentAlignment.MiddleLeft ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter;
@@ -308,12 +316,16 @@ internal sealed class CapsuleFrame : Panel
     {
         var p = AppTheme.Current;
         var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? p.Card);
+        var glass = GlassPaint.UnderWallpaper(this);
+        if (glass) GlassPaint.PaintBackdrop(this, g, ClientRectangle);
+        else g.Clear(Parent?.BackColor ?? p.Card);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), Px(5));
-        using var fill = new SolidBrush(HoverHighlight && Hovered ? p.Hover : p.Field);
+        using var fill = new SolidBrush(glass
+            ? (HoverHighlight && Hovered ? Color.FromArgb(150, 255, 255, 255) : ThemeManager.GlassTint)
+            : (HoverHighlight && Hovered ? p.Hover : p.Field));
         g.FillPath(fill, path);
-        using var edge = new Pen(p.Border);
+        using var edge = new Pen(glass ? ThemeManager.GlassEdge : p.Border);
         g.DrawPath(edge, path);
     }
 
@@ -359,6 +371,32 @@ internal sealed class FluentToggle : CheckBox
 internal interface IWallpaperBackdrop
 {
     void PaintWallpaperFor(Graphics g, Rectangle clip, Point childInPage);
+}
+
+/// <summary>Shared painting helpers for the frosted-glass look inside cards.</summary>
+internal static class GlassPaint
+{
+    public static bool UnderWallpaper(Control control)
+    {
+        if (!ThemeManager.HasWallpaper) return false;
+        for (var parent = control.Parent; parent is not null; parent = parent.Parent)
+            if (parent is IWallpaperBackdrop) return true;
+        return false;
+    }
+
+    /// <summary>Draws the wallpaper slice behind a control so an alpha fill reads as glass.</summary>
+    public static void PaintBackdrop(Control control, Graphics g, Rectangle clip)
+    {
+        for (var parent = control.Parent; parent is not null; parent = parent.Parent)
+        {
+            if (parent is not IWallpaperBackdrop backdrop) continue;
+            Point at;
+            try { at = parent.PointToClient(control.PointToScreen(Point.Empty)); }
+            catch { at = control.Location; }
+            backdrop.PaintWallpaperFor(g, clip, at);
+            return;
+        }
+    }
 }
 
 internal sealed class FluentSettingRow : Panel
