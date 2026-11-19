@@ -150,12 +150,9 @@ internal sealed class TrayContext : ApplicationContext
                     if (_historyPreview is { IsDisposed: false } popup && popup.Bounds.Contains(Cursor.Position)) e.Cancel = true;
                 };
                 menu.Opening += (_, _) => _history.PruneMissing();
-                // Grey out both history entries when nothing is left.
                 menu.Opening += (_, _) =>
                 {
-                    var any = _history.Entries.Count > 0;
-                    history.Enabled = any;
-                    if (clearHistory is not null) clearHistory.Enabled = any;
+                    if (clearHistory is not null) clearHistory.Enabled = _history.Entries.Count > 0;
                 };
                 menu.Items.Add(history);
             }
@@ -188,43 +185,52 @@ internal sealed class TrayContext : ApplicationContext
     /// </summary>
     private void ShowHistoryPreview(ToolStripMenuItem item)
     {
-        _history.PruneMissing();
-        var entries = _history.Entries;
-        var menu = _trayMenu;
-        if (entries.Count == 0 || menu is null || !menu.Visible) return;
-        var bounds = menu.Bounds;
-        if (bounds.Width <= 0) return;
-        CloseHistoryPreview();
-        var screen = Screen.FromPoint(bounds.Location).WorkingArea;
-        var menuRight = bounds.Right;
-        var maxRightW = Math.Max(80, screen.Right - menuRight - 4);
-        var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-        var finalW = Math.Min(requested, maxRightW);
-        var popup = new HistoryPreviewPopup(entries, finalW, screen.Height - 16, entry =>
+        try
         {
+            _history.PruneMissing();
+            var menu = _trayMenu;
+            if (menu is null || !menu.Visible) return;
+            var bounds = menu.Bounds;
+            if (bounds.Width <= 0) return;
+            var entries = _history.Entries;
             CloseHistoryPreview();
-            menu.Close();
-            // The file may have been deleted after the list was filled.
-            if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
+            var screen = Screen.FromPoint(bounds.Location).WorkingArea;
+            var menuRight = bounds.Right;
+            var maxRightW = Math.Max(80, screen.Right - menuRight - 4);
+            var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
+            var finalW = Math.Min(requested, maxRightW);
+            var popup = new HistoryPreviewPopup(entries, finalW, screen.Height - 16, entry =>
             {
-                _history.Remove(entry);
-                return;
-            }
-            PinImage(entry.Image(), entry.Bounds, exact: true);
-        });
-        var top = bounds.Bottom - popup.Height;
-        top = Math.Max(screen.Top, Math.Min(top, screen.Bottom - popup.Height));
-        popup.Location = new Point(menuRight, top);
-        popup.FormClosed += (_, _) =>
+                CloseHistoryPreview();
+                menu.Close();
+                // The file may have been deleted after the list was filled.
+                if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
+                {
+                    _history.Remove(entry);
+                    return;
+                }
+                PinImage(entry.Image(), entry.Bounds, exact: true);
+            });
+            var top = bounds.Bottom - popup.Height;
+            top = Math.Max(screen.Top, Math.Min(top, screen.Bottom - popup.Height));
+            popup.Location = new Point(menuRight, top);
+            popup.FormClosed += (_, _) =>
+            {
+                if (!ReferenceEquals(_historyPreview, popup)) return;
+                _historyPreview = null;
+                _historyItem = null;
+            };
+            _historyItem = item;
+            _historyPreview = popup;
+            // Raw SW_SHOWNOACTIVATE: never Activate()/Focus(), the tray menu keeps focus.
+            popup.ShowNoActivate();
+            ToolWindow.HideTaskbarTab(popup.Handle);
+        }
+        catch (Exception ex)
         {
-            if (!ReferenceEquals(_historyPreview, popup)) return;
-            _historyPreview = null;
-            _historyItem = null;
-        };
-        _historyItem = item;
-        _historyPreview = popup;
-        popup.Show();
-        ToolWindow.HideTaskbarTab(popup.Handle);
+            AppLog.Write("打开截屏历史预览失败", ex);
+            CloseHistoryPreview();
+        }
     }
 
     private void CloseHistoryPreview()
@@ -232,7 +238,9 @@ internal sealed class TrayContext : ApplicationContext
         _historyItem = null;
         var popup = _historyPreview;
         _historyPreview = null;
-        if (popup is not null && !popup.IsDisposed) popup.Close();
+        if (popup is null || popup.IsDisposed) return;
+        try { popup.Dismiss(); }
+        catch (Exception ex) { AppLog.Write("关闭截屏历史预览失败", ex); }
     }
 
     /// <summary>Closes the preview when the pointer is over neither the item nor the popup.</summary>

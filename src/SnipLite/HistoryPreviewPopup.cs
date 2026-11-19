@@ -43,8 +43,27 @@ internal sealed class HistoryPreviewPopup : Form
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
             | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
-        Width = cardWidth + Pad * 2 + 2;   // 1 px theme border on each side
-        Height = Math.Min(ContentHeight, Math.Max(80, maxHeight));
+        Width = entries.Count == 0 ? Math.Max(180, cardWidth + Pad * 2 + 2) : cardWidth + Pad * 2 + 2;
+        Height = entries.Count == 0 ? 36 : Math.Min(ContentHeight, Math.Max(80, maxHeight));
+    }
+
+    /// <summary>
+    /// Creates the handle and shows the window with SW_SHOWNOACTIVATE, so the open
+    /// tray menu never loses input focus or its mouse capture.
+    /// </summary>
+    public void ShowNoActivate()
+    {
+        // Touching Handle creates the window without making it visible or active.
+        var handle = Handle;
+        ShowWindow(handle, 4 /* SW_SHOWNOACTIVATE */);
+    }
+
+    /// <summary>Hides the raw-shown window and disposes it.</summary>
+    public void Dismiss()
+    {
+        if (IsDisposed) return;
+        if (IsHandleCreated) ShowWindow(Handle, 0 /* SW_HIDE */);
+        Close();
     }
 
     /// <summary>No taskbar button, no Alt+Tab entry and no activation at all.</summary>
@@ -103,6 +122,12 @@ internal sealed class HistoryPreviewPopup : Form
             g.DrawRectangle(edge, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
 
         var left = Pad + 1;
+        if (_entries.Count == 0)
+        {
+            TextRenderer.DrawText(g, UiText.T("暂无历史截图"), Font, ClientRectangle,
+                AppTheme.Current.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            return;
+        }
         for (var index = 0; index < _entries.Count; index++)
         {
             var top = TopOf(index);
@@ -162,12 +187,18 @@ internal sealed class HistoryPreviewPopup : Form
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr GetModuleHandle(string? name);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ShowWindow(IntPtr window, int command);
+
     private readonly MouseHookProc _hookProc;
     private IntPtr _hook;
 
-    protected override void OnShown(EventArgs e)
+    protected override void OnHandleCreated(EventArgs e)
     {
-        base.OnShown(e);
+        base.OnHandleCreated(e);
+        // Installed here, not in OnShown: the window is shown through raw ShowWindow
+        // and therefore never raises the normal Shown pipeline.
+        if (_hook != IntPtr.Zero) return;
         // A field keeps the delegate alive for as long as the hook is installed.
         _hook = SetWindowsHookEx(WhMouseLl, _hookProc, GetModuleHandle(null), 0);
     }
@@ -205,9 +236,22 @@ internal sealed class HistoryPreviewPopup : Form
         return CallNextHookEx(_hook, code, message, data);
     }
 
-    private void SetHover(Point screen)
+    protected override void OnMouseMove(MouseEventArgs e)
     {
-        var hit = Bounds.Contains(screen) ? IndexAt(PointToClient(screen).Y) : -1;
+        base.OnMouseMove(e);
+        SetHoverIndex(IndexAt(e.Y));
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.Button == MouseButtons.Left) PerformClick(IndexAt(e.Y));
+    }
+
+    private void SetHover(Point screen) => SetHoverIndex(Bounds.Contains(screen) ? IndexAt(PointToClient(screen).Y) : -1);
+
+    private void SetHoverIndex(int hit)
+    {
         if (hit == _hover) return;
         _hover = hit;
         Cursor = hit >= 0 ? Cursors.Hand : Cursors.Default;
@@ -223,16 +267,28 @@ internal sealed class HistoryPreviewPopup : Form
         Invalidate();
     }
 
+    private long _lastClick;
+
+    private void PerformClick(int index)
+    {
+        if (index < 0 || index >= _entries.Count) return;
+        // The hook and the control event can both fire for one physical click.
+        var now = Environment.TickCount64;
+        if (now - _lastClick < 400) return;
+        _lastClick = now;
+        var chosen = _entries[index];
+        _click(chosen);
+    }
+
     private void PostClick(Point screen)
     {
-        var entry = IndexAt(PointToClient(screen).Y);
-        if (entry < 0) return;
-        var chosen = _entries[entry];
+        var index = IndexAt(PointToClient(screen).Y);
+        if (index < 0) return;
         // Deferred: the hook must return before the menu is closed from inside it.
         BeginInvoke(() =>
         {
             if (IsDisposed) return;
-            _click(chosen);
+            PerformClick(index);
         });
     }
 }
