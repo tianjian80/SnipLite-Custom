@@ -15,9 +15,11 @@ internal sealed class DelayCountdownForm : ToolWindow
     private const int LogicalSize = 400;
 
     // Segment geometry in 96 dpi units: digit height, bar thickness, corner gap.
-    private const float DigitHeight = 180f;
-    private const float BarThickness = 26f;
+    // 210 x 113.5 keeps every bar slim (about 1:4.2) like a real LED display.
+    private const float DigitHeight = 210f;
+    private const float BarThickness = 20f;
     private const float SegmentGap = 4f;
+    private const float DigitAspect = 1.85f;
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private readonly int _total;
@@ -148,7 +150,7 @@ internal sealed class DelayCountdownForm : ToolWindow
             var h = DigitHeight * _scale;
             var t = BarThickness * _scale / 2f;
             var gap = SegmentGap * _scale;
-            var w = h * 0.56f;
+            var w = h / DigitAspect;
             var spacing = w * 0.18f;
             var total = digits.Length * w + (digits.Length - 1) * spacing;
             var x = (Width - total) / 2f;
@@ -167,41 +169,70 @@ internal sealed class DelayCountdownForm : ToolWindow
             {
                 foreach (var segment in bodies) lit.AddPath(segment, false);
 
-                // 1. Soft red halo: five widening round pens, faint outside, brighter near the bars.
-                var halo = new (float Width, int Alpha)[] { (34f, 18), (24f, 30), (16f, 50), (9f, 70), (4f, 85) };
-                foreach (var (width, alpha) in halo)
-                {
-                    using var pen = new Pen(Color.FromArgb(alpha, 255, 25, 35), width * _scale)
-                    {
-                        LineJoin = LineJoin.Round
-                    };
-                    g.DrawPath(pen, lit);
-                }
+                // 1. Silky halo: paint the lit bars small, then scale back up twice.
+                //    Bilinear down/up sampling acts as a true gaussian-ish blur, so
+                //    there are no stacked hard-edged rings around the digit.
+                PaintGlow(g, lit, glowColor: Color.FromArgb(145, 255, 20, 30));
             }
 
-            // 2. Saturated LED body: bright gem red, slightly hotter in the middle of each bar.
+            // 2. Crisp LED body: sharp anti-aliased hexagons, gem red gradient,
+            //    no inner blur so every 45 degree corner stays razor sharp.
             foreach (var segment in bodies)
             {
                 using (segment)
                 {
-                    using var body = new PathGradientBrush(segment)
-                    {
-                        CenterColor = Color.FromArgb(255, 0xFF, 0x2A, 0x2A),
-                        SurroundColors = new[] { Color.FromArgb(255, 0xD8, 0x00, 0x0C) }
-                    };
-                    g.FillPath(body, segment);
-
-                    // Faint sheen along the top half so the tube looks filled, not flat.
                     var b = segment.GetBounds();
                     if (b.Width <= 0 || b.Height <= 0) continue;
-                    using var sheen = new LinearGradientBrush(b,
-                        Color.FromArgb(90, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90f);
-                    g.FillPath(sheen, segment);
+
+                    using var body = new LinearGradientBrush(b,
+                        Color.FromArgb(255, 0xE6, 0x00, 0x12), Color.FromArgb(255, 0xFF, 0x1E, 0x2D), 45f);
+                    g.FillPath(body, segment);
                 }
             }
         }
 
         PushLayered(bitmap);
+    }
+
+    /// <summary>
+    /// Smooth LED glow: fill the lit bars into a quarter-size ARGB bitmap, then
+    /// scale it back up through two bilinear passes. The resampling spreads the
+    /// light like a real gaussian blur instead of stacked hard-edged pen rings.
+    /// </summary>
+    private void PaintGlow(Graphics g, GraphicsPath lit, Color glowColor)
+    {
+        var qw = Math.Max(1, Width / 4);
+        var qh = Math.Max(1, Height / 4);
+        using var small = new Bitmap(qw, qh, PixelFormat.Format32bppPArgb);
+        using (var sg = Graphics.FromImage(small))
+        {
+            sg.SmoothingMode = SmoothingMode.AntiAlias;
+            sg.Clear(Color.Transparent);
+            sg.ScaleTransform(qw / (float)Width, qh / (float)Height);
+            using var brush = new SolidBrush(glowColor);
+            sg.FillPath(brush, lit);
+        }
+
+        var hw = Math.Max(1, Width / 2);
+        var hh = Math.Max(1, Height / 2);
+        using var mid = new Bitmap(hw, hh, PixelFormat.Format32bppPArgb);
+        using (var mg = Graphics.FromImage(mid))
+        {
+            mg.InterpolationMode = InterpolationMode.HighQualityBilinear;
+            mg.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            mg.DrawImage(small, new Rectangle(0, 0, hw, hh), 0, 0, qw, qh, GraphicsUnit.Pixel);
+        }
+
+        g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        g.DrawImage(mid, new Rectangle(0, 0, Width, Height), 0, 0, hw, hh, GraphicsUnit.Pixel);
+
+        // A wider, fainter ambient pass lets the red fog dissolve naturally.
+        var pad = (int)Math.Round(12 * _scale);
+        var wide = new Rectangle(-pad, -pad, Width + pad * 2, Height + pad * 2);
+        using var fade = new ImageAttributes();
+        fade.SetColorMatrix(new ColorMatrix { Matrix33 = 0.35f });
+        g.DrawImage(mid, wide, 0, 0, hw, hh, GraphicsUnit.Pixel, fade);
     }
 
     private static readonly Dictionary<char, string> SegmentMap = new()
