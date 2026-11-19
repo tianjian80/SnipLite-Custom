@@ -291,9 +291,12 @@ internal sealed class TrayContext : ApplicationContext
                         menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
                         available = screen.Right - menu.Bounds.Right;
                     }
-                    available = Math.Max(160, available);
+                    // Extra 24 px covers the drop-down border plus a small safety gap, so
+                    // the thumbnails sit flush with the screen's right edge instead of
+                    // poking a dozen pixels past it.
+                    var maxRightWidth = Math.Max(80, available - 24);
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-                    var cardWidth = Math.Max(50, Math.Min(requested, available - 12));
+                    var cardWidth = Math.Max(50, Math.Min(requested, maxRightWidth));
                     var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
                     // The popup hugs the thumbnails: 6 px padding on both sides only.
                     var panelWidth = cardWidth + 12;
