@@ -27,6 +27,8 @@ internal sealed partial class AppSettings
     public bool TrayItemRecord { get; set; } = true;
     public bool TrayItemGif { get; set; } = true;
     public bool TrayItemMouseThrough { get; set; } = true;
+    /// <summary>Global mouse-through state for pinned images, mirrored by the 按键 page switch.</summary>
+    public bool MouseThroughEnabled { get; set; }
     public bool TrayItemPin { get; set; } = true;
     public bool TrayItemTogglePins { get; set; } = true;
     public bool TrayItemSwitchGroup { get; set; } = true;

@@ -216,7 +216,7 @@ internal sealed class TrayContext : ApplicationContext
         Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true), Key(_settings.LongCaptureHotkey));
         Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record), Key(_settings.RecordHotkey));
         Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif), Key(_settings.GifHotkey));
-        Add(_settings.TrayItemMouseThrough, "鼠标穿透", PinForm.ToggleMouseThroughActive);
+        Add(_settings.TrayItemMouseThrough, "鼠标穿透", ToggleMouseThrough);
         Add(_settings.TrayItemPin, "贴图 / 恢复贴图", PasteFromClipboard, Key(_settings.PinHotkey));
         Add(_settings.TrayItemTogglePins, "隐藏 / 显示所有贴图", PinForm.ToggleAll, Key(_settings.TogglePinsHotkey));
         if (_settings.EnhancedTrayMenu)
@@ -538,7 +538,7 @@ internal sealed class TrayContext : ApplicationContext
             [nameof(_settings.PinHotkey)] = PasteFromClipboard,
             [nameof(_settings.TogglePinsHotkey)] = PinForm.ToggleAll,
             [nameof(_settings.SwitchGroupHotkey)] = PinForm.SwitchGroup,
-            [nameof(_settings.MouseThroughHotkey)] = PinForm.ToggleMouseThroughActive,
+            [nameof(_settings.MouseThroughHotkey)] = ToggleMouseThrough,
             [nameof(_settings.TranslationHotkey)] = () => StartCapture(CaptureMode.Translation),
             [nameof(_settings.OcrHotkey)] = () => StartCapture(CaptureMode.Ocr),
             [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr),
@@ -742,6 +742,16 @@ internal sealed class TrayContext : ApplicationContext
         }
 
         return Path.GetTempPath();
+    }
+
+    /// <summary>Flips mouse-through on every pin and persists it for the 按键 switch.</summary>
+    private void ToggleMouseThrough()
+    {
+        if (PinForm.OpenCount == 0) { PinForm.ToggleMouseThroughActive(); return; }
+        var on = !PinForm.MouseThroughActive;
+        PinForm.SetMouseThroughActive(on);
+        _settings.MouseThroughEnabled = on;
+        _settings.Save();
     }
 
     /// <summary>Redacts the current selection, or starts a capture that redacts once framed.</summary>

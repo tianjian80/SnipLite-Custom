@@ -899,7 +899,14 @@ internal sealed partial class PreferencesForm
     {
         Flag("禁用鼠标滚轮功能", nameof(_s.DisableCaptureWheel)); Flag("按 Esc 时弹出确认对话框", nameof(_s.ConfirmEscape));
         Flag("忽略其他程序模拟的复制命令", nameof(_s.IgnoreInjectedCopy));
-        Flag("截屏时屏蔽左 Win 键", nameof(_s.BlockLeftWindows)); Flag("截屏时屏蔽右 Win 键", nameof(_s.BlockRightWindows));
+        var winGap = Px(10);
+        var winWidth = (ContentWidth() - winGap * 2) / 3;
+        var winHeight = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        CheckCard(_labelX, winWidth, winHeight, ("禁 Win 左键", nameof(_s.BlockLeftWindows), "keyboard"));
+        CheckCard(_labelX + winWidth + winGap, winWidth, winHeight, ("禁 Win 右键", nameof(_s.BlockRightWindows), "keyboard"));
+        CheckCard(_labelX + (winWidth + winGap) * 2, winWidth, winHeight,
+            ("鼠标穿透", nameof(_s.MouseThroughEnabled), "mouse"), on => PinForm.SetMouseThroughActive(on));
+        _y += winHeight + Px(8);
         ActionRow("左键双击", nameof(_s.DoubleClickAction), nameof(_s.DoubleClickExit));
         ActionRow("中键单击", nameof(_s.MiddleClickAction), nameof(_s.MiddleClickExit));
         ActionRow("回车键", nameof(_s.EnterAction), nameof(_s.EnterExit));
@@ -1518,7 +1525,8 @@ internal sealed partial class PreferencesForm
         }
     }
 
-    private void CheckCard(int left, int width, int height, (string Label, string Property, string Icon) item)
+    private void CheckCard(int left, int width, int height, (string Label, string Property, string Icon) item,
+        Action<bool>? changed = null)
     {
         var card = new FluentSettingRow
         {
@@ -1541,7 +1549,7 @@ internal sealed partial class PreferencesForm
             ForeColor = Ink,
             Checked = (bool)Value(item.Property)
         };
-        box.CheckedChanged += (_, _) => Set(item.Property, box.Checked);
+        box.CheckedChanged += (_, _) => { Set(item.Property, box.Checked); changed?.Invoke(box.Checked); };
         card.Controls.Add(box);
     }
     private void LayoutPage()

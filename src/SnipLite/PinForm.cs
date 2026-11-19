@@ -53,6 +53,7 @@ internal sealed class PinForm : ToolWindow
         _windowSize = new Size(Math.Max(1, (int)(image.Width * _scale)), Math.Max(1, (int)(image.Height * _scale)));
         _location = new Point(anchor.X - _windowSize.Width / 2, anchor.Y - _windowSize.Height / 2); ClampIntoVirtualScreen();
         ContextMenuStrip = BuildMenu(); Open.Add(this);
+        if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
         _flashTimer.Tick += (_, _) =>
         {
             _flashTicks--;
@@ -97,11 +98,21 @@ internal sealed class PinForm : ToolWindow
         }
         Toast.Show(Localization.LanguageService.Format("贴图分组 {0}", _group));
     }
+    /// <summary>Mouse-through state shared by every open pin.</summary>
+    public static bool MouseThroughActive { get; private set; }
+
     public static void ToggleMouseThroughActive()
     {
-        var pin = Open.LastOrDefault(pin => pin.ContainsFocus) ?? Open.LastOrDefault(pin => pin.Visible);
-        if (pin is null) { Toast.Show(UiText.T("当前没有贴图")); return; }
-        pin.ToggleMouseThrough();
+        if (!Open.Any(pin => pin.Visible)) { Toast.Show(UiText.T("当前没有贴图")); return; }
+        SetMouseThroughActive(!MouseThroughActive);
+    }
+
+    /// <summary>Applies the state to every open pin so the switch and hotkey stay in sync.</summary>
+    public static void SetMouseThroughActive(bool on)
+    {
+        MouseThroughActive = on;
+        foreach (var pin in Open.ToArray()) pin.ApplyMouseThrough(on);
+        Toast.Show(on ? UiText.T("贴图鼠标穿透已启用，可用全局快捷键关闭") : UiText.T("贴图鼠标穿透已关闭"));
     }
     public static bool RestoreHidden()
     {
@@ -314,12 +325,13 @@ internal sealed class PinForm : ToolWindow
         _scale = _thumbnail ? Math.Min(_settings.ThumbnailWidth / (float)_image.Width, _settings.ThumbnailHeight / (float)_image.Height) : 1;
         ApplyLayout();
     }
-    private void ToggleMouseThrough()
+    private void ToggleMouseThrough() => SetMouseThroughActive(!MouseThroughActive);
+
+    private void ApplyMouseThrough(bool on)
     {
-        _mouseThrough = !_mouseThrough;
+        _mouseThrough = on;
         var style = GetWindowLongPtr(Handle, -20).ToInt64();
-        SetWindowLongPtr(Handle, -20, new IntPtr(_mouseThrough ? style | 0x20 : style & ~0x20));
-        Toast.Show(_mouseThrough ? UiText.T("贴图鼠标穿透已启用，可用全局快捷键关闭") : UiText.T("贴图鼠标穿透已关闭"));
+        SetWindowLongPtr(Handle, -20, new IntPtr(on ? style | 0x20 : style & ~0x20));
     }
     private void Copy()
     {
