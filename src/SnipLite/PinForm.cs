@@ -33,8 +33,6 @@ internal sealed class PinForm : ToolWindow
     private bool _mouseThrough;
     private bool _suppressContext;
     private int _pinGroup;
-    /// <summary>Pins restored from 截屏历史 must not open the pin context menu.</summary>
-    internal bool DisableContextMenu;
     private PinShadowWindow? _shadow;
     private Size _shadowSize;
     private int _shadowColor;
@@ -43,12 +41,9 @@ internal sealed class PinForm : ToolWindow
     public static int OpenCount => Open.Count;
     public static int RecoverableCount => History.Count(entry => !Open.Any(pin => pin._historyEntry == entry));
 
-    public PinForm(Bitmap image, Point? screenPoint = null, int opacityPercent = 100, AppSettings? settings = null, bool disableContextMenu = false)
+    public PinForm(Bitmap image, Point? screenPoint = null, int opacityPercent = 100, AppSettings? settings = null)
     {
         _image = image; _settings = settings ?? AppSettings.Load(); _pinGroup = _group;
-        // Set before the menu binding below: a history-restored pin must never own a
-        // context menu, not even for the very first right-click.
-        DisableContextMenu = disableContextMenu;
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual;
         // Paint straight into the double buffer so the first frame shown already is
         // the image: no white/black erase frame flashes at the default position.
@@ -63,8 +58,7 @@ internal sealed class PinForm : ToolWindow
         // Final geometry is applied before the window is ever shown; nothing moves or
         // resizes in Load/Shown, which is what used to cause the jump-flash.
         Bounds = new Rectangle(_location, _windowSize);
-        // No menu object at all for history-restored pins.
-        ContextMenuStrip = DisableContextMenu ? null : BuildMenu(); Open.Add(this);
+        ContextMenuStrip = BuildMenu(); Open.Add(this);
         if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
         _zoomBadgeTimer.Tick += (_, _) => { _zoomBadgeTimer.Stop(); Invalidate(); };
         VisibleChanged += (_, _) =>
@@ -81,8 +75,7 @@ internal sealed class PinForm : ToolWindow
         {
             pin.Text = UiText.T("SnipLite 贴图");
             pin.Font = pin._settings.CreateInterfaceFont(); pin.UpdateShadow(); pin.Invalidate();
-            var previous = pin.ContextMenuStrip;
-            pin.ContextMenuStrip = pin.DisableContextMenu ? null : pin.BuildMenu();
+            var previous = pin.ContextMenuStrip; pin.ContextMenuStrip = pin.BuildMenu();
             if (previous is not null) SynchronizationContext.Current?.Post(_ => previous.Dispose(), null);
         }
     }
@@ -393,20 +386,10 @@ internal sealed class PinForm : ToolWindow
         }
         _location.Offset(now.X - _grab.X, now.Y - _grab.Y); _grab = now; ApplyLayout();
     }
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        _dragging = false; Capture = false; UpdateShadow();
-        // A history-restored pin never answers a click with its context menu.
-        if (DisableContextMenu) { _suppressContext = false; }
-    }
+    protected override void OnMouseUp(MouseEventArgs e) { _dragging = false; Capture = false; UpdateShadow(); }
     protected override void WndProc(ref Message m)
     {
-        // WM_CONTEXTMENU: WinForms turns this into the pin menu for either button.
-        if (m.Msg == 0x007B && (DisableContextMenu || _suppressContext))
-        {
-            _suppressContext = false;
-            return;
-        }
+        if (m.Msg == 0x007B && _suppressContext) { _suppressContext = false; return; }
         base.WndProc(ref m);
     }
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -531,8 +514,6 @@ internal sealed class PinForm : ToolWindow
         // Fixed menu font: the pin window itself inherits the large 界面字体, which
         // must not scale the context menu up with it.
         var menu = SnipMenu.Create(); menu.Font = new Font("Microsoft YaHei UI", 9.5f);
-        // Read live: the flag is set after construction for history-restored pins.
-        menu.Opening += (_, e) => { if (DisableContextMenu) e.Cancel = true; };
         ToolStripMenuItem Item(string text, Action action, string key = "") => SnipMenu.Item(text, action, _settings.PinMenuShortcuts ? key : "");
         menu.Items.Add(Item("复制图像", Copy, "Ctrl+C")); menu.Items.Add(Item("另存为…", SaveAs, "Ctrl+S"));
         menu.Items.Add(Item("识别文字", () => _ = RecognizeText())); menu.Items.Add(Item("识别二维码", ScanQr));
