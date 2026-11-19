@@ -10,7 +10,7 @@ internal sealed partial class PreferencesForm
 
     /// <summary>Shared width for the General page pickers; fits the longest engine label.</summary>
     private int ChooserWidth => Math.Max(Px(200),
-        TextRenderer.MeasureText("本地增强 (自动识别)", Font).Width + Px(56));
+        OcrEngines.Choices.Max(choice => TextRenderer.MeasureText(choice.Label, Font).Width) + Px(56));
 
     private void SubPages(string[] names, params Action[] pages)
     {
@@ -206,12 +206,12 @@ internal sealed partial class PreferencesForm
         var languageChooser = MakeChooser(languageLabels,
             Math.Max(0, Array.IndexOf(languageValues, Value(nameof(_s.DisplayLanguage)))),
             index => Set(nameof(_s.DisplayLanguage), languageValues[index]), chooserWidth, true, true);
-        var engineValues = new object[] { OcrEngineKind.SimdPaddle, OcrEngineKind.Windows };
-        var engineChooser = MakeChooser(new[] { "本地增强 (自动识别)", "Windows 系统识别" },
+        var engineValues = OcrEngines.Choices.Select(choice => (object)choice.Kind).ToArray();
+        var engineChooser = MakeChooser(OcrEngines.Choices.Select(choice => choice.Label).ToArray(),
             Math.Max(0, Array.IndexOf(engineValues, Value(nameof(_s.OcrEngine)))),
             index => Set(nameof(_s.OcrEngine), engineValues[index]), chooserWidth, true, true);
         // Two pickers share the first line; the grid gives each card the room its
-        // longest caption needs, so "本地增强 (自动识别)" never ends in an ellipsis.
+        // longest caption needs, so the engine name never ends in an ellipsis.
         GridRow("显示语言", languageChooser, "识别引擎", engineChooser, leftPercent: 50);
         // Free engines and credentialed engines share one compact line: the two cards
         // are equal width, and the paid picker owns the credential dialogs.

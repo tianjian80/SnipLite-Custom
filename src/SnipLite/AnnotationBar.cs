@@ -45,6 +45,7 @@ internal sealed class AnnotationBar
     // Two colour rows fit the same 34 px content height as every editor.
     private const int Swatch = 17;
     private const int Group = 9;
+    private const int OcrEngineChooserWidth = 140;
 
     private static Color BarBack => AppTheme.Current.Card;
     private static Color IconColor => AppTheme.Current.Text;
@@ -65,6 +66,7 @@ internal sealed class AnnotationBar
     public bool TranslationMode { get; set; }
     public int AttachedPanelHeight { get; set; }
     public bool OcrCopyVisible { get; set; }
+    public string OcrEngineLabel { get; set; } = OcrEngines.Label(OcrEngineKind.SimdPaddle);
     public bool CanUndo { get; set; }
     public bool CanRedo { get; set; }
     private string _rawStatus = "";
@@ -352,8 +354,37 @@ internal sealed class AnnotationBar
         _message = Rectangle.Empty;
         if (Status.Length > 0)
         {
-            _message = new Rectangle(0, totalHeight - 1, mainWidth, Px(OcrMode ? 44 : 32));
             var copyWidth = ResultButtonWidth();
+            var engineWidth = Px(OcrEngineChooserWidth);
+            var messageWidth = mainWidth;
+            if (OcrMode)
+            {
+                // Hint text stays on the left; the engine chooser sits on the right
+                // with its centre aligned under the "识" tool button above it.
+                var ocr = ItemBounds("ocr");
+                var copyReserve = OcrCopyVisible ? copyWidth + Px(8) : 0;
+                var rightPad = Px(8);
+                var hintMin = Px(280);
+                if (!ocr.IsEmpty)
+                {
+                    var center = ocr.Left + ocr.Width / 2;
+                    messageWidth = Math.Max(messageWidth, center + engineWidth / 2 + copyReserve + rightPad);
+                }
+                messageWidth = Math.Max(messageWidth, hintMin + Px(20) + engineWidth + copyReserve + rightPad);
+            }
+            _message = new Rectangle(0, totalHeight - 1, messageWidth, Px(OcrMode ? 44 : 32));
+            if (OcrMode)
+            {
+                var ocr = ItemBounds("ocr");
+                var copyReserve = OcrCopyVisible ? copyWidth + Px(8) : 0;
+                var rightPad = Px(8);
+                var minLeft = _message.Left + Px(280) + Px(10);
+                var maxLeft = _message.Right - engineWidth - copyReserve - rightPad;
+                var ex = ocr.IsEmpty
+                    ? maxLeft
+                    : Math.Clamp(ocr.Left + ocr.Width / 2 - engineWidth / 2, minLeft, maxLeft);
+                Add(ex, _message.Top + Px(5), engineWidth, Px(34), "ocrengine");
+            }
             if (ResultCopyVisible)
                 Add(_message.Right - copyWidth - Px(6), _message.Top + Px(4), copyWidth, _message.Height - Px(8), "resultcopy");
             if (OcrMode && OcrCopyVisible)
@@ -607,6 +638,7 @@ internal sealed class AnnotationBar
         "undo" => UiText.T("撤销（Ctrl+Z）"), "redo" => UiText.T("重做（Ctrl+Y）"),
         "resultcopy" => UiText.T("复制二维码 / 条码完整内容"),
         "ocrtextcopy" => UiText.T("复制选中文字，未选字时复制全部识别结果"),
+        "ocrengine" => UiText.T("切换识别引擎"),
         _ => ""
     };
 
@@ -625,7 +657,17 @@ internal sealed class AnnotationBar
             DrawBar(g, _message);
             using var font = new Font("Microsoft YaHei UI", 12f * Scale, GraphicsUnit.Pixel);
             var text = Rectangle.Inflate(_message, -Px(10), 0);
-            if (ResultCopyVisible || OcrMode && OcrCopyVisible) text.Width -= ResultButtonWidth() + Px(10);
+            if (OcrMode)
+            {
+                // Hint text fills the left side and stops just before the chooser.
+                var engine = ItemBounds("ocrengine");
+                if (!engine.IsEmpty)
+                    text.Width = engine.Left - Px(10) - text.X;
+            }
+            else if (ResultCopyVisible)
+            {
+                text.Width -= ResultButtonWidth() + Px(10);
+            }
             TextRenderer.DrawText(g, Status.Replace("\r", " ").Replace("\n", " "), font, text, IconColor,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
@@ -660,12 +702,13 @@ internal sealed class AnnotationBar
                 DrawWidth(g, rect);
                 continue;
             }
-            if (id is "fontfamily" or "fontsize" or "arrowstyle")
+            if (id is "fontfamily" or "fontsize" or "arrowstyle" or "ocrengine")
             {
                 var label = id switch
                 {
                     "fontfamily" => FontFamily,
                     "fontsize" => FontSize.ToString("0.#"),
+                    "ocrengine" => OcrEngineLabel,
                     _ => ArrowStyle switch { ArrowStyle.Line => "―", ArrowStyle.Double => "↔", ArrowStyle.Open => "➝", ArrowStyle.Outline => "⇨", _ => "➜" }
                 };
                 using var border = new Pen(Divider);

@@ -26,14 +26,19 @@ internal static partial class Services
 
     public static async Task<OcrDocument> RecognizeTextAsync(Bitmap bitmap, string language, OcrEngineKind engine = OcrEngineKind.SimdPaddle)
     {
-        if (engine != OcrEngineKind.Windows)
+        if (engine is OcrEngineKind.RapidLight or OcrEngineKind.SimdPaddle)
         {
-            try { return await SimdOcr.RecognizeAsync(bitmap).ConfigureAwait(false); }
+            try
+            {
+                return engine == OcrEngineKind.RapidLight
+                    ? await RapidOcrEngine.RecognizeAsync(bitmap).ConfigureAwait(false)
+                    : await SimdOcr.RecognizeAsync(bitmap).ConfigureAwait(false);
+            }
             catch (Exception ex)
             {
                 // A failed model load/inference must not take down capture or pinning.
                 // An empty successful result is left empty rather than running twice.
-                AppLog.Write("本地增强识别不可用，改用 Windows OCR", ex);
+                AppLog.Write($"{OcrEngines.Label(engine)}不可用，改用本地系统增强", ex);
             }
         }
         return await RecognizeWindowsTextAsync(bitmap, language).ConfigureAwait(false);

@@ -5,7 +5,27 @@ using Sdcb.SimdPaddleOCR.Models.ChineseV6Small;
 
 namespace SnipLite;
 
-internal enum OcrEngineKind { SimdPaddle, Windows }
+internal enum OcrEngineKind
+{
+    SimdPaddle = 0,
+    WindowsEnhanced = 1,
+    RapidLight = 2
+}
+
+internal sealed record OcrEngineChoice(OcrEngineKind Kind, string Label);
+
+internal static class OcrEngines
+{
+    public static OcrEngineChoice[] Choices { get; } =
+    {
+        new(OcrEngineKind.RapidLight, "轻量极速识别"),
+        new(OcrEngineKind.SimdPaddle, "飞桨高精识别"),
+        new(OcrEngineKind.WindowsEnhanced, "本地系统增强")
+    };
+
+    public static string Label(OcrEngineKind kind) =>
+        Choices.FirstOrDefault(choice => choice.Kind == kind)?.Label ?? "飞桨高精识别";
+}
 
 /// <summary>A single, lazily loaded offline model, shared by capture and pin OCR.</summary>
 internal static class SimdOcr
@@ -70,25 +90,49 @@ internal static class SimdOcr
         {
             if (string.IsNullOrEmpty(line.Text)) continue;
             var detected = line.Box;
-            lineBounds.Add(Bounds(detected.X1, detected.Y1, detected.X2, detected.Y2, detected.X3, detected.Y3, detected.X4, detected.Y4));
+            var lineRect = Bounds(detected.X1, detected.Y1, detected.X2, detected.Y2, detected.X3, detected.Y3, detected.X4, detected.Y4);
+            lineBounds.Add(lineRect);
             var prefix = characters.Count == 0 ? "" : Environment.NewLine;
             var boxes = line.EstimateCharacterBoxes();
             if (boxes.Length == 0 || string.Concat(boxes.Select(b => b.Text)) != line.Text)
             {
                 // Retain all text when a future model cannot return token alignment.
-                var box = line.Box;
-                var fallback = new OcrDocument(new[] { new RecognizedWord(line.Text,
-                    Bounds(box.X1, box.Y1, box.X2, box.Y2, box.X3, box.Y3, box.X4, box.Y4), 0) });
+                var fallback = new OcrDocument(new[] { new RecognizedWord(line.Text, lineRect, 0) });
                 characters.AddRange(fallback.Characters.Select((c, index) => index == 0 ? c with { Prefix = prefix } : c));
                 continue;
             }
-            foreach (var box in boxes)
+            // Sdcb's CTC character estimates shrink inward at the line ends, leaving the
+            // first/last glyph under-covered. Stretch the per-character bounds so their
+            // outer rectangle exactly matches the detected line box — the same geometry
+            // the other two engines already produce — then scale back to the crop.
+            var mapped = boxes.Select(b => Bounds(b.X1, b.Y1, b.X2, b.Y2, b.X3, b.Y3, b.X4, b.Y4)).ToArray();
+            NormalizeToLine(mapped, lineRect);
+            for (var i = 0; i < boxes.Length; i++)
             {
-                characters.Add(new(box.Text, Bounds(box.X1, box.Y1, box.X2, box.Y2, box.X3, box.Y3, box.X4, box.Y4), prefix));
+                characters.Add(new(boxes[i].Text, mapped[i], prefix));
                 prefix = "";
             }
         }
         return OcrDocument.FromCharacters(characters, lineBounds);
+
+        static void NormalizeToLine(RectangleF[] chars, RectangleF line)
+        {
+            var left = chars.Min(c => c.Left);
+            var top = chars.Min(c => c.Top);
+            var right = chars.Max(c => c.Right);
+            var bottom = chars.Max(c => c.Bottom);
+            var fx = right > left ? line.Width / (right - left) : 1f;
+            var fy = bottom > top ? line.Height / (bottom - top) : 1f;
+            for (var i = 0; i < chars.Length; i++)
+            {
+                var c = chars[i];
+                chars[i] = new RectangleF(
+                    line.Left + (c.Left - left) * fx,
+                    line.Top + (c.Top - top) * fy,
+                    c.Width * fx,
+                    c.Height * fy);
+            }
+        }
 
         RectangleF Bounds(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4)
         {

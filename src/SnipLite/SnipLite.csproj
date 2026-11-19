@@ -29,6 +29,7 @@
     <InternalsVisibleTo Include="SnipLite.SelfTest" />
     <EmbeddedResource Include="../../logo/SnipLite.ico" LogicalName="SnipLite.AppIcon.ico" />
     <EmbeddedResource Include="Assets/PaperFold.wav" LogicalName="SnipLite.PaperFold.wav" />
+    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
     <PackageReference Include="Sdcb.SimdPaddleOCR" Version="2.0.0" />
     <PackageReference Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Small" Version="1.0.0" />
     <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.17" />
@@ -37,6 +38,14 @@
     <EmbeddedResource Include="../../licenses/**/*.txt">
       <LogicalName>SnipLite.Notices.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets/Ocr/v6/*">
+      <Link>models/v6/%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

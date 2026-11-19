@@ -264,14 +264,14 @@ internal static class SnipMenu
         return menu;
     }
 
-    public static ToolStripMenuItem Item(string text, Action action, string shortcut = "", bool check = false, int verticalPadding = 5)
+    public static ToolStripMenuItem Item(string text, Action action, string shortcut = "", bool check = false, int verticalPadding = 5, bool showIcon = true)
     {
         var item = new ToolStripMenuItem(text)
         {
             CheckOnClick = false,
             Checked = check,
             TextAlign = ContentAlignment.MiddleLeft,
-            Tag = "fluent:" + FluentIcons.ForLabel(text),
+            Tag = showIcon ? "fluent:" + FluentIcons.ForLabel(text) : null,
             Padding = new Padding(0, verticalPadding, 0, verticalPadding)
         };
 

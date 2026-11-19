@@ -216,6 +216,7 @@ internal sealed partial class CaptureForm : ToolWindow
 
         _bar.Scale = Ui;
         _bar.Accent = _settings.Accent;
+        _bar.OcrEngineLabel = OcrEngines.Label(_settings.OcrEngine);
         _bar.ItemVisible = id => id switch
         {
             "rect" => _settings.ShowToolRect,
@@ -564,6 +565,7 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             var command = _bar.HitTest(p);
             if (command == "ocr") { ExitRecognition(); return; }
+            if (command == "ocrengine") { ShowOcrEnginePicker(); return; }
             if (command == "ocrtextcopy") { CopyOcrText(allIfUnselected: true); return; }
             if (command is not null) { ExitRecognition(); Command(command); return; }
             if (_recognitionBusy) return;
@@ -1516,6 +1518,31 @@ internal sealed partial class CaptureForm : ToolWindow
         menu.Show(this, screenLocation.HasValue ? PointToClient(screenLocation.Value) : new Point(bounds.Left, bounds.Bottom));
     }
 
+    private void ShowOcrEnginePicker()
+    {
+        var menu = SnipMenu.Create();
+        foreach (var choice in OcrEngines.Choices)
+        {
+            var engine = choice.Kind;
+            menu.Items.Add(SnipMenu.Item(choice.Label, () => SelectOcrEngine(engine),
+                check: _settings.OcrEngine == engine, showIcon: false));
+        }
+        ShowOptionMenu(menu, "ocrengine");
+    }
+
+    private void SelectOcrEngine(OcrEngineKind engine)
+    {
+        if (_settings.OcrEngine == engine) return;
+        _settings.OcrEngine = engine;
+        _settings.Save();
+        _bar.OcrEngineLabel = OcrEngines.Label(engine);
+        if (!_hasSelection || !_ocrMode && !_recognitionBusy) { Invalidate(); return; }
+
+        // Invalidate the old request before starting again with the selected engine.
+        ExitRecognition();
+        _ = RecognizeSelectionAsync(ocr: true);
+    }
+
     private void ShowSizePicker()
     {
         var menu = SnipMenu.Create();
@@ -1636,7 +1663,8 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             if (ocr)
             {
-                var document = await Task.Run(() => Services.RecognizeTextAsync(image, _settings.OcrLanguage, _settings.OcrEngine));
+                var engine = _settings.OcrEngine;
+                var document = await Task.Run(() => Services.RecognizeTextAsync(image, _settings.OcrLanguage, engine));
                 if (IsDisposed || version != _recognitionVersion) return;
                 _recognitionBusy = false;
                 _ocrDocument = document;
