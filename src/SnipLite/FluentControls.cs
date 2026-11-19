@@ -368,8 +368,9 @@ internal sealed class FluentSettingRow : Panel
         var s = DeviceDpi / 96f; var p = AppTheme.Current;
         // Inset a full pixel for both fill and stroke so the 1px border is never
         // clipped by the card's own edge, even when siblings sit right above it.
-        if (ThemeManager.HasWallpaper) base.OnPaintBackground(e);
-        else e.Graphics.Clear(Parent?.BackColor ?? p.Window);
+        // Transparent BackColor on a double-buffered panel paints black, so the
+        // card clears with the page colour and draws its own frosted fill.
+        e.Graphics.Clear(Parent?.BackColor ?? p.Window);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), 7 * s);
         using var fill = new SolidBrush(p.Card); e.Graphics.FillPath(fill, path);

@@ -216,22 +216,22 @@ internal static class ThemeManager
     private static ThemePalette WallpaperPalette()
     {
         var accent = (Find(_key) ?? Skins[0]).Colors;
-        var light = _wallpaperLight;
         Color Over(Color top) => Blend(top, _wallpaperAverage);
-        var colors = light
-            ? new SkinColors(
-                Over(Color.FromArgb(150, 255, 255, 255)), Over(Color.FromArgb(190, 255, 255, 255)),
-                Over(Color.FromArgb(215, 255, 255, 255)), Over(Color.FromArgb(235, 255, 255, 255)),
-                Over(Color.FromArgb(150, 120, 130, 145)), Color.FromArgb(0x1A, 0x1E, 0x24),
-                Color.FromArgb(0x4C, 0x57, 0x64), Over(Color.FromArgb(190, 235, 238, 244)),
-                accent.Accent, accent.AccentSoft, accent.OnAccent, Over(Color.FromArgb(160, 200, 205, 212)))
-            : new SkinColors(
-                Over(Color.FromArgb(150, 15, 18, 24)), Over(Color.FromArgb(185, 22, 26, 34)),
-                Over(Color.FromArgb(205, 22, 26, 34)), Over(Color.FromArgb(225, 28, 32, 41)),
-                Over(Color.FromArgb(150, 210, 220, 232)), Color.FromArgb(0xF2, 0xF4, 0xF8),
-                Color.FromArgb(0xC3, 0xCC, 0xD7), Over(Color.FromArgb(190, 40, 45, 55)),
-                accent.Accent, accent.AccentSoft, accent.OnAccent, Over(Color.FromArgb(160, 120, 130, 145)));
-        return new ThemePalette(!light, !light, false, colors, _wallpaperVersion);
+        // Every card uses the same frosted white, whatever the picture looks like:
+        // the specified translucency is composited over the sampled average here
+        // because WinForms controls cannot hold an alpha BackColor (it renders black).
+        var colors = new SkinColors(
+            Over(Color.FromArgb(60, 255, 255, 255)),
+            Over(Color.FromArgb(210, 255, 255, 255)),
+            Over(Color.FromArgb(228, 255, 255, 255)),
+            Over(Color.FromArgb(238, 255, 255, 255)),
+            Over(Color.FromArgb(150, 205, 213, 223)),
+            Color.FromArgb(30, 35, 42),
+            Color.FromArgb(90, 100, 112),
+            Over(Color.FromArgb(205, 240, 243, 248)),
+            accent.Accent, accent.AccentSoft, accent.OnAccent,
+            Over(Color.FromArgb(170, 205, 212, 220)));
+        return new ThemePalette(false, false, false, colors, _wallpaperVersion);
     }
 
     /// <summary>Composites a translucent colour over the wallpaper average into an opaque one.</summary>

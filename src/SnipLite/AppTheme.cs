@@ -105,7 +105,7 @@ internal static class AppTheme
         if (!accent) control.ForeColor = p.Text;
         if (!accent) control.BackColor = control switch
         {
-            FluentSettingRow => ThemeManager.HasWallpaper ? Color.Transparent : p.Card,
+            FluentSettingRow => p.Card,
             FluentInputFrame => p.Field,
             TextBoxBase or UpDownBase => p.Field,
             Button => p.Field,
