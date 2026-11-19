@@ -59,13 +59,14 @@ internal sealed class TrayContext : ApplicationContext
 
         /// <summary>
         /// Height that keeps the whole picture visible at the given width, using the real
-        /// aspect ratio of this capture (portrait, 16:9, square — all stay uncropped).
+        /// aspect ratio of the saved full capture (never a square cache).
         /// </summary>
         internal static int HeightFor(CaptureHistory.Entry entry, int width)
         {
-            var thumb = entry.Thumbnail;
-            if (thumb.Width <= 0) return 24;
-            return Math.Max(24, (int)Math.Round((double)thumb.Height * width / thumb.Width));
+            var size = entry.PixelSize;
+            if (size.IsEmpty) size = entry.Thumbnail.Size;
+            if (size.Width <= 0 || size.Height <= 0) return 20;
+            return Math.Max(20, (int)Math.Round((double)size.Height * width / size.Width));
         }
 
         /// <summary>Total content height: every item plus a 4 px gap between them.</summary>
@@ -327,12 +328,10 @@ internal sealed class TrayContext : ApplicationContext
                     // 1 px of slack on either side so the popup frame clips nothing.
                     var panelWidth = canvasW + 4;
                     var entries = _history.Entries;
-                    // Every capture contributes its own aspect-correct height.
+                    // Every capture contributes its own aspect-correct height; the canvas is
+                    // exactly as tall as the stacked pictures plus their 4 px gaps.
                     var contentHeight = HistoryPanel.ContentHeight(entries, canvasW);
-                    // About five 16:9 rows are visible; the rest scroll with the wheel.
-                    var average = Math.Max(24, (int)Math.Round(canvasW * 9 / 16.0));
-                    var maxHeight = Math.Min(average * 5 + 16, screen.Height - 16);
-                    var height = Math.Min(contentHeight, maxHeight);
+                    var height = Math.Min(contentHeight, screen.Height - 8);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
                     var key = $"{signature}@{canvasW}";
                     if (history.Tag as string == key) return;
@@ -346,10 +345,9 @@ internal sealed class TrayContext : ApplicationContext
                         dropMenu.Size = new Size(panelWidth, 40);
                         return;
                     }
-                    // The hosted item stays a couple of pixels shorter than the drop-down:
-                    // ToolStripDropDownMenu reserves that strip for its own border and would
-                    // otherwise enable its ▲ / ▼ overflow bars.
-                    var panelHeight = Math.Max(48, height);
+                    // The hosted item fills the popup exactly: AutoSize is off, so any extra
+                    // pixel would show up as a strip of menu background around the pictures.
+                    var panelHeight = Math.Max(20, height);
                     var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), canvasW, entry =>
                     {
                         // The file may have been deleted after the menu was filled.
@@ -371,7 +369,7 @@ internal sealed class TrayContext : ApplicationContext
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    dropMenu.Size = new Size(panelWidth, panelHeight + 4);
+                    dropMenu.Size = new Size(panelWidth, panelHeight);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Grey out both history entries when nothing is left: a disabled item
