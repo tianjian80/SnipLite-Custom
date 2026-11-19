@@ -153,6 +153,7 @@ internal sealed partial class PreferencesForm : ToolWindow
         _reset.Click += (_, _) => ResetAll();
 
         Controls.Add(_page);
+        CreateSearchUi();
         Controls.Add(_reset);
         AppTheme.Changed += ApplyTheme;
         Localization.LanguageService.Changed += RefreshLanguage;
@@ -178,6 +179,8 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         if (IsDisposed) return;
         AppTheme.Apply(this);
+        _searchHost.BackColor = Page;
+        _search.Invalidate();
         if (_ready) PrepareTree(_page);   // labels back to opaque card colour
         AppTheme.ApplyWindow(this);
     }
@@ -221,6 +224,7 @@ internal sealed partial class PreferencesForm : ToolWindow
 
         _ui = DeviceDpi / 96f;
         StyleButton(_reset, UiText.T("恢复默认", _s.DisplayLanguage));
+        _search.Font = Font;
 
         var area = Screen.FromControl(this).WorkingArea;
         ClientSize = new Size(Math.Min(Px(WinW), area.Width - Px(32)), Math.Min(Px(WinH), area.Height - Px(64)));
@@ -327,6 +331,14 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         _page.Bounds = PageRect();
 
+        var area = PageRect();
+        _search.Bounds = new Rectangle(
+            area.Right - Px(PagePad) - Px(232),
+            Px(20) + (Px(44) - Px(32)) / 2,
+            Px(232),
+            Px(32));
+        _searchHost.Bounds = area;
+
         var footer = ClientSize.Height - Px(FooterH);
         _reset.Bounds = new Rectangle(
             ClientSize.Width - Px(28) - _reset.Width,
@@ -409,6 +421,20 @@ internal sealed partial class PreferencesForm : ToolWindow
         if (e.KeyCode == Keys.Escape)
         {
             Close();
+            return;
+        }
+
+        if (e.Control && e.KeyCode == Keys.F)
+        {
+            _search.FocusInput();
+            e.Handled = e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.Escape && (_searching || _search.Query.Length > 0))
+        {
+            _search.ClearInput();
+            e.Handled = e.SuppressKeyPress = true;
             return;
         }
 
@@ -595,6 +621,9 @@ internal sealed partial class PreferencesForm : ToolWindow
         while (_page.Controls.Count > 0)
             _page.Controls[0].Dispose();
 
+        // A tab click always leaves the search view; the page owns the surface again.
+        if (_searching) EndSearch(rebuild: false);
+
         _y = Px(PagePad);
         _labelX = Px(PagePad);
         _controlX = _labelX + Px(LabelW + ControlGap);
@@ -603,19 +632,7 @@ internal sealed partial class PreferencesForm : ToolWindow
         // Pages with a single group need no caption repeating the tab name.
         _captions = index is 0 or 1 or 5;
 
-        switch (index)
-        {
-            case 0: BuildGeneral(); break;
-            case 1: BuildInterface(); break;
-            case 2: BuildCapture(); break;
-            case 3: BuildVideo(); break;
-            case 4: BuildPin(); break;
-            case 5: BuildOutput(); break;
-            case 6: BuildControl(); break;
-            case 7: BuildLayout(); break;
-            case 8: BuildUpdate(); break;
-            default: BuildAbout(); break;
-        }
+        BuildPage(index);
 
         _page.AutoScrollMinSize = new Size(0, _y + Px(PagePad));
         _page.ResumeLayout();
@@ -629,6 +646,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     }
 
     private void BuildGeneral() => GeneralPage();
+
     private void BuildInterface() => SubPages(new[] { "风格", "放大镜" }, InterfacePage, MagnifierPage);
     private void BuildCapture() => SubPages(new[] { "显示", "行为", "按键", "截图" }, CaptureDisplayPage, CaptureBehaviorPage, CaptureKeysPage, LongCapturePage);
     private void BuildVideo() => SubPages(new[] { "录屏", "GIF动画" }, RecordPage, GifPage);
@@ -636,6 +654,24 @@ internal sealed partial class PreferencesForm : ToolWindow
     private void BuildOutput() => SubPages(new[] { "文件", "剪贴板" }, OutputFilePage, OutputClipboardPage);
     private void BuildControl() => SubPages(new[] { "全局快捷键", "鼠标" }, HotkeysPage, MousePage);
     private void BuildLayout() => LayoutPage();
+
+    /// <summary>Builds one tab into the page panel; shared by navigation and the search index.</summary>
+    private void BuildPage(int index)
+    {
+        switch (index)
+        {
+            case 0: BuildGeneral(); break;
+            case 1: BuildInterface(); break;
+            case 2: BuildCapture(); break;
+            case 3: BuildVideo(); break;
+            case 4: BuildPin(); break;
+            case 5: BuildOutput(); break;
+            case 6: BuildControl(); break;
+            case 7: BuildLayout(); break;
+            case 8: BuildUpdate(); break;
+            default: BuildAbout(); break;
+        }
+    }
     private void BuildUpdate()
     {
         Row("当前版本", MakeStatic($"{AppInfo.ProductName} {AppInfo.Version}"));
