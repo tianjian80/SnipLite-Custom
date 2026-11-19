@@ -33,6 +33,9 @@ internal sealed class CaptureResult
 
     /// <summary>The overlay already saved this capture to history (explicit save).</summary>
     public bool HistoryRecorded { get; init; }
+
+    /// <summary>Produced by a double-click: copy it, but never add a history record.</summary>
+    public bool SkipHistory { get; init; }
 }
 
 /// <summary>
@@ -978,9 +981,21 @@ internal sealed partial class CaptureForm : ToolWindow
         }
     }
 
-    // Double-click inside the selection used to copy + save automatically; that easily
-    // fired by accident and produced duplicate history records, so it is gone. Single
-    // clicks, the toolbar buttons and the hotkeys are unchanged.
+    // Double-click inside the selection copies the picture (and exits), but the capture
+    // is deliberately kept out of the history list so accidental double-clicks cannot
+    // pile up duplicate records.
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        if (_ocrMode || _recognitionBusy) return;
+        if (_bar.Tool == ToolKind.Text || _activeText is not null) return;
+        if (!_hasSelection || _ime != null) return;
+
+        var p = Clamp(CursorToLocal());
+        if (_bar.HitTest(p) != null) return;
+        if (!_selection.Contains(p)) return;
+
+        ExecuteAction(_settings.DoubleClickAction, _settings.DoubleClickExit, skipHistory: true);
+    }
 
     protected override bool ProcessCmdKey(ref Message m, Keys keyData)
     {
@@ -1416,7 +1431,7 @@ internal sealed partial class CaptureForm : ToolWindow
             if (!IsDisposed && !ContainsFocus && !OwnedForms.Any(form => form.Visible) && !_optionMenus.Any(menu => menu.Visible)) Cancel();
         });
     }
-    private void ExecuteAction(CaptureAction action, bool exit)
+    private void ExecuteAction(CaptureAction action, bool exit, bool skipHistory = false)
     {
         if (!_hasSelection || _finished) return;
         CommitText();
@@ -1426,7 +1441,7 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             Image = RenderComposite(crop), Bounds = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height),
             Pin = action == CaptureAction.Pin, Action = action, KeepOpen = !exit,
-            HistoryRecorded = _historyRecorded
+            HistoryRecorded = _historyRecorded, SkipHistory = skipHistory
         });
     }
 
