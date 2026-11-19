@@ -195,10 +195,12 @@ internal sealed partial class PreferencesForm
                         PathLabel(path, ref y);
                         _page.Controls.Remove(card);
                         card.Anchor = AnchorStyles.None;
-                        card.Bounds = new Rectangle(Px(PagePad + 4), y,
-                            Math.Max(Px(200), _searchHost.ClientSize.Width - Px(PagePad * 2 + 10)), card.Height);
+                        var cardWidth = Math.Max(Px(260),
+                            _searchHost.ClientSize.Width - Px(PagePad) - Px(SystemInformation.VerticalScrollBarWidth) - Px(PagePad + 4));
+                        NormalizeResultCard(card, cardWidth);
+                        card.Bounds = new Rectangle(Px(PagePad + 4), y, cardWidth, card.Height);
                         _searchHost.Controls.Add(card);
-                        y += card.Height + Px(10);
+                        y += card.Height + Px(14);
                     }
                 }
                 catch (Exception ex)
@@ -272,12 +274,58 @@ internal sealed partial class PreferencesForm
         {
             Text = path,
             AutoSize = false,
-            Bounds = new Rectangle(Px(PagePad + 6), y, Math.Max(Px(200), _searchHost.ClientSize.Width - Px(PagePad * 2 + 14)), Px(18)),
+            Bounds = new Rectangle(Px(PagePad + 6), y, Math.Max(Px(200), _searchHost.ClientSize.Width - Px(PagePad * 2 + 14)), Px(24)),
+            TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = Muted,
             BackColor = Page
         };
         _searchHost.Controls.Add(label);
-        y += Px(20);
+        y += Px(28);
+    }
+
+    /// <summary>
+    /// Widens a card harvested from a narrow grid column to the result column and
+    /// slides its right-hand controls (toggle, picker, slider) to the shared 18 px
+    /// inner margin, so mixed sources line up like regular full-width rows.
+    /// </summary>
+    private void NormalizeResultCard(FluentSettingRow card, int width)
+    {
+        var oldWidth = Math.Max(card.Width, Px(120));
+        var delta = width - oldWidth;
+        if (Math.Abs(delta) < 1) return;
+
+        card.SuspendLayout();
+        card.Width = width;
+
+        var rightSide = new List<Control>();
+        foreach (Control child in card.Controls)
+        {
+            var iconLike = child.Left <= Px(24) && child.Width <= Px(28) && child.Height <= Px(28);
+            if (iconLike) continue;
+
+            var leadLabel = child is Label && child.Left <= Px(60);
+            if (leadLabel) continue;
+
+            var anchoredRight = child.Left >= Px(60) || child.Right >= oldWidth - Px(60);
+            if (!anchoredRight) continue;
+
+            var spansMost = child.Width > oldWidth / 2 && child.Left <= Px(60);
+            if (spansMost) child.Width = Math.Max(Px(120), child.Width + delta);
+            else child.Left += delta;
+
+            rightSide.Add(child);
+        }
+
+        // Pixel-exact right edge for the outermost control on every card.
+        if (rightSide.Count > 0)
+        {
+            var right = rightSide.Max(c => c.Right);
+            var fix = width - Px(18) - right;
+            if (fix != 0)
+                foreach (var child in rightSide) child.Left += fix;
+        }
+
+        card.ResumeLayout();
     }
 
     // ------------------------------------------------------------ matching
