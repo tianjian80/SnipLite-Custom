@@ -1557,7 +1557,7 @@ internal sealed partial class PreferencesForm
         // Five rows of short entries, then the long labels get a full-width card each.
         GridCheck(
             ("截屏", nameof(_s.TrayItemSnip), "capture"),
-            ("延时截图 (5秒)", nameof(_s.TrayItemDelay), "timer"),
+            ("延时截图", nameof(_s.TrayItemDelay), "timer"),
             ("长截图", nameof(_s.TrayItemLong), "long"),
             ("禁用快捷键", nameof(_s.TrayItemDisableHotkeys), "keyboard"),
 

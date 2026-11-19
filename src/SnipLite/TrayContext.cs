@@ -207,7 +207,7 @@ internal sealed class TrayContext : ApplicationContext
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
         Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), Key(_settings.CaptureHotkey));
-        Add(_settings.TrayItemDelay, "延时截图 (5秒)", () => StartDelayedCapture(5), Key(_settings.DelayCaptureHotkey));
+        Add(_settings.TrayItemDelay, "延时截图", () => StartDelayedCapture(5), Key(_settings.DelayCaptureHotkey));
         if (_settings.EnhancedTrayMenu)
         {
             Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), Key(_settings.CopyCaptureHotkey));
