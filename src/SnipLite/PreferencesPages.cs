@@ -560,23 +560,21 @@ internal sealed partial class PreferencesForm
             index => Set(nameof(_s.CloseButtonAction), closeActions[index]), 0, true, true);
         Value(nameof(_s.StartAsAdministrator)); Value(nameof(_s.HideTrayIcon));
 
-        // First line: startup and tray visibility, two equal cards.
         var gap = Px(10);
         var cardWidth = (ContentWidth() - gap) / 2;
-        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
-        // Always the highest-privilege logon task; the old HKCU Run value is removed.
-        StartupCard(_labelX, cardWidth, height, "开机启动", _s.StartAsAdministrator, async value =>
-        {
-            if (!await ApplyStartupAsync(value, true)) return false;
-            Set(nameof(_s.StartAsAdministrator), value);
-            return true;
-        });
-        CheckCell(_labelX + cardWidth + gap, cardWidth, height, "隐藏托盘图标", nameof(_s.HideTrayIcon));
-        _y += height + gap;
+        // One shared picker column for every two-column cell, so the dropdowns on
+        // rows 2-4 keep the same left edge and the same width all the way down.
+        const int pickerLabelW = 78;
+        var gridWidth = Math.Max(Px(180), (ContentWidth() - gap) * 50 / 100);
+        var pickerLeft = Px(48) + Px(pickerLabelW) + Px(8);
+        var pickerWidth = gridWidth - Px(48) - Px(12) - Px(pickerLabelW) - Px(8);
 
-        GridRow("系统语言", systemLanguage, "关闭程序", closeAction, leftPercent: 50);
         fontButton.Width = FillWidth();
         Row("界面字体", fontButton);
+
+        GridRow("系统语言", systemLanguage, "关闭程序", closeAction,
+            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true);
+
         var skinKeys = ThemeManager.Skins.Select(skin => skin.Key).ToArray();
         var skinChooser = MakeChooser(ThemeManager.Skins.Select(skin => skin.Name).ToArray(),
             Math.Max(0, Array.IndexOf(skinKeys, ThemeManager.Normalize((string)Value(nameof(_s.Skin))))),
@@ -589,7 +587,9 @@ internal sealed partial class PreferencesForm
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             Set(nameof(_s.AccentArgb), dialog.Color.ToArgb());
         };
-        GridRow("皮肤", skinChooser, "托盘图标颜色", accentButton, leftPercent: 50, rightAnchorRight: true);
+        GridRow("皮肤", skinChooser, "托盘图标颜色", accentButton,
+            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true);
+
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
         var iconButton = new FluentButton { Tag = "accent-button" }; StyleButton(iconButton, "选择图标文件");
@@ -605,12 +605,33 @@ internal sealed partial class PreferencesForm
             }
             catch (Exception ex) { Toast.Error("图标无法读取：" + ex.Message); }
         };
-        // Keep the picker and its button on one line, like the translation row.
         var trayStyles = new[] { "Auto", "Color", "Custom" };
-        var trayWidth = Math.Min(ChooserWidth, Math.Max(Px(150), FillWidth() - iconButton.Width - Px(ControlGap)));
-        Row("托盘图标", MakeChooser(new[] { "自动", "彩色", "自定义" },
+        var trayChooser = MakeChooser(new[] { "自动", "彩色", "自定义" },
             Math.Max(0, Array.IndexOf(trayStyles, trayStyle)), index => Set(nameof(_s.TrayIconStyle), trayStyles[index]),
-            trayWidth, true, true), iconButton);
+            pickerWidth, true, true);
+        var trayHeight = AdaptiveRowHeight(Math.Max(Math.Max(TextHeight, trayChooser.Height), iconButton.Height));
+        var trayCard = NewSettingRow(trayHeight);
+        AddRowIcon(trayCard, FluentIcons.ForLabel("托盘图标"));
+        trayCard.Controls.Add(CardLabel("托盘图标", Px(48), Px(pickerLabelW), trayHeight));
+        trayChooser.Location = new Point(pickerLeft, (trayHeight - trayChooser.Height) / 2);
+        trayCard.Controls.Add(trayChooser);
+        // Pinned to the card's 12 px inner padding so its right edge lines up with
+        // the 选择颜色 button in the row above.
+        iconButton.Location = new Point(trayCard.Width - Px(12) - iconButton.Width, (trayHeight - iconButton.Height) / 2);
+        trayCard.Controls.Add(iconButton);
+        _y += trayHeight + Px(6);
+
+        // Last line: startup and tray visibility, two equal cards.
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        // Always the highest-privilege logon task; the old HKCU Run value is removed.
+        StartupCard(_labelX, cardWidth, height, "开机启动", _s.StartAsAdministrator, async value =>
+        {
+            if (!await ApplyStartupAsync(value, true)) return false;
+            Set(nameof(_s.StartAsAdministrator), value);
+            return true;
+        });
+        CheckCell(_labelX + cardWidth + gap, cardWidth, height, "隐藏托盘图标", nameof(_s.HideTrayIcon));
+        _y += height + gap;
         Value(nameof(_s.CustomTrayIcon));
     }
     private void MagnifierPage()
