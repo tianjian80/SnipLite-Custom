@@ -564,13 +564,21 @@ internal sealed partial class PreferencesForm
         var cardWidth = (ContentWidth() - gap) / 2;
         // One shared picker column for every two-column cell, so the dropdowns on
         // rows 2-4 keep the same left edge and the same width all the way down.
-        const int pickerLabelW = 78;
+        const int pickerLabelW = 96;
         var gridWidth = Math.Max(Px(180), (ContentWidth() - gap) * 50 / 100);
         var pickerLeft = Px(48) + Px(pickerLabelW) + Px(8);
         var pickerWidth = gridWidth - Px(48) - Px(12) - Px(pickerLabelW) - Px(8);
 
-        fontButton.Width = FillWidth();
-        Row("界面字体", fontButton);
+        // The font field is centred on the card's midline instead of filling the row.
+        var fontWidth = Math.Min(Px(330), ContentWidth() - Px(LabelW + ControlGap + 16));
+        var fontHeight = AdaptiveRowHeight(Math.Max(TextHeight, fontButton.Height));
+        var fontCard = NewSettingRow(fontHeight);
+        AddRowIcon(fontCard, FluentIcons.ForLabel("界面字体"));
+        fontCard.Controls.Add(CardLabel("界面字体", Px(42), Px(LabelW - 42), fontHeight));
+        fontButton.Width = fontWidth;
+        fontButton.Location = new Point((fontCard.Width - fontWidth) / 2, (fontHeight - fontButton.Height) / 2);
+        fontCard.Controls.Add(fontButton);
+        _y += fontHeight + Px(6);
 
         GridRow("系统语言", systemLanguage, "关闭程序", closeAction,
             leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true);
@@ -613,6 +621,9 @@ internal sealed partial class PreferencesForm
         var trayCard = NewSettingRow(trayHeight);
         AddRowIcon(trayCard, FluentIcons.ForLabel("托盘图标"));
         trayCard.Controls.Add(CardLabel("托盘图标", Px(48), Px(pickerLabelW), trayHeight));
+        // Stretch the picker right up to the card's midline, which is also the gap
+        // between the two cards above.
+        trayChooser.Width = Math.Max(pickerWidth, trayCard.Width / 2 - pickerLeft);
         trayChooser.Location = new Point(pickerLeft, (trayHeight - trayChooser.Height) / 2);
         trayCard.Controls.Add(trayChooser);
         // Pinned to the card's 12 px inner padding so its right edge lines up with
