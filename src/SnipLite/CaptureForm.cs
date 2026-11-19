@@ -2062,6 +2062,9 @@ internal sealed partial class CaptureForm : ToolWindow
             return;
         }
         var region = new Rectangle(crop.X + _virtual.X, crop.Y + _virtual.Y, crop.Width, crop.Height);
+        // Remember the framed region so 记忆上次选区 can start the next run instantly.
+        _settings.LastRecordRegion = region;
+        _settings.Save();
         CommitText();
         Hide();
 

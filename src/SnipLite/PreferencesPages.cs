@@ -1107,19 +1107,19 @@ internal sealed partial class PreferencesForm
                 new object[] { VideoContainer.Mp4, VideoContainer.Mov, VideoContainer.Mkv, VideoContainer.Webm, VideoContainer.Avi },
                 centeredRows: true, popupRowWidth: 108),
             "分辨率", MakeChoice(nameof(_s.RecResolution),
-                new[] { "跟随选区", "1280*720", "1K 1920*1080", "2K 2560*1440", "4K 3840*2160",
+                new[] { "跟随选区", "记忆上次选区", "1280*720", "1K 1920*1080", "2K 2560*1440", "4K 3840*2160",
                     "720*1280", "1K 1080*1920", "2K 1440*2560", "4K 2160*3840" },
-                new object[] { VideoSize.Native, VideoSize.P720, VideoSize.P1080, VideoSize.Qhd, VideoSize.Uhd,
+                new object[] { VideoSize.Native, VideoSize.Recent, VideoSize.P720, VideoSize.P1080, VideoSize.Qhd, VideoSize.Uhd,
                     VideoSize.Portrait720, VideoSize.Portrait1080, VideoSize.Portrait2K, VideoSize.Portrait4K },
                 centeredRows: true,
                 // Landscape picks read blue, portrait picks amber, split by a hairline rule.
                 itemColor: index => index switch
                 {
-                    0 => null,
-                    <= 4 => Color.FromArgb(0x00, 0x52, 0x9B),
+                    0 or 1 => null,
+                    <= 5 => Color.FromArgb(0x00, 0x52, 0x9B),
                     _ => Color.FromArgb(0xC6, 0x51, 0x02)
                 },
-                separatorBefore: 5),
+                separatorBefore: 6),
             74, 68, 46, true, true);
 
         GridRow("视频帧率", MakeChoice(nameof(_s.RecFps),

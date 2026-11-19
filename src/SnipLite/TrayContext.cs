@@ -635,9 +635,29 @@ internal sealed class TrayContext : ApplicationContext
             return;
         }
         if (_recorder is not null) return;
+        var region = _settings.RecResolution == VideoSize.Recent && TryRecentRegion(out var recent)
+            ? recent
+            : Screen.FromPoint(Cursor.Position).WorkingArea;
+        BeginRecording(region, gif);
+    }
+
+    /// <summary>True when the remembered region is still fully inside one current screen.</summary>
+    private bool TryRecentRegion(out Rectangle region)
+    {
+        var value = _settings.LastRecordRegion;
+        region = Rectangle.Empty;
+        if (value.Width < 20 || value.Height < 20) return false;
+        if (!Screen.AllScreens.Any(screen => screen.Bounds.Contains(value))) return false;
+        region = value;
+        return true;
+    }
+
+    /// <summary>Starts a session straight away, skipping the freeze-frame selection.</summary>
+    private void BeginRecording(Rectangle region, bool gif)
+    {
+        if (_recorder is not null || RecordingSession.Current is not null) return;
         try
         {
-            var region = Screen.FromPoint(Cursor.Position).WorkingArea;
             var showControls = gif ? _settings.GifShowTimer : _settings.RecShowTimer;
             var form = new RecordingForm(region, _settings, gif, showControls);
             form.FormClosed += (_, _) => _recorder = null;
@@ -799,6 +819,13 @@ internal sealed class TrayContext : ApplicationContext
     private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null, bool longCapture = false, bool autoRedact = false)
     {
         if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.Activate(); return; }
+        // 记忆上次选区: skip the freeze-frame framing and reuse the remembered region.
+        if (mode is CaptureMode.Record or CaptureMode.Gif
+            && _settings.RecResolution == VideoSize.Recent && TryRecentRegion(out var remembered))
+        {
+            BeginRecording(remembered, mode == CaptureMode.Gif);
+            return;
+        }
         _overlay?.Dispose();
         try
         {

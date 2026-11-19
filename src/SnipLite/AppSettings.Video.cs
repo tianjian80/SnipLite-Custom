@@ -1,7 +1,7 @@
 namespace SnipLite;
 
 internal enum VideoContainer { Mp4, Mov, Mkv, Webm, Avi }
-internal enum VideoSize { Native, P720, P1080, Qhd, Uhd, Portrait720, Portrait1080, Portrait2K, Portrait4K }
+internal enum VideoSize { Native, P720, P1080, Qhd, Uhd, Portrait720, Portrait1080, Portrait2K, Portrait4K, Recent }
 internal enum VideoFps { Fps24, Fps25, Fps30, Fps60 }
 internal enum VideoBitrateMode { Low, Medium, High, Ultra, Ultra4K, Custom }
 internal enum VideoLength { Unlimited, S30, M1, M3, M5, M10, M30 }
@@ -16,6 +16,8 @@ internal sealed partial class AppSettings
     // 录屏
     public VideoContainer RecFormat { get; set; } = VideoContainer.Mp4;
     public VideoSize RecResolution { get; set; } = VideoSize.Native;
+    /// <summary>Last region the user framed for a recording; reused by 记忆上次选区.</summary>
+    public Rectangle LastRecordRegion { get; set; } = Rectangle.Empty;
     public VideoFps RecFps { get; set; } = VideoFps.Fps30;
     public VideoBitrateMode RecBitrate { get; set; } = VideoBitrateMode.High;
     public int RecCustomBitrateMbps { get; set; } = 15;
@@ -116,6 +118,7 @@ internal sealed partial class AppSettings
     {
         if (!Enum.IsDefined(RecFormat)) RecFormat = VideoContainer.Mp4;
         if (!Enum.IsDefined(RecResolution)) RecResolution = VideoSize.Native;
+        if (LastRecordRegion.Width < 0 || LastRecordRegion.Height < 0) LastRecordRegion = Rectangle.Empty;
         if (!Enum.IsDefined(RecFps)) RecFps = VideoFps.Fps30;
         if (!Enum.IsDefined(RecBitrate)) RecBitrate = VideoBitrateMode.High;
         if (!Enum.IsDefined(RecLength)) RecLength = VideoLength.Unlimited;
