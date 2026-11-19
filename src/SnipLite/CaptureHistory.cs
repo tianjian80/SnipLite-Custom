@@ -9,7 +9,15 @@ internal sealed class CaptureHistory
 
     internal sealed record Entry(byte[] Png, Rectangle Bounds, DateTime Time, Bitmap Thumbnail, string? FilePath = null)
     {
-        public Bitmap Image() { using var stream = new MemoryStream(Png); using var image = new Bitmap(stream); return new Bitmap(image); }
+        public Bitmap Image()
+        {
+            using var stream = new MemoryStream(Png);
+            using var image = new Bitmap(stream);
+            var copy = new Bitmap(image);
+            // Normalise the DPI so the full-size pin is drawn 1:1 on any scaled display.
+            copy.SetResolution(96f, 96f);
+            return copy;
+        }
     }
     private readonly List<Entry> _entries = new();
     public IReadOnlyList<Entry> Entries => _entries;

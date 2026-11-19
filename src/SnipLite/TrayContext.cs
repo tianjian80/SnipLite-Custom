@@ -136,12 +136,15 @@ internal sealed class TrayContext : ApplicationContext
                 if (top > Height) break;
                 var card = new Rectangle(4 + (ClientSize.Width - 8 - drawWidth) / 2, top, drawWidth, cardHeight);
                 var thumb = _entries[index].Thumbnail;
+                // Force 96 DPI: a high-DPI source would otherwise be scaled by GDI+ and
+                // overflow the destination, cutting the right/bottom ~25% away.
+                if (Math.Abs(thumb.HorizontalResolution - 96f) > 0.1f) thumb.SetResolution(96f, 96f);
                 var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
                 var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
                 var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
                 // Whole source in pixel units, so no edge (close button / clock) is cut.
-                g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
+                g.DrawImage(thumb, rect, 0, 0, thumb.Width, thumb.Height, GraphicsUnit.Pixel);
                 // No card frame: only a hover outline hugging the thumbnail itself,
                 // so no grey rules run across the popup between entries.
                 if (index == _hover)
@@ -295,11 +298,12 @@ internal sealed class TrayContext : ApplicationContext
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
-                    // The tray menu is already on screen when its drop-down opens, so the
-                    // real right edge is reliable. Never shift the menu sideways: that made
-                    // WinForms flip the submenu to the left.
-                    var rightEdge = menu.Bounds.Right > 0 ? menu.Bounds.Right : Cursor.Position.X;
-                    var maxRightWidth = Math.Max(80, screen.Right - rightEdge - 24);
+                    // The tray menu is already on screen when its drop-down opens. Use its
+                    // real left edge plus width, minus a 28 px safety gap for the popup
+                    // border, so the submenu always has room and never flips left.
+                    var rightEdge = menu.Left + menu.Width;
+                    if (rightEdge <= 0) rightEdge = Cursor.Position.X;
+                    var maxRightWidth = Math.Max(80, screen.Right - rightEdge - 28);
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
                     var cardWidth = Math.Max(50, Math.Min(requested, maxRightWidth));
                     var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
