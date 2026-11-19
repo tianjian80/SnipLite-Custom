@@ -904,7 +904,8 @@ internal sealed partial class PreferencesForm
     }
     private void LongCapturePage()
     {
-        Flag("启用长截图功能", nameof(_s.LongCaptureEnabled));
+        // Long capture is always on; this is a section caption rather than a switch.
+        TitleCard("长截图功能");
         Choice("滚动模式", nameof(_s.LongCaptureMode),
             new[] { "自动滚动", "手动滚动" },
             new object[] { LongCaptureMode.Auto, LongCaptureMode.Manual }, ChooserWidth, true);
@@ -914,7 +915,10 @@ internal sealed partial class PreferencesForm
         Choice("最大拼接高度", nameof(_s.LongCaptureMaxHeight),
             new[] { "50000 像素", "100000 像素", "无限制" },
             new object[] { 50000, 100000, 0 }, ChooserWidth, true);
-        Section("延时截图", () => { });
+
+        // 20 px of breathing room (6 px row gap + 14 px) separates the two sections.
+        _y += Px(14);
+        TitleCard("延时截图功能", "timer");
 
         var gap = Px(10);
         var cardWidth = (ContentWidth() - gap) / 2;

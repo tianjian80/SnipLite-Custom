@@ -2083,11 +2083,6 @@ internal sealed partial class CaptureForm : ToolWindow
     private void StartLongCapture()
     {
         if (_longForm != null) return;
-        if (!_settings.LongCaptureEnabled)
-        {
-            Toast.Error(UiText.T("长截图功能已关闭"));
-            return;
-        }
         var crop = Crop;
         if (crop.Width < 40 || crop.Height < 40)
         {

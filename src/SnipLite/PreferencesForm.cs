@@ -1084,6 +1084,16 @@ internal sealed partial class PreferencesForm : ToolWindow
         TextAlign = align, ForeColor = Ink, BackColor = Color.Transparent
     };
 
+    /// <summary>A pure caption card: icon plus title, no switch. Groups a section on the page.</summary>
+    private void TitleCard(string label, string? icon = null)
+    {
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        var card = NewSettingRow(height);
+        AddRowIcon(card, icon ?? FluentIcons.ForLabel(label));
+        card.Controls.Add(CardLabel(label, Px(48), Math.Max(Px(60), card.Width - Px(62)), height));
+        _y += height + Px(6);
+    }
+
     /// <summary>A card at an explicit column position, used by the two-column grids.</summary>
     private FluentSettingRow NewSettingRow(int x, int width, int height)
     {

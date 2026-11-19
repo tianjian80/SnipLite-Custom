@@ -144,7 +144,7 @@ internal sealed partial class AppSettings
     public Keys LongCaptureHotkey { get; set; } = Keys.None;
 
     // Long screenshot: scroll the target window and stitch frames vertically.
-    public bool LongCaptureEnabled { get; set; } = true;
+    // Always enabled; the preference page only groups its settings.
     public LongCaptureMode LongCaptureMode { get; set; } = LongCaptureMode.Auto;
     public LongCaptureSpeed LongCaptureSpeed { get; set; } = LongCaptureSpeed.Normal;
     /// <summary>Maximum stitched height in pixels; 0 means no limit.</summary>
