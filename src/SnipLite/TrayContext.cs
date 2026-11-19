@@ -126,12 +126,19 @@ internal sealed class TrayContext : ApplicationContext
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             var cardHeight = CardHeight;
+            // Never draw wider than the space the popup actually got: it is clamped near
+            // the screen edge, so the requested card width can exceed the visible area and
+            // used to crop the picture's right edge.
+            var visibleRight = Screen.FromControl(this).WorkingArea.Right;
+            var originX = PointToScreen(Point.Empty).X;
+            var drawWidth = Math.Max(8, Math.Min(_cardWidth,
+                Math.Min(ClientSize.Width - Pad * 2, visibleRight - originX - Pad - 4)));
             for (var index = 0; index < _entries.Count; index++)
             {
                 var top = Pad + index * Stride - _offset;
                 if (top + cardHeight < 0) continue;
                 if (top > Height) break;
-                var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
+                var card = new Rectangle(Pad, top, drawWidth, cardHeight);
                 var thumb = _entries[index].Thumbnail;
                 var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
