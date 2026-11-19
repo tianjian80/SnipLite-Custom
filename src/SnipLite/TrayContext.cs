@@ -347,13 +347,18 @@ internal sealed class TrayContext : ApplicationContext
                         menu.Close();
                         PinImage(entry.Image(), entry.Bounds, exact: true);
                     });
+                    // AutoSize lets the drop-down grow to the hosted panel instead of
+                    // clipping its right edge (a fixed Size made the panel wider than the
+                    // menu's content area, so the picture's right edge was cut off).
                     history.DropDownItems.Add(new ToolStripControlHost(panel)
                     {
-                        AutoSize = false,
+                        AutoSize = true,
                         Size = new Size(panelWidth, panelHeight),
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
+                    dropMenu.Padding = Padding.Empty;
+                    dropMenu.AutoSize = true;
                     dropMenu.Size = new Size(panelWidth, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
