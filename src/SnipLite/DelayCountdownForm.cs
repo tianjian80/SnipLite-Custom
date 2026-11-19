@@ -5,15 +5,19 @@ using System.Runtime.InteropServices;
 namespace SnipLite;
 
 /// <summary>
-/// Large glass-style digit in the middle of the screen before a delayed capture.
-/// Painted per pixel through UpdateLayeredWindow so the glyph keeps clean edges
-/// on any desktop background. Never in the taskbar, never takes focus, click
-/// through, and Esc anywhere cancels it.
+/// Large red seven-segment LED digit in the middle of the screen before a delayed
+/// capture. Painted per pixel through UpdateLayeredWindow so the glow keeps clean
+/// edges on any desktop background. Never in the taskbar, never takes focus,
+/// click through, and Esc anywhere cancels it.
 /// </summary>
 internal sealed class DelayCountdownForm : ToolWindow
 {
     private const int LogicalSize = 400;
-    private const float EmSize = 170f;
+
+    // Segment geometry in 96 dpi units: digit height, bar thickness, corner gap.
+    private const float DigitHeight = 180f;
+    private const float BarThickness = 26f;
+    private const float SegmentGap = 4f;
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private readonly int _total;
@@ -129,133 +133,151 @@ internal sealed class DelayCountdownForm : ToolWindow
     protected override void OnPaintBackground(PaintEventArgs e) { }
     protected override void OnPaint(PaintEventArgs e) { }
 
-    /// <summary>
-    /// Draws the neon / jelly-glass digit into an ARGB bitmap and pushes it to the
-    /// layered window. Four stacked passes: outer neon glow, translucent glass
-    /// body, inner highlights, then a sharp neon tube rim.
-    /// </summary>
+    /// <summary>Renders the lit seven-segment digit with its red LED glow.</summary>
     private void Render()
     {
         if (!IsHandleCreated) return;
 
-        var size = new Size(Width, Height);
-        using var bitmap = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
+        using var bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bitmap))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.Clear(Color.Transparent);
 
-            using var path = GlyphPath(_remaining.ToString());
-            if (path is null) return;
+            var digits = _remaining.ToString();
+            var h = DigitHeight * _scale;
+            var t = BarThickness * _scale / 2f;
+            var gap = SegmentGap * _scale;
+            var w = h * 0.56f;
+            var spacing = w * 0.18f;
+            var total = digits.Length * w + (digits.Length - 1) * spacing;
+            var x = (Width - total) / 2f;
+            var y = (Height - h) / 2f;
 
-            var bounds = path.GetBounds();
-            var glowArea = RectangleF.Inflate(bounds, 60 * _scale, 60 * _scale);
-
-            // 1. Outer neon halo: five widening round pens, warm orange -> magenta.
-            var halo = new (float Width, int Alpha)[] { (40f, 20), (30f, 30), (22f, 45), (14f, 65), (7f, 90) };
-            foreach (var (width, alpha) in halo)
+            var lit = new GraphicsPath();
+            var bodies = new List<GraphicsPath>();
+            foreach (var ch in digits)
             {
-                using var brush = NeonBrush(glowArea, alpha);
-                using var pen = new Pen(brush, width * _scale) { LineJoin = LineJoin.Round };
-                g.DrawPath(pen, path);
+                var figure = DigitPath(ch, x, y, w, h, t, gap);
+                foreach (var segment in figure) bodies.Add(segment);
+                x += w + spacing;
             }
 
-            // 2. Translucent jelly body: pink top -> violet middle -> blue-violet base.
-            using (var body = new LinearGradientBrush(bounds,
-                       Color.FromArgb(150, 255, 190, 245), Color.FromArgb(145, 160, 185, 255), 90f))
+            using (lit)
             {
-                body.InterpolationColors = new ColorBlend
-                {
-                    Positions = new[] { 0f, 0.5f, 1f },
-                    Colors = new[]
-                    {
-                        Color.FromArgb(150, 255, 190, 245),
-                        Color.FromArgb(110, 210, 140, 255),
-                        Color.FromArgb(145, 160, 185, 255)
-                    }
-                };
-                g.FillPath(body, path);
-            }
+                foreach (var segment in bodies) lit.AddPath(segment, false);
 
-            // 3. Inner refraction: clip to the glyph, then stroke offset copies so
-            //    only the upper-left highlight and lower-right dark line show.
-            using (var clip = (GraphicsPath)path.Clone())
-            {
-                var state = g.Save();
-                g.SetClip(clip, CombineMode.Replace);
-
-                using (var highlight = (GraphicsPath)path.Clone())
-                using (var shift = new Matrix())
+                // 1. Soft red halo: five widening round pens, faint outside, brighter near the bars.
+                var halo = new (float Width, int Alpha)[] { (34f, 18), (24f, 30), (16f, 50), (9f, 70), (4f, 85) };
+                foreach (var (width, alpha) in halo)
                 {
-                    shift.Translate(-3.2f * _scale, -3.2f * _scale);
-                    highlight.Transform(shift);
-                    using var pen = new Pen(Color.FromArgb(195, 255, 255, 255), Math.Max(4f, 8f * _scale))
+                    using var pen = new Pen(Color.FromArgb(alpha, 255, 25, 35), width * _scale)
                     {
                         LineJoin = LineJoin.Round
                     };
-                    g.DrawPath(pen, highlight);
+                    g.DrawPath(pen, lit);
                 }
-
-                using (var shade = (GraphicsPath)path.Clone())
-                using (var shift = new Matrix())
-                {
-                    shift.Translate(3.2f * _scale, 3.2f * _scale);
-                    shade.Transform(shift);
-                    using var pen = new Pen(Color.FromArgb(85, 95, 20, 140), Math.Max(1.2f, 2.2f * _scale))
-                    {
-                        LineJoin = LineJoin.Round
-                    };
-                    g.DrawPath(pen, shade);
-                }
-
-                g.Restore(state);
             }
 
-            // 4. Sharp neon tube rim: thin bright white-pink edge.
-            using (var rim = new Pen(Color.FromArgb(245, 255, 235, 255), Math.Max(2f, 2f * _scale)))
+            // 2. Saturated LED body: bright gem red, slightly hotter in the middle of each bar.
+            foreach (var segment in bodies)
             {
-                rim.LineJoin = LineJoin.Round;
-                g.DrawPath(rim, path);
+                using (segment)
+                {
+                    using var body = new PathGradientBrush(segment)
+                    {
+                        CenterColor = Color.FromArgb(255, 0xFF, 0x2A, 0x2A),
+                        SurroundColors = new[] { Color.FromArgb(255, 0xD8, 0x00, 0x0C) }
+                    };
+                    g.FillPath(body, segment);
+
+                    // Faint sheen along the top half so the tube looks filled, not flat.
+                    var b = segment.GetBounds();
+                    if (b.Width <= 0 || b.Height <= 0) continue;
+                    using var sheen = new LinearGradientBrush(b,
+                        Color.FromArgb(90, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90f);
+                    g.FillPath(sheen, segment);
+                }
             }
         }
 
         PushLayered(bitmap);
     }
 
-    /// <summary>Orange -> magenta -> violet diagonal gradient used by every halo pass.</summary>
-    private static LinearGradientBrush NeonBrush(RectangleF area, int alpha)
+    private static readonly Dictionary<char, string> SegmentMap = new()
     {
-        var brush = new LinearGradientBrush(area,
-            Color.FromArgb(alpha, 0xFF, 0x5E, 0x3A), Color.FromArgb(alpha, 0x8A, 0x2B, 0xE2), 45f);
-        brush.InterpolationColors = new ColorBlend
+        ['0'] = "abcdef",
+        ['1'] = "bc",
+        ['2'] = "abged",
+        ['3'] = "abgcd",
+        ['4'] = "fgbc",
+        ['5'] = "afgcd",
+        ['6'] = "afgecd",
+        ['7'] = "abc",
+        ['8'] = "abcdefg",
+        ['9'] = "abcdfg"
+    };
+
+    /// <summary>Lit bar polygons for one digit, in digit-local coordinates offset by (x, y).</summary>
+    private static List<GraphicsPath> DigitPath(char digit, float x, float y, float w, float h, float t, float gap)
+    {
+        var map = SegmentMap.TryGetValue(digit, out var segments) ? segments : "";
+        var paths = new List<GraphicsPath>(7);
+
+        var halfBar = w / 2f - gap;
+        var vertHalf = h / 4f - 1.5f * t - gap;
+        var left = x + t;
+        var right = x + w - t;
+        var center = x + w / 2f;
+
+        void Add(char segment, GraphicsPath path)
         {
-            Positions = new[] { 0f, 0.55f, 1f },
-            Colors = new[]
-            {
-                Color.FromArgb(alpha, 0xFF, 0x5E, 0x3A),
-                Color.FromArgb(alpha, 0xE0, 0x26, 0xFF),
-                Color.FromArgb(alpha, 0x8A, 0x2B, 0xE2)
-            }
-        };
-        return brush;
+            if (map.Contains(segment)) paths.Add(path);
+            else path.Dispose();
+        }
+
+        Add('a', BarH(center, y + t, halfBar, t));
+        Add('g', BarH(center, y + h / 2f, halfBar, t));
+        Add('d', BarH(center, y + h - t, halfBar, t));
+        Add('f', BarV(left, y + h / 4f + t / 2f, vertHalf, t));
+        Add('b', BarV(right, y + h / 4f + t / 2f, vertHalf, t));
+        Add('e', BarV(left, y + 3f * h / 4f - t / 2f, vertHalf, t));
+        Add('c', BarV(right, y + 3f * h / 4f - t / 2f, vertHalf, t));
+
+        return paths;
     }
 
-    private GraphicsPath GlyphPath(string digit)
+    /// <summary>Horizontal bar with 45 degree pointed ends.</summary>
+    private static GraphicsPath BarH(float cx, float cy, float half, float t)
     {
-        using var family = RoundedFamily();
         var path = new GraphicsPath();
+        path.AddPolygon(new[]
+        {
+            new PointF(cx - half, cy),
+            new PointF(cx - half + t, cy - t),
+            new PointF(cx + half - t, cy - t),
+            new PointF(cx + half, cy),
+            new PointF(cx + half - t, cy + t),
+            new PointF(cx - half + t, cy + t)
+        });
+        path.CloseFigure();
+        return path;
+    }
 
-        var em = EmSize * _scale;
-        path.AddString(digit, family, (int)FontStyle.Bold, em, PointF.Empty, StringFormat.GenericTypographic);
-
-        if (path.PointCount == 0) { path.Dispose(); return null!; }
-
-        // Centre the measured glyph (and leave room for its shadow) in the window.
-        var b = path.GetBounds();
-        using var m = new Matrix();
-        m.Translate((Width - b.Width) / 2f - b.X, (Height - b.Height) / 2f - b.Y - 6 * _scale);
-        path.Transform(m);
+    /// <summary>Vertical bar with 45 degree pointed ends.</summary>
+    private static GraphicsPath BarV(float cx, float cy, float half, float t)
+    {
+        var path = new GraphicsPath();
+        path.AddPolygon(new[]
+        {
+            new PointF(cx, cy - half),
+            new PointF(cx + t, cy - half + t),
+            new PointF(cx + t, cy + half - t),
+            new PointF(cx, cy + half),
+            new PointF(cx - t, cy + half - t),
+            new PointF(cx - t, cy - half + t)
+        });
+        path.CloseFigure();
         return path;
     }
 
@@ -280,17 +302,6 @@ internal sealed class DelayCountdownForm : ToolWindow
             DeleteDC(memDc);
             ReleaseDC(IntPtr.Zero, screenDc);
         }
-    }
-
-    /// <summary>Rounded modern face when installed, otherwise the system UI face.</summary>
-    private static FontFamily RoundedFamily()
-    {
-        foreach (var name in new[] { "Arial Rounded MT Bold", "Nunito", "Segoe UI" })
-        {
-            try { return new FontFamily(name); }
-            catch (ArgumentException) { /* not installed */ }
-        }
-        return new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
     }
 
     [StructLayout(LayoutKind.Sequential)]
