@@ -511,15 +511,19 @@ internal sealed class PinForm : ToolWindow
     }
     private ContextMenuStrip BuildMenu()
     {
-        // Fixed menu font: the pin window itself inherits the large 界面字体, which
-        // must not scale the context menu up with it.
-        var menu = SnipMenu.Create(); menu.Font = new Font("Microsoft YaHei UI", 9.5f);
-        ToolStripMenuItem Item(string text, Action action, string key = "") => SnipMenu.Item(text, action, _settings.PinMenuShortcuts ? key : "");
+        // Same source as the tray menu: 界面 → 风格 → 托盘字体大小, and the same
+        // compact layout (row padding, font, icon column) as the tray popup.
+        var menuFontSize = (float)Math.Clamp(_settings.TrayFontSize, 5, 25);
+        var menu = SnipMenu.CreateTray(compact: true);
+        menu.Font = new Font("Microsoft YaHei UI", menuFontSize);
+        var rowPad = Math.Max(2, (int)Math.Round(menuFontSize * 0.35));
+        ToolStripMenuItem Item(string text, Action action, string key = "") => SnipMenu.Item(text, action, _settings.PinMenuShortcuts ? key : "", verticalPadding: rowPad);
         menu.Items.Add(Item("复制图像", Copy, "Ctrl+C")); menu.Items.Add(Item("另存为…", SaveAs, "Ctrl+S"));
         menu.Items.Add(Item("识别文字", () => _ = RecognizeText())); menu.Items.Add(Item("识别二维码", ScanQr));
         menu.Items.Add(new ToolStripSeparator()); menu.Items.Add(Item("原始大小", Reset, "Ctrl+0"));
         menu.Items.Add(Item("快速缩略图", ToggleThumbnail)); menu.Items.Add(Item("鼠标穿透开关", ToggleMouseThrough));
         var groups = new ToolStripMenuItem(UiText.T("移动到分组"));
+        groups.DropDown.Font = menu.Font;
         for (var i = 1; i <= 3; i++) { var group = i; groups.DropDownItems.Add(Item(Localization.LanguageService.Format("分组 {0}", group), () => { _pinGroup = group; if (_pinGroup != _group) Hide(); })); }
         menu.Items.Add(groups); menu.Items.Add(Item("关闭", Close, "Esc")); menu.Items.Add(Item("关闭全部贴图", CloseAll));
         menu.Items.Add(Item("隐藏 / 显示所有贴图", ToggleAll)); menu.Items.Add(Item("恢复 100% 不透明度", () => { _opacity = 1; CommitLayered(); }));
