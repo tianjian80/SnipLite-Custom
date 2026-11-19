@@ -890,7 +890,9 @@ internal sealed partial class PreferencesForm
         card.Controls.Add(new Label
         {
             Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), chooserLeft - Px(48) - Px(8)), height),
+            // Keep the label clear of the card's 1px border: a full-height child
+            // paints over the top edge and breaks the rounded outline.
+            Bounds = new Rectangle(Px(48), Px(4), Math.Max(Px(60), chooserLeft - Px(48) - Px(8)), Math.Max(Px(16), height - Px(8))),
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
         });
         _y += height + Px(6);
