@@ -1527,6 +1527,19 @@ internal sealed partial class CaptureForm : ToolWindow
             menu.Items.Add(SnipMenu.Item(choice.Label, () => SelectOcrEngine(engine),
                 check: _settings.OcrEngine == engine, showIcon: false));
         }
+        // Match the toolbar chooser exactly so the popup edges line up with it.
+        var chooser = _bar.ItemBounds("ocrengine");
+        if (chooser.Width > 0)
+        {
+            menu.MinimumSize = new Size(chooser.Width, 0);
+            menu.MaximumSize = new Size(chooser.Width, (int)Math.Round(320 * Ui));
+            foreach (ToolStripItem item in menu.Items)
+            {
+                item.AutoSize = false;
+                item.Size = new Size(chooser.Width - menu.Padding.Horizontal, (int)Math.Round(32 * Ui));
+                item.Padding = Padding.Empty;
+            }
+        }
         ShowOptionMenu(menu, "ocrengine");
     }
 

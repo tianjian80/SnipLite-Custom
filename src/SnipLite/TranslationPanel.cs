@@ -292,7 +292,8 @@ internal sealed class TranslationPanel : UserControl
 
     private void OpenDropdown(Button owner, ContextMenuStrip menu)
     {
-        var width = Px(168);
+        // Match the trigger box exactly so the popup edges line up with it.
+        var width = owner.Width;
         menu.Font = _contentFont;
         menu.MinimumSize = new Size(width, 0);
         menu.MaximumSize = new Size(width, Px(284));
