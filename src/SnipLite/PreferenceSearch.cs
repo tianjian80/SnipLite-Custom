@@ -12,7 +12,7 @@ namespace SnipLite;
 internal sealed partial class PreferencesForm
 {
     private readonly SearchBox _search = new();
-    private readonly BufferedPage _searchHost = new() { Visible = false };
+    private readonly Panel _searchHost = new() { AutoScroll = true, Visible = false };
     private readonly System.Windows.Forms.Timer _searchDebounce = new() { Interval = 220 };
     private bool _searching;
     private bool _suppressSearch;
@@ -491,18 +491,16 @@ internal sealed class SearchBox : Control
     {
         var theme = AppTheme.Current;
         var g = e.Graphics;
-        var glass = GlassPaint.UnderWallpaper(this);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        _input.BackColor = glass ? ThemeManager.GlassField : theme.Field;
+        _input.BackColor = theme.Field;
         _input.ForeColor = theme.Text;
 
         var box = new Rectangle(Px(1), Px(1), Width - Px(2), Height - Px(2));
-        if (glass) GlassPaint.PaintBackdrop(this, g, ClientRectangle);
         using (var path = Rounded(box, Px(8)))
         {
-            using var fill = new SolidBrush(glass ? ThemeManager.GlassTint : theme.Field);
+            using var fill = new SolidBrush(theme.Field);
             g.FillPath(fill, path);
-            using var border = new Pen(_hot ? theme.Accent : glass ? ThemeManager.GlassEdge : theme.Border, Px(1));
+            using var border = new Pen(_hot ? theme.Accent : theme.Border, Px(1));
             g.DrawPath(border, path);
         }
 

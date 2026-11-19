@@ -36,7 +36,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     private readonly List<(Rectangle Rect, int Index)> _tabRects = new();
 
     private readonly AppSettings _s;
-    private sealed class BufferedPage : Panel, IWallpaperBackdrop
+    private sealed class BufferedPage : Panel
     {
         private const int WmHScroll = 0x0114;
         private const int WmSize = 0x0005;
@@ -69,31 +69,6 @@ internal sealed partial class PreferencesForm : ToolWindow
             base.WndProc(ref m);
 
             if (m.Msg == WmSize) HideHorizontalBar();
-        }
-
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            if (ThemeManager.Wallpaper is null || Parent is null)
-            {
-                base.OnPaintBackground(e);
-                return;
-            }
-            // The wallpaper is anchored to the window, not the scroll offset, so the
-            // page paints the slice that lies under its own bounds.
-            using (var brush = new SolidBrush(Page)) e.Graphics.FillRectangle(brush, ClientRectangle);
-            ThemeManager.DrawWallpaper(e.Graphics, ClientRectangle, Parent.ClientSize, Location);
-        }
-
-        /// <summary>
-        /// Paints the exact wallpaper slice under a child, so a translucent card can
-        /// let the picture show through without relying on WinForms transparency.
-        /// </summary>
-        public void PaintWallpaperFor(Graphics g, Rectangle clip, Point childInPage)
-        {
-            using (var brush = new SolidBrush(Page)) g.FillRectangle(brush, clip);
-            var surface = Parent?.ClientSize ?? ClientSize;
-            ThemeManager.DrawWallpaper(g, clip, surface,
-                new Point(Location.X + childInPage.X, Location.Y + childInPage.Y));
         }
 
         private void ClampChildrenToWidth()
@@ -208,7 +183,7 @@ internal sealed partial class PreferencesForm : ToolWindow
         _page.BackColor = Page;
         _searchHost.BackColor = Page;
         _search.Invalidate();
-        if (_ready) PrepareTree(_page);   // labels match the card / wallpaper beneath
+        if (_ready) PrepareTree(_page);   // labels back to opaque card colour
         AppTheme.ApplyWindow(this);
     }
 
@@ -396,7 +371,6 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         using var brush = new SolidBrush(Chrome);
         e.Graphics.FillRectangle(brush, ClientRectangle);
-        ThemeManager.DrawWallpaper(e.Graphics, ClientRectangle, ClientSize, Point.Empty);
     }
 
     private void QueueContentRelayout()
@@ -439,9 +413,7 @@ internal sealed partial class PreferencesForm : ToolWindow
             catch { /* control does not support the style */ }
 
             if (child is Label)
-                child.BackColor = ThemeManager.HasWallpaper
-                    ? Color.Transparent
-                    : child.Parent?.BackColor ?? SystemColors.Control;
+                child.BackColor = child.Parent?.BackColor ?? SystemColors.Control;
 
             PrepareTree(child);
         }
@@ -490,32 +462,15 @@ internal sealed partial class PreferencesForm : ToolWindow
         var g = e.Graphics;
         var palette = AppTheme.Current;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        if (ThemeManager.Wallpaper is null)
-            using (var chrome = new SolidBrush(Chrome)) g.FillRectangle(chrome, e.ClipRectangle);
-        var sidebarColor = ThemeManager.HasWallpaper
-            ? Color.FromArgb(palette.Dark ? 190 : 200, palette.Sidebar)
-            : palette.Sidebar;
-        using (var sidebar = new SolidBrush(sidebarColor)) g.FillRectangle(sidebar, 0, 0, Px(SidebarW), ClientSize.Height);
+        using (var chrome = new SolidBrush(Chrome)) g.FillRectangle(chrome, e.ClipRectangle);
+        using (var sidebar = new SolidBrush(palette.Sidebar)) g.FillRectangle(sidebar, 0, 0, Px(SidebarW), ClientSize.Height);
         FluentIcons.Draw(g, "capture", new Rectangle(Px(23), Px(26), Px(26), Px(26)), palette.Accent);
         using var brandFont = new Font(Font.FontFamily, Font.Size + 3, FontStyle.Bold);
         TextRenderer.DrawText(g, "SnipLite", brandFont, new Rectangle(Px(58), Px(25), Px(116), Px(30)), Ink, TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g, UiText.T("首选项", _s.DisplayLanguage), Font, new Rectangle(Px(24), Px(65), Px(136), Px(24)), Muted);
         using var headingFont = new Font(Font.FontFamily, Font.Size + 10, FontStyle.Bold);
-        var titleRect = new Rectangle(PageRect().X + Px(PagePad), Px(20), PageRect().Width, Px(44));
-        var title = UiText.T(_tabs[_selected], _s.DisplayLanguage);
-        var titleFlags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix;
-        if (ThemeManager.HasWallpaper)
-        {
-            // Soft shadow keeps the headline legible on any wallpaper.
-            TextRenderer.DrawText(g, title, headingFont,
-                new Rectangle(titleRect.X + Px(1), titleRect.Y + Px(2), titleRect.Width, titleRect.Height),
-                Color.FromArgb(150, 0, 0, 0), titleFlags);
-            TextRenderer.DrawText(g, title, headingFont, titleRect, Color.White, titleFlags);
-        }
-        else
-        {
-            TextRenderer.DrawText(g, title, headingFont, titleRect, Ink, titleFlags);
-        }
+        TextRenderer.DrawText(g, UiText.T(_tabs[_selected], _s.DisplayLanguage), headingFont,
+            new Rectangle(PageRect().X + Px(PagePad), Px(20), PageRect().Width, Px(44)), Ink, TextFormatFlags.VerticalCenter);
 
         if (_tabRects.Count == 0) LayoutTabs(g);
 
@@ -540,10 +495,7 @@ internal sealed partial class PreferencesForm : ToolWindow
             if (active || index == _hoverTab)
             {
                 using var path = FluentDrawing.Rounded(rect, Px(5));
-                var fillColor = active && ThemeManager.HasWallpaper
-                    ? Color.FromArgb(palette.Dark ? 175 : 190, palette.Card)
-                    : active ? palette.Card : palette.Hover;
-                using var fill = new SolidBrush(fillColor);
+                using var fill = new SolidBrush(active ? palette.Card : palette.Hover);
                 g.FillPath(fill, path);
             }
             if (active)
@@ -567,24 +519,10 @@ internal sealed partial class PreferencesForm : ToolWindow
             new Rectangle(versionRect.X, versionRect.Y + lineHeight, versionRect.Width, lineHeight), Hint,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
-        var wallpaper = ThemeManager.HasWallpaper;
-        FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)),
-            wallpaper ? Color.White : palette.Accent);
-        var themeText = $"{UiText.T("皮肤", _s.DisplayLanguage)} · {UiText.T(wallpaper ? "自定义背景" : ThemeManager.Current.Name, _s.DisplayLanguage)}";
-        var statusRect = new Rectangle(PageRect().X + Px(30), footerY - Px(2), Px(260), Px(23));
-        if (wallpaper)
-        {
-            TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font,
-                new Rectangle(statusRect.X + Px(1), statusRect.Y + Px(1), statusRect.Width, statusRect.Height),
-                Color.FromArgb(140, 0, 0, 0), TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-            TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font, statusRect,
-                Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-        }
-        else
-        {
-            TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font, statusRect, Muted,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-        }
+        FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
+        var themeText = $"{UiText.T("皮肤", _s.DisplayLanguage)} · {UiText.T(ThemeManager.Current.Name, _s.DisplayLanguage)}";
+        TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font,
+            new Rectangle(PageRect().X + Px(30), footerY - Px(2), Px(260), Px(23)), Muted, TextFormatFlags.VerticalCenter);
     }
 
     private void LayoutTabs(Graphics g)
@@ -854,11 +792,14 @@ internal sealed partial class PreferencesForm : ToolWindow
         if (_captions)
         {
             var height = TextRenderer.MeasureText(title, Font).Height + Px(12);
-            _page.Controls.Add(new FluentHintLabel
+            _page.Controls.Add(new Label
             {
                 Text = title,
+                AutoSize = false,
                 Bounds = new Rectangle(_labelX, _y, ContentWidth(), height),
-                ForeColor = Muted
+                ForeColor = Muted,
+                BackColor = Page,
+                TextAlign = ContentAlignment.MiddleLeft
             });
 
             _y += height;
@@ -1272,11 +1213,14 @@ internal sealed partial class PreferencesForm : ToolWindow
         var height = Math.Max(Px(22), TextRenderer.MeasureText(text, Font,
             new Size(ContentWidth(), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + Px(4));
 
-        _page.Controls.Add(new FluentHintLabel
+        _page.Controls.Add(new Label
         {
             Text = text,
+            AutoSize = false,
             Bounds = new Rectangle(_labelX, _y, ContentWidth(), height),
-            ForeColor = Hint
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Hint,
+            BackColor = Page
         });
 
         _y += height + Px(2);
@@ -1396,17 +1340,20 @@ internal sealed partial class PreferencesForm : ToolWindow
         return button;
     }
 
-    private NumericStepper MakeNumber(int min, int max, int value, int width, Action<int> onChange)
+    private NumericUpDown MakeNumber(int min, int max, int value, int width, Action<int> onChange)
     {
-        var number = new NumericStepper
+        var number = new NumericUpDown
         {
             Minimum = min,
             Maximum = max,
+            Value = Math.Clamp(value, min, max),
             Width = Px(width),
-            Height = FieldHeight
+            BackColor = Field,
+            ForeColor = Ink,
+            TextAlign = HorizontalAlignment.Right
         };
-        number.Value = Math.Clamp(value, min, max);
-        number.ValueChanged += (_, _) => onChange(number.Value);
+
+        number.ValueChanged += (_, _) => onChange((int)number.Value);
 
         return number;
     }
@@ -1415,7 +1362,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         Text = value,
         Width = width,
-        BackColor = ThemeManager.GlassField,
+        BackColor = Field,
         ForeColor = Ink,
         BorderStyle = BorderStyle.FixedSingle
     };

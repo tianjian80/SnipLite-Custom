@@ -36,7 +36,6 @@ internal static class Program
 
         var startupSettings = AppSettings.Load();
         ThemeManager.Apply(startupSettings.Skin);
-        ThemeManager.ApplyBackground(startupSettings.BackgroundImage);
         Localization.LanguageService.Configure(startupSettings.DisplayLanguage);
         using var mutex = new Mutex(false, @"Global\SnipLite.SingleInstance");
         var waitForInstance = args.Contains("--wait-for-instance");

@@ -1,5 +1,3 @@
-using System.Drawing.Drawing2D;
-
 namespace SnipLite;
 
 /// <summary>The full colour set a skin supplies; every surface in the app derives from it.</summary>
@@ -20,15 +18,6 @@ internal static class ThemeManager
     public const string DefaultKey = "Light";
 
     private static string _key = DefaultKey;
-    private static Bitmap? _wallpaper;
-    private static Color _wallpaperAverage = Color.FromArgb(0xF3, 0xF5, 0xF8);
-    private static bool _wallpaperLight = true;
-    private static int _wallpaperVersion;
-
-    /// <summary>Wallpaper currently painted behind the preferences window, if any.</summary>
-    public static Image? Wallpaper => _wallpaper;
-    public static bool HasWallpaper => _wallpaper is not null;
-    public static int WallpaperVersion => _wallpaperVersion;
 
     public static IReadOnlyList<SkinDefinition> Skins { get; } = new[]
     {
@@ -114,166 +103,13 @@ internal static class ThemeManager
         {
             // Windows high contrast always wins: readability beats styling.
             if (SystemInformation.HighContrast) return new ThemePalette(false, false, true);
-            if (_wallpaper is not null) return WallpaperPalette();
             var skin = Current;
-            return new ThemePalette(skin.Dark, skin.Dark, false, skin.Colors, _wallpaperVersion);
+            return new ThemePalette(skin.Dark, skin.Dark, false, skin.Colors);
         }
         catch (Exception ex)
         {
             AppLog.Write("解析皮肤失败", ex);
             return AppTheme.Fallback;
         }
-    }
-
-    /// <summary>Loads (or clears) the wallpaper skin; a missing file silently falls back to the solid skin.</summary>
-    public static void ApplyBackground(string? path)
-    {
-        path = path?.Trim() ?? "";
-        if (string.Equals(path, _wallpaperPath, StringComparison.OrdinalIgnoreCase) && (_wallpaper is not null || path.Length == 0)) return;
-        _wallpaperVersion++;
-        _wallpaper?.Dispose();
-        _wallpaper = null;
-        _scaled?.Dispose();
-        _scaled = null;
-        _wallpaperPath = "";
-        if (path.Length > 0)
-        {
-            try
-            {
-                using var source = Image.FromFile(path);
-                var bitmap = new Bitmap(source);
-                _wallpaper = bitmap;
-                _wallpaperAverage = AverageColor(bitmap);
-                _wallpaperLight = Luminance(_wallpaperAverage) >= 128;
-                _wallpaperPath = path;
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("背景图片读取失败，已回退简约浅灰", ex);
-                _wallpaper?.Dispose();
-                _wallpaper = null;
-                _key = DefaultKey;
-            }
-        }
-        try { AppTheme.Refresh(); }
-        catch (Exception ex) { AppLog.Write("应用背景失败", ex); }
-    }
-
-    private static string _wallpaperPath = "";
-
-    /// <summary>Paints the wallpaper like CSS cover: scaled, centred and cropped, never stretched.</summary>
-    public static void DrawWallpaper(Graphics g, Rectangle target, Size surface, Point offset)
-    {
-        var image = Scaled(surface);
-        if (image is null || surface.Width <= 0 || surface.Height <= 0) return;
-        var destination = new RectangleF(
-            (surface.Width - image.Width) / 2f - offset.X,
-            (surface.Height - image.Height) / 2f - offset.Y,
-            image.Width, image.Height);
-        var state = g.Save();
-        try
-        {
-            g.SetClip(target, CombineMode.Intersect);
-            g.DrawImage(image, destination);
-        }
-        finally { g.Restore(state); }
-    }
-
-    private static Bitmap? _scaled;
-    private static Size _scaledFor;
-    private static int _scaledVersion = -1;
-
-    /// <summary>Cover-scaled copy cached per window size: cards repaint often, resampling is not.</summary>
-    private static Bitmap? Scaled(Size surface)
-    {
-        if (_wallpaper is null || surface.Width <= 0 || surface.Height <= 0) return null;
-        if (_scaled is not null && _scaledFor == surface && _scaledVersion == _wallpaperVersion) return _scaled;
-        _scaled?.Dispose();
-        _scaled = null;
-        try
-        {
-            var scale = Math.Max(surface.Width / (float)_wallpaper.Width, surface.Height / (float)_wallpaper.Height);
-            var width = Math.Max(1, (int)Math.Round(_wallpaper.Width * scale));
-            var height = Math.Max(1, (int)Math.Round(_wallpaper.Height * scale));
-            var scaled = new Bitmap(width, height);
-            using (var graphics = Graphics.FromImage(scaled))
-            {
-                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                graphics.DrawImage(_wallpaper, 0, 0, width, height);
-            }
-            _scaled = scaled;
-            _scaledFor = surface;
-            _scaledVersion = _wallpaperVersion;
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("缩放背景图片失败", ex);
-        }
-        return _scaled;
-    }
-
-    /// <summary>Glass tint for controls that sit inside a frosted card.</summary>
-    public static Color GlassTint => Color.FromArgb(95, 255, 255, 255);
-    /// <summary>Soft white hairline of an inset glass field.</summary>
-    public static Color GlassEdge => Color.FromArgb(180, 255, 255, 255);
-
-    /// <summary>
-    /// Opaque stand-in for the glass tint: native editors (TextBox/NumericUpDown)
-    /// cannot be translucent, so they get the tint composited over the sampled
-    /// wallpaper colour instead of a flat white block.
-    /// </summary>
-    public static Color GlassField => _wallpaper is null
-        ? AppTheme.Current.Field
-        : Blend(GlassTint, _wallpaperAverage);
-
-    private static ThemePalette WallpaperPalette()
-    {
-        var accent = (Find(_key) ?? Skins[0]).Colors;
-        Color Over(Color top) => Blend(top, _wallpaperAverage);
-        // Every card uses the same frosted white, whatever the picture looks like:
-        // the specified translucency is composited over the sampled average here
-        // because WinForms controls cannot hold an alpha BackColor (it renders black).
-        var colors = new SkinColors(
-            Over(Color.FromArgb(60, 255, 255, 255)),
-            Over(Color.FromArgb(210, 255, 255, 255)),
-            Over(Color.FromArgb(228, 255, 255, 255)),
-            Over(Color.FromArgb(238, 255, 255, 255)),
-            Over(Color.FromArgb(150, 205, 213, 223)),
-            Color.FromArgb(20, 24, 31),
-            Color.FromArgb(72, 80, 90),
-            Over(Color.FromArgb(205, 240, 243, 248)),
-            accent.Accent, accent.AccentSoft, accent.OnAccent,
-            Color.FromArgb(85, 92, 102));
-        return new ThemePalette(false, false, false, colors, _wallpaperVersion);
-    }
-
-    /// <summary>Composites a translucent colour over the wallpaper average into an opaque one.</summary>
-    private static Color Blend(Color top, Color under)
-    {
-        if (top.A >= 255) return top;
-        var a = top.A / 255f;
-        return Color.FromArgb(
-            (int)Math.Round(top.R * a + under.R * (1 - a)),
-            (int)Math.Round(top.G * a + under.G * (1 - a)),
-            (int)Math.Round(top.B * a + under.B * (1 - a)));
-    }
-
-    private static double Luminance(Color c) => 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
-
-    private static Color AverageColor(Bitmap bitmap)
-    {
-        using var small = new Bitmap(bitmap, new Size(24, 24));
-        long r = 0, g = 0, b = 0;
-        for (var y = 0; y < small.Height; y++)
-        {
-            for (var x = 0; x < small.Width; x++)
-            {
-                var c = small.GetPixel(x, y);
-                r += c.R; g += c.G; b += c.B;
-            }
-        }
-        var count = small.Width * small.Height;
-        return Color.FromArgb((int)(r / count), (int)(g / count), (int)(b / count));
     }
 }
