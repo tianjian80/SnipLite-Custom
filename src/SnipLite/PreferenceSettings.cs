@@ -18,6 +18,8 @@ internal sealed partial class AppSettings
     public bool HideTrayIcon { get; set; }
     /// <summary>Global skin key; see <see cref="ThemeManager"/> (Light / Dark / Warm / Tech).</summary>
     public string Skin { get; set; } = ThemeManager.DefaultKey;
+    /// <summary>Wallpaper skin; empty means the solid skin selected by <see cref="Skin"/>.</summary>
+    public string BackgroundImage { get; set; } = "";
     public bool AutoBackup { get; set; } = true;
     public bool KeepResponsive { get; set; } = true;
     public bool EnhancedTrayMenu { get; set; } = true;
@@ -195,6 +197,8 @@ internal sealed partial class AppSettings
     {
         DisplayLanguage = Localization.LanguageService.NormalizePreference(DisplayLanguage);
         Skin = ThemeManager.Normalize(Skin);
+        // A wallpaper moved or deleted outside the app falls back to the solid skin.
+        if (!string.IsNullOrWhiteSpace(BackgroundImage) && !File.Exists(BackgroundImage)) BackgroundImage = "";
         if (!Enum.IsDefined(OcrEngine)) OcrEngine = OcrEngineKind.SimdPaddle;
         TranslationSourceLanguage = TranslationLanguages.Normalize(TranslationSourceLanguage, allowAuto: true, "en");
         TranslationTargetLanguage = TranslationLanguages.Normalize(TranslationTargetLanguage, allowAuto: false, "zh-CN");

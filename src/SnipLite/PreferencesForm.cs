@@ -71,6 +71,19 @@ internal sealed partial class PreferencesForm : ToolWindow
             if (m.Msg == WmSize) HideHorizontalBar();
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            if (ThemeManager.Wallpaper is null || Parent is null)
+            {
+                base.OnPaintBackground(e);
+                return;
+            }
+            // The wallpaper is anchored to the window, not the scroll offset, so the
+            // page paints the slice that lies under its own bounds.
+            using (var brush = new SolidBrush(Page)) e.Graphics.FillRectangle(brush, ClientRectangle);
+            ThemeManager.DrawWallpaper(e.Graphics, ClientRectangle, Parent.ClientSize, Location);
+        }
+
         private void ClampChildrenToWidth()
         {
             var maxRight = ClientSize.Width;
@@ -371,6 +384,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         using var brush = new SolidBrush(Chrome);
         e.Graphics.FillRectangle(brush, ClientRectangle);
+        ThemeManager.DrawWallpaper(e.Graphics, ClientRectangle, ClientSize, Point.Empty);
     }
 
     private void QueueContentRelayout()
@@ -462,8 +476,12 @@ internal sealed partial class PreferencesForm : ToolWindow
         var g = e.Graphics;
         var palette = AppTheme.Current;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var chrome = new SolidBrush(Chrome)) g.FillRectangle(chrome, e.ClipRectangle);
-        using (var sidebar = new SolidBrush(palette.Sidebar)) g.FillRectangle(sidebar, 0, 0, Px(SidebarW), ClientSize.Height);
+        if (ThemeManager.Wallpaper is null)
+            using (var chrome = new SolidBrush(Chrome)) g.FillRectangle(chrome, e.ClipRectangle);
+        var sidebarColor = ThemeManager.HasWallpaper
+            ? Color.FromArgb(palette.Dark ? 190 : 200, palette.Sidebar)
+            : palette.Sidebar;
+        using (var sidebar = new SolidBrush(sidebarColor)) g.FillRectangle(sidebar, 0, 0, Px(SidebarW), ClientSize.Height);
         FluentIcons.Draw(g, "capture", new Rectangle(Px(23), Px(26), Px(26), Px(26)), palette.Accent);
         using var brandFont = new Font(Font.FontFamily, Font.Size + 3, FontStyle.Bold);
         TextRenderer.DrawText(g, "SnipLite", brandFont, new Rectangle(Px(58), Px(25), Px(116), Px(30)), Ink, TextFormatFlags.VerticalCenter);
@@ -495,7 +513,10 @@ internal sealed partial class PreferencesForm : ToolWindow
             if (active || index == _hoverTab)
             {
                 using var path = FluentDrawing.Rounded(rect, Px(5));
-                using var fill = new SolidBrush(active ? palette.Card : palette.Hover);
+                var fillColor = active && ThemeManager.HasWallpaper
+                    ? Color.FromArgb(palette.Dark ? 175 : 190, palette.Card)
+                    : active ? palette.Card : palette.Hover;
+                using var fill = new SolidBrush(fillColor);
                 g.FillPath(fill, path);
             }
             if (active)
@@ -520,7 +541,7 @@ internal sealed partial class PreferencesForm : ToolWindow
             TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
-        var themeText = $"{UiText.T("皮肤", _s.DisplayLanguage)} · {UiText.T(ThemeManager.Current.Name, _s.DisplayLanguage)}";
+        var themeText = $"{UiText.T("皮肤", _s.DisplayLanguage)} · {UiText.T(ThemeManager.HasWallpaper ? "自定义背景" : ThemeManager.Current.Name, _s.DisplayLanguage)}";
         TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font,
             new Rectangle(PageRect().X + Px(30), footerY - Px(2), Px(260), Px(23)), Muted, TextFormatFlags.VerticalCenter);
     }

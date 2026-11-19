@@ -357,13 +357,20 @@ internal sealed class FluentToggle : CheckBox
 
 internal sealed class FluentSettingRow : Panel
 {
-    public FluentSettingRow() { DoubleBuffered = true; ResizeRedraw = true; BackColor = AppTheme.Current.Card; }
+    public FluentSettingRow()
+    {
+        DoubleBuffered = true; ResizeRedraw = true; BackColor = AppTheme.Current.Card;
+        // With a wallpaper the card lets the parent paint behind its rounded corners.
+        SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+    }
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         var s = DeviceDpi / 96f; var p = AppTheme.Current;
         // Inset a full pixel for both fill and stroke so the 1px border is never
         // clipped by the card's own edge, even when siblings sit right above it.
-        e.Graphics.Clear(Parent?.BackColor ?? p.Window); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        if (ThemeManager.HasWallpaper) base.OnPaintBackground(e);
+        else e.Graphics.Clear(Parent?.BackColor ?? p.Window);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), 7 * s);
         using var fill = new SolidBrush(p.Card); e.Graphics.FillPath(fill, path);
         using var border = new Pen(p.Border); e.Graphics.DrawPath(border, path);

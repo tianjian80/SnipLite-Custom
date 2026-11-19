@@ -549,7 +549,6 @@ internal sealed partial class PreferencesForm
 
     private void InterfacePage()
     {
-        HintText("皮肤与图标即时生效；开机启动使用最高权限的登录任务计划。");
         var systemLanguages = new object[] { "zh-Hans", "en-US", "" };
         var systemLanguage = MakeChooser(new[] { "简体中文", "English", "跟随系统" },
             Math.Max(0, Array.IndexOf(systemLanguages, (string)Value(nameof(_s.OcrLanguage)))),
@@ -560,6 +559,7 @@ internal sealed partial class PreferencesForm
             Math.Max(0, Array.IndexOf(closeActions, Value(nameof(_s.CloseButtonAction)))),
             index => Set(nameof(_s.CloseButtonAction), closeActions[index]), 0, true, true);
         Value(nameof(_s.StartAsAdministrator)); Value(nameof(_s.HideTrayIcon));
+        Value(nameof(_s.BackgroundImage));
 
         // First line: startup and tray visibility, two equal cards.
         var gap = Px(10);
@@ -581,9 +581,33 @@ internal sealed partial class PreferencesForm
         var skinKeys = ThemeManager.Skins.Select(skin => skin.Key).ToArray();
         var skinChooser = MakeChooser(ThemeManager.Skins.Select(skin => skin.Name).ToArray(),
             Math.Max(0, Array.IndexOf(skinKeys, ThemeManager.Normalize((string)Value(nameof(_s.Skin))))),
-            index => Set(nameof(_s.Skin), skinKeys[index]), FillWidth(), true, true);
-        Row("皮肤", skinChooser);
-        ColorRow("主题颜色", nameof(_s.AccentArgb));
+            index =>
+            {
+                // Picking a solid skin always leaves the wallpaper mode.
+                Set(nameof(_s.Skin), skinKeys[index]);
+                if (!string.IsNullOrEmpty(_s.BackgroundImage)) Set(nameof(_s.BackgroundImage), "");
+            }, 0, true, true);
+        var backgroundButton = new FluentButton { Tag = "accent-button" };
+        StyleButton(backgroundButton, "选择背景图片");
+        StyleAccent(backgroundButton);
+        backgroundButton.Click += (_, _) =>
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Filter = UiText.T("图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp"),
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            Set(nameof(_s.BackgroundImage), dialog.FileName);
+        };
+        // Right-click restores the solid skin without opening the picker.
+        backgroundButton.MouseUp += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right && !string.IsNullOrEmpty(_s.BackgroundImage))
+                Set(nameof(_s.BackgroundImage), "");
+        };
+        GridRow("皮肤", skinChooser, "自定义背景", backgroundButton, leftPercent: 50);
+        ColorRow("托盘图标颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
         var iconButton = new FluentButton { Tag = "accent-button" }; StyleButton(iconButton, "选择图标文件");

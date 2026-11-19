@@ -12,7 +12,7 @@ namespace SnipLite;
 internal sealed partial class PreferencesForm
 {
     private readonly SearchBox _search = new();
-    private readonly Panel _searchHost = new() { AutoScroll = true, Visible = false };
+    private readonly BufferedPage _searchHost = new() { Visible = false };
     private readonly System.Windows.Forms.Timer _searchDebounce = new() { Interval = 220 };
     private bool _searching;
     private bool _suppressSearch;

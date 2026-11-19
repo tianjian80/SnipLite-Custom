@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace SnipLite;
 
-internal sealed record ThemePalette(bool Dark, bool TaskbarDark, bool HighContrast = false, SkinColors? Colors = null)
+internal sealed record ThemePalette(bool Dark, bool TaskbarDark, bool HighContrast = false, SkinColors? Colors = null, int WallpaperVersion = 0)
 {
     public Color Window => Colors is { } c ? c.Window : HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(32, 32, 32) : Color.FromArgb(247, 247, 249);
     public Color Sidebar => Colors is { } c ? c.Sidebar : HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(27, 27, 29) : Color.FromArgb(240, 241, 244);
@@ -105,7 +105,7 @@ internal static class AppTheme
         if (!accent) control.ForeColor = p.Text;
         if (!accent) control.BackColor = control switch
         {
-            FluentSettingRow => p.Card,
+            FluentSettingRow => ThemeManager.HasWallpaper ? Color.Transparent : p.Card,
             FluentInputFrame => p.Field,
             TextBoxBase or UpDownBase => p.Field,
             Button => p.Field,
