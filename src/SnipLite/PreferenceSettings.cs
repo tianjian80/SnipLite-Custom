@@ -21,30 +21,30 @@ internal sealed partial class AppSettings
     public bool AutoBackup { get; set; } = true;
     public bool KeepResponsive { get; set; } = true;
     public bool EnhancedTrayMenu { get; set; } = true;
-    // Which entries the tray context menu shows; every toggle defaults to on.
-    // 首选项 / 退出 stay permanent so the menu can never lock the user out.
+    // Which entries the tray context menu shows. Factory set: 截屏 / 延时截图 /
+    // 长截图 / 录屏 / 录制 GIF / 文字识别 on, everything else hidden.
     public bool TrayItemSnip { get; set; } = true;
     public bool TrayItemDelay { get; set; } = true;
     public bool TrayItemLong { get; set; } = true;
-    public bool TrayItemSnipCopy { get; set; } = true;
-    public bool TrayItemFullSave { get; set; } = true;
+    public bool TrayItemSnipCopy { get; set; }
+    public bool TrayItemFullSave { get; set; }
     public bool TrayItemRecord { get; set; } = true;
     public bool TrayItemGif { get; set; } = true;
     /// <summary>Global mouse-through state for pinned images, mirrored by the 按键 page switch.</summary>
     public bool MouseThroughEnabled { get; set; }
-    public bool TrayItemPin { get; set; } = true;
-    public bool TrayItemTogglePins { get; set; } = true;
-    public bool TrayItemSwitchGroup { get; set; } = true;
-    public bool TrayItemRestorePins { get; set; } = true;
-    public bool TrayItemClosePins { get; set; } = true;
-    public bool TrayItemHistory { get; set; } = true;
-    public bool TrayItemClearHistory { get; set; } = true;
-    public bool TrayItemDisableHotkeys { get; set; } = true;
-    public bool TrayItemPreferences { get; set; } = true;
+    public bool TrayItemPin { get; set; }
+    public bool TrayItemTogglePins { get; set; }
+    public bool TrayItemSwitchGroup { get; set; }
+    public bool TrayItemRestorePins { get; set; }
+    public bool TrayItemClosePins { get; set; }
+    public bool TrayItemHistory { get; set; }
+    public bool TrayItemClearHistory { get; set; }
+    public bool TrayItemDisableHotkeys { get; set; }
+    public bool TrayItemPreferences { get; set; }
     public bool TrayItemOcr { get; set; } = true;
-    public bool TrayItemQr { get; set; } = true;
-    public bool TrayItemAbout { get; set; } = true;
-    public bool TrayItemRestart { get; set; } = true;
+    public bool TrayItemQr { get; set; }
+    public bool TrayItemAbout { get; set; }
+    public bool TrayItemRestart { get; set; }
     public string LogLevel { get; set; } = "Normal";
     public string InterfaceFont { get; set; } = "Microsoft YaHei UI";
     public float InterfaceFontSize { get; set; } = 9;
@@ -141,10 +141,12 @@ internal sealed partial class AppSettings
     public bool QuickSaveToast { get; set; } = true;
     public bool CaptureBitmapClipboard { get; set; } = true;
     public bool PinBitmapClipboard { get; set; }
-    public Keys CaptureHotkey { get; set; } = Keys.F1;
+    // Factory hotkeys: 截屏 Ctrl+Alt+A, 首选项 F3, 全屏截图并自动保存 Shift+F1,
+    // 录屏 小键盘 *; every other action ships unbound.
+    public Keys CaptureHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.A;
     public Keys CopyCaptureHotkey { get; set; } = Keys.None;
-    public Keys PreferencesHotkey { get; set; } = Keys.None;
-    public Keys CustomCaptureHotkey { get; set; } = Keys.None;
+    public Keys PreferencesHotkey { get; set; } = Keys.F3;
+    public Keys CustomCaptureHotkey { get; set; } = Keys.Shift | Keys.F1;
     public Keys LongCaptureHotkey { get; set; } = Keys.None;
 
     // Long screenshot: scroll the target window and stitch frames vertically.
@@ -159,23 +161,23 @@ internal sealed partial class AppSettings
     /// captures the whole monitor only for full-screen apps/games. When off, the
     /// whole monitor is always captured, taskbar included.
     /// </summary>
-    public bool SmartFullScreenCapture { get; set; } = true;
+    public bool SmartFullScreenCapture { get; set; }
     /// <summary>Delay in seconds before the tray/hotkey delayed capture fires.</summary>
     public int DelayCaptureSeconds { get; set; } = 5;
     /// <summary>Show the small countdown badge; off means a silent background delay.</summary>
     public bool DelayShowCountdown { get; set; } = true;
-    public Keys PinHotkey { get; set; } = Keys.F3;
+    public Keys PinHotkey { get; set; } = Keys.None;
     public Keys TogglePinsHotkey { get; set; } = Keys.None;
     public Keys SwitchGroupHotkey { get; set; } = Keys.None;
-    public Keys CopyCoordinatesHotkey { get; set; } = Keys.Control | Keys.Shift | Keys.C;
-    public Keys TranslationHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.T;
-    public Keys OcrHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.O;
+    public Keys CopyCoordinatesHotkey { get; set; } = Keys.None;
+    public Keys TranslationHotkey { get; set; } = Keys.None;
+    public Keys OcrHotkey { get; set; } = Keys.None;
     public Keys RedactHotkey { get; set; } = Keys.None;
     public Keys DelayCaptureHotkey { get; set; } = Keys.None;
     /// <summary>Toggles a screen recording at the configured preset resolution.</summary>
-    public Keys RecordHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.R;
+    public Keys RecordHotkey { get; set; } = Keys.Multiply;
     /// <summary>Toggles a GIF recording.</summary>
-    public Keys GifHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.G;
+    public Keys GifHotkey { get; set; } = Keys.None;
     public Keys PinZoomModifiers { get; set; } = Keys.None;
     public Keys PinOpacityModifiers { get; set; } = Keys.Control;
     public MouseBinding PinCloseMouse { get; set; } = new(Keys.None, PointerGesture.LeftDoubleClick);
