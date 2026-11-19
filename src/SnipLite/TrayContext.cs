@@ -24,29 +24,27 @@ internal sealed class TrayContext : ApplicationContext
     private readonly Localization.LanguageMonitor _languageMonitor;
     private readonly CaptureHistory _history = new();
     /// <summary>
-    /// Scrollable thumbnail list for the history dropdown. Every capture is drawn at the
-    /// full column width with its own aspect ratio (no letterboxing, no cropping), the
-    /// wheel scrolls smoothly and no native scrollbar is shown.
+    /// Scrollable thumbnail list for the history dropdown. Cards keep a 16:9 shape,
+    /// the wheel scrolls smoothly and no native scrollbar is shown.
     /// </summary>
     private sealed class HistoryPanel : Control
     {
-        private const int Gap = 4;
-        /// <summary>1 px of slack on both sides so the popup border never clips a pixel.</summary>
-        private const int Inset = 2;
+        private const int Pad = 6;
+        private const int Gap = 6;
         private readonly IReadOnlyList<CaptureHistory.Entry> _entries;
-        private readonly int _width;
-        private readonly int[] _heights;
+        private readonly int _cardWidth;
+        private readonly int _cardHeight;
         private readonly Action<CaptureHistory.Entry> _click;
         private readonly long _shownAt;
         private int _offset;
         private int _hover = -1;
 
-        public HistoryPanel(IReadOnlyList<CaptureHistory.Entry> entries, Size size, int width, Action<CaptureHistory.Entry> click)
+        public HistoryPanel(IReadOnlyList<CaptureHistory.Entry> entries, Size size, int cardWidth, int cardHeight, Action<CaptureHistory.Entry> click)
         {
             _entries = entries;
-            _width = width;
+            _cardWidth = cardWidth;
+            _cardHeight = cardHeight;
             _click = click;
-            _heights = entries.Select(entry => HeightFor(entry, width)).ToArray();
             // Any mouse activity during the first 150 ms after the popup appears is an
             // artefact of opening it, never a deliberate choice of a thumbnail.
             _shownAt = Environment.TickCount64;
@@ -57,56 +55,37 @@ internal sealed class TrayContext : ApplicationContext
             TabStop = true;
         }
 
+        private int Stride => CardHeight + Gap;
         /// <summary>
-        /// Height that keeps the whole picture visible at the given width, using the real
-        /// aspect ratio of the saved full capture (never a square cache).
+        /// Effective card height: the constructor's 16:9 height, capped so the visible
+        /// cards always fit the hosted client area exactly (the drop-down keeps a
+        /// couple of pixels for its own border, which used to trigger ▲ / ▼ bars).
         /// </summary>
-        internal static int HeightFor(CaptureHistory.Entry entry, int width)
-        {
-            var size = entry.PixelSize;
-            if (size.IsEmpty) size = entry.Thumbnail.Size;
-            if (size.Width <= 0 || size.Height <= 0) return 20;
-            return Math.Max(20, (int)Math.Round((double)size.Height * width / size.Width));
-        }
-
-        /// <summary>Total content height: every item plus a 4 px gap between them.</summary>
-        internal static int ContentHeight(IReadOnlyList<CaptureHistory.Entry> entries, int width)
-        {
-            if (entries.Count == 0) return 0;
-            var sum = 0;
-            foreach (var entry in entries) sum += HeightFor(entry, width);
-            return sum + Gap * (entries.Count - 1);
-        }
-
-        private int TotalHeight
+        private int CardHeight
         {
             get
             {
-                var sum = 0;
-                foreach (var h in _heights) sum += h;
-                return sum + Gap * Math.Max(0, _heights.Length - 1);
+                var count = Math.Max(1, Math.Min(_entries.Count, 5));
+                var fit = (Height - Pad * 2 - (count - 1) * Gap) / count;
+                return Math.Min(_cardHeight, Math.Max(24, fit));
             }
         }
-
-        /// <summary>Top of one item in content coordinates, gaps included.</summary>
-        private int TopOf(int index)
+        private int ContentHeight
         {
-            var top = 0;
-            for (var i = 0; i < index; i++) top += _heights[i] + Gap;
-            return top;
+            get
+            {
+                var card = CardHeight;
+                return Pad * 2 + _entries.Count * card + Math.Max(0, _entries.Count - 1) * Gap;
+            }
         }
 
         private int IndexAt(int y)
         {
-            y += _offset;
+            y += _offset - Pad;
             if (y < 0) return -1;
-            for (var index = 0; index < _heights.Length; index++)
-            {
-                var top = TopOf(index);
-                if (y < top) return -1;
-                if (y < top + _heights[index]) return index;
-            }
-            return -1;
+            var index = y / Stride;
+            if (index >= _entries.Count || y % Stride >= CardHeight) return -1;
+            return index;
         }
 
         // Hovering only moves the highlight; it must never restore a picture.
@@ -131,7 +110,7 @@ internal sealed class TrayContext : ApplicationContext
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e);
-            var max = Math.Max(0, TotalHeight - Height);
+            var max = Math.Max(0, ContentHeight - Height);
             var next = Math.Clamp(_offset - e.Delta / 2, 0, max);
             if (next == _offset) return;
             _offset = next;
@@ -154,24 +133,26 @@ internal sealed class TrayContext : ApplicationContext
             g.Clear(BackColor);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            var cardHeight = CardHeight;
             for (var index = 0; index < _entries.Count; index++)
             {
-                var top = TopOf(index) - _offset;
-                var height = _heights[index];
-                if (top + height < 0) continue;
+                var top = Pad + index * Stride - _offset;
+                if (top + cardHeight < 0) continue;
                 if (top > Height) break;
+                var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
                 var thumb = _entries[index].Thumbnail;
-                // Force 96 DPI so GDI+ does not rescale the bitmap by its own metadata.
-                if (Math.Abs(thumb.HorizontalResolution - 96f) > 0.1f) thumb.SetResolution(96f, 96f);
-                // Full column width, height from this picture only: the complete source
-                // rectangle is mapped 1:1 onto the item, so nothing on either side is cut.
-                var rect = new Rectangle(Inset, top, _width, height);
+                var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
+                var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
+                var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
+                var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
+                // Whole source in pixel units, so no edge (close button / clock) is cut.
                 g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
-                // Only the hovered picture gets a 2 px accent frame; no card background.
+                // No card frame: only a hover outline hugging the thumbnail itself,
+                // so no grey rules run across the popup between entries.
                 if (index == _hover)
                 {
-                    using var border = new Pen(AppTheme.Current.Accent, 2f);
-                    g.DrawRectangle(border, rect.X + 1, rect.Y + 1, rect.Width - 3, rect.Height - 3);
+                    using var border = new Pen(AppTheme.Current.Accent, 1f);
+                    g.DrawRectangle(border, rect.X, rect.Y, rect.Width - 1, rect.Height - 1);
                 }
             }
         }
@@ -312,28 +293,25 @@ internal sealed class TrayContext : ApplicationContext
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
-                    var menuRight = menu.Bounds.Width > 0 ? menu.Bounds.Right : Cursor.Position.X;
-                    var available = menu.Bounds.Width > 0 ? screen.Right - menuRight : 240;
+                    var available = menu.Bounds.Width > 0 ? screen.Right - menu.Bounds.Right : 240;
                     if (menu.Visible && available < 220)
                     {
                         menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
-                        menuRight = menu.Bounds.Right;
-                        available = screen.Right - menuRight;
+                        available = screen.Right - menu.Bounds.Right;
                     }
-                    // Hard limit: the popup never passes the Windows working-area edge
-                    // (4 px safety gap), however far the slider is pushed to the right.
-                    var maxRightW = Math.Max(80, screen.Right - menuRight - 4);
+                    available = Math.Max(160, available);
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-                    var canvasW = Math.Min(requested, maxRightW);
-                    // 1 px of slack on either side so the popup frame clips nothing.
-                    var panelWidth = canvasW + 4;
+                    var cardWidth = Math.Max(50, Math.Min(requested, available - 12));
+                    var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
+                    // The popup hugs the thumbnails: 6 px padding on both sides only.
+                    var panelWidth = cardWidth + 12;
                     var entries = _history.Entries;
-                    // Every capture contributes its own aspect-correct height; the canvas is
-                    // exactly as tall as the stacked pictures plus their 4 px gaps.
-                    var contentHeight = HistoryPanel.ContentHeight(entries, canvasW);
-                    var height = Math.Min(contentHeight, screen.Height - 8);
+                    var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
+                    // At most five cards are visible; the rest scroll with the wheel.
+                    var maxHeight = Math.Min(5 * cardHeight + 36, screen.Height - 16);
+                    var height = Math.Min(contentHeight, maxHeight);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
-                    var key = $"{signature}@{canvasW}";
+                    var key = $"{signature}@{panelWidth}x{cardHeight}";
                     if (history.Tag as string == key) return;
                     history.Tag = key;
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
@@ -345,10 +323,11 @@ internal sealed class TrayContext : ApplicationContext
                         dropMenu.Size = new Size(panelWidth, 40);
                         return;
                     }
-                    // The hosted item fills the popup exactly: AutoSize is off, so any extra
-                    // pixel would show up as a strip of menu background around the pictures.
-                    var panelHeight = Math.Max(20, height);
-                    var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), canvasW, entry =>
+                    // The hosted item must stay a couple of pixels shorter than the
+                    // drop-down: ToolStripDropDownMenu reserves that strip for its own
+                    // border and would otherwise enable its ▲ / ▼ overflow bars.
+                    var panelHeight = Math.Max(60, height - 4);
+                    var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), cardWidth, cardHeight, entry =>
                     {
                         // The file may have been deleted after the menu was filled.
                         if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
@@ -369,7 +348,7 @@ internal sealed class TrayContext : ApplicationContext
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    dropMenu.Size = new Size(panelWidth, panelHeight);
+                    dropMenu.Size = new Size(panelWidth, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Grey out both history entries when nothing is left: a disabled item

@@ -9,33 +9,6 @@ internal sealed class CaptureHistory
 
     internal sealed record Entry(byte[] Png, Rectangle Bounds, DateTime Time, Bitmap Thumbnail, string? FilePath = null)
     {
-        private Size _pixel = Size.Empty;
-
-        /// <summary>
-        /// Dimensions of the untouched full capture, read straight from the PNG header.
-        /// The preview always uses this ratio, never a cached or pre-cropped one.
-        /// </summary>
-        public Size PixelSize
-        {
-            get
-            {
-                if (_pixel.IsEmpty) _pixel = ReadPixelSize(Png);
-                return _pixel;
-            }
-        }
-
-        private static Size ReadPixelSize(byte[] png)
-        {
-            // PNG: 8-byte signature, then an IHDR chunk whose width/height are big-endian
-            // 32-bit integers at offsets 16 and 20.
-            if (png.Length < 24) return Size.Empty;
-            static int BigEndian(byte[] data, int at) =>
-                (data[at] << 24) | (data[at + 1] << 16) | (data[at + 2] << 8) | data[at + 3];
-            var width = BigEndian(png, 16);
-            var height = BigEndian(png, 20);
-            return width > 0 && height > 0 ? new Size(width, height) : Size.Empty;
-        }
-
         public Bitmap Image()
         {
             using var stream = new MemoryStream(Png);
