@@ -132,13 +132,13 @@ internal sealed class TrayContext : ApplicationContext
             var visibleRight = Screen.FromControl(this).WorkingArea.Right;
             var originX = PointToScreen(Point.Empty).X;
             var drawWidth = Math.Max(8, Math.Min(_cardWidth,
-                Math.Min(ClientSize.Width - Pad * 2, visibleRight - originX - Pad - 4)));
+                Math.Min(ClientSize.Width - 8, visibleRight - originX - 8)));
             for (var index = 0; index < _entries.Count; index++)
             {
                 var top = Pad + index * Stride - _offset;
                 if (top + cardHeight < 0) continue;
                 if (top > Height) break;
-                var card = new Rectangle(Pad, top, drawWidth, cardHeight);
+                var card = new Rectangle(4 + (ClientSize.Width - 8 - drawWidth) / 2, top, drawWidth, cardHeight);
                 var thumb = _entries[index].Thumbnail;
                 var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
@@ -289,6 +289,10 @@ internal sealed class TrayContext : ApplicationContext
                     // Files deleted outside the app disappear from the list before it opens.
                     _history.PruneMissing();
                     var dropMenu = (ToolStripDropDownMenu)history.DropDown!;
+                    // The drop-down would otherwise reserve a 28 px icon/check column on the
+                    // left and push the hosted thumbnails right, cropping their right edge.
+                    dropMenu.ShowImageMargin = false;
+                    dropMenu.ShowCheckMargin = false;
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
@@ -305,8 +309,8 @@ internal sealed class TrayContext : ApplicationContext
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
                     var cardWidth = Math.Max(50, Math.Min(requested, maxRightWidth));
                     var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
-                    // The popup hugs the thumbnails: 6 px padding on both sides only.
-                    var panelWidth = cardWidth + 12;
+                    // The popup hugs the thumbnails: 4 px padding on both sides only.
+                    var panelWidth = cardWidth + 8;
                     var entries = _history.Entries;
                     var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
                     // At most five cards are visible; the rest scroll with the wheel.
