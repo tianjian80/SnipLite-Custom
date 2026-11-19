@@ -994,6 +994,9 @@ internal sealed partial class CaptureForm : ToolWindow
         // Same for the dimmed desktop outside the selection.
         if (!_selection.Contains(p)) return;
 
+        // A double-click only copies / saves the picture: it must not litter the
+        // capture history, so mark the record as already handled.
+        _historyRecorded = true;
         ExecuteAction(_settings.DoubleClickAction, _settings.DoubleClickExit);
     }
 
