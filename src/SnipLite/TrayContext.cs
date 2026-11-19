@@ -23,8 +23,8 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ThemeMonitor _themeMonitor = new();
     private readonly Localization.LanguageMonitor _languageMonitor;
     private readonly CaptureHistory _history = new();
-    /// <summary>Borderless floating thumbnail list shown right of the tray menu.</summary>
-    private HistoryPreviewPopup? _historyPreview;
+    /// <summary>Native drop-down hosting the thumbnail canvas, shown right of the menu.</summary>
+    private ToolStripDropDown? _historyPreview;
     private ToolStripMenuItem? _historyItem;
     /// <summary>Closes the preview once the pointer leaves both the item and the popup.</summary>
     private readonly System.Windows.Forms.Timer _historyWatch = new() { Interval = 120 };
@@ -179,9 +179,10 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Opens the floating thumbnail list to the right of the open tray menu. The width
-    /// is capped by both the slider and the room left before the screen edge, so the
-    /// popup never covers the menu, never flips left and never crops a picture.
+    /// Opens the thumbnail drop-down to the right of the open tray menu. A plain
+    /// ToolStripDropDown is part of the native menu family, so the tray menu keeps
+    /// its mouse capture (an independent Form made it close instantly), while an
+    /// explicit Show(Point) bypasses the automatic left flip of a submenu.
     /// </summary>
     private void ShowHistoryPreview(ToolStripMenuItem item)
     {
@@ -194,12 +195,12 @@ internal sealed class TrayContext : ApplicationContext
             if (bounds.Width <= 0) return;
             var entries = _history.Entries;
             CloseHistoryPreview();
-            var screen = Screen.FromPoint(bounds.Location).WorkingArea;
+            var screen = Screen.FromControl(menu).WorkingArea;
             var menuRight = bounds.Right;
             var maxRightW = Math.Max(80, screen.Right - menuRight - 4);
             var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
             var finalW = Math.Min(requested, maxRightW);
-            var popup = new HistoryPreviewPopup(entries, finalW, screen.Height - 16, entry =>
+            var canvas = new HistoryCanvasControl(entries, finalW, screen.Height - 16, entry =>
             {
                 CloseHistoryPreview();
                 menu.Close();
@@ -211,20 +212,33 @@ internal sealed class TrayContext : ApplicationContext
                 }
                 PinImage(entry.Image(), entry.Bounds, exact: true);
             });
-            var top = bounds.Bottom - popup.Height;
-            top = Math.Max(screen.Top, Math.Min(top, screen.Bottom - popup.Height));
-            popup.Location = new Point(menuRight, top);
-            popup.FormClosed += (_, _) =>
+            var totalH = canvas.Height;
+            var dropDown = new ToolStripDropDown
             {
-                if (!ReferenceEquals(_historyPreview, popup)) return;
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                AutoSize = true,
+                DropShadowEnabled = false
+            };
+            dropDown.Items.Add(new ToolStripControlHost(canvas)
+            {
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                AutoSize = false,
+                Size = new Size(canvas.Width, totalH)
+            });
+            dropDown.Closed += (_, _) =>
+            {
+                if (!ReferenceEquals(_historyPreview, dropDown)) return;
                 _historyPreview = null;
                 _historyItem = null;
             };
             _historyItem = item;
-            _historyPreview = popup;
-            // Raw SW_SHOWNOACTIVATE: never Activate()/Focus(), the tray menu keeps focus.
-            popup.ShowNoActivate();
-            ToolWindow.HideTaskbarTab(popup.Handle);
+            _historyPreview = dropDown;
+            // Explicit screen point: the drop-down only ever touches the right edge.
+            var showY = Math.Min(bounds.Top + item.Bounds.Top, screen.Bottom - totalH - 4);
+            dropDown.Show(new Point(menuRight, Math.Max(4, showY)));
+            ToolWindow.HideTaskbarTab(dropDown.Handle);
         }
         catch (Exception ex)
         {
@@ -236,10 +250,10 @@ internal sealed class TrayContext : ApplicationContext
     private void CloseHistoryPreview()
     {
         _historyItem = null;
-        var popup = _historyPreview;
+        var dropDown = _historyPreview;
         _historyPreview = null;
-        if (popup is null || popup.IsDisposed) return;
-        try { popup.Dismiss(); }
+        if (dropDown is null || dropDown.IsDisposed) return;
+        try { dropDown.Close(); }
         catch (Exception ex) { AppLog.Write("关闭截屏历史预览失败", ex); }
     }
 
