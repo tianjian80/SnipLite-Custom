@@ -367,6 +367,45 @@ internal sealed class FluentToggle : CheckBox
     }
 }
 
+/// <summary>Hint line that floats on the page: white with a soft shadow over a wallpaper.</summary>
+internal sealed class FluentHintLabel : Label
+{
+    public FluentHintLabel()
+    {
+        AutoSize = false;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var wallpaper = ThemeManager.HasWallpaper;
+        if (wallpaper && Parent is IWallpaperBackdrop backdrop)
+        {
+            backdrop.PaintWallpaperFor(g, ClientRectangle, Location);
+        }
+        else
+        {
+            using var brush = new SolidBrush(Parent?.BackColor ?? AppTheme.Current.Window);
+            g.FillRectangle(brush, ClientRectangle);
+        }
+        const TextFormatFlags flags = TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix;
+        if (wallpaper)
+        {
+            TextRenderer.DrawText(g, Text, Font,
+                new Rectangle(ClientRectangle.X + 1, ClientRectangle.Y + 1, Width, Height),
+                Color.FromArgb(150, 0, 0, 0), flags);
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Color.White, flags);
+        }
+        else
+        {
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, AppTheme.Current.Muted, flags);
+        }
+    }
+}
+
 /// <summary>Lets a translucent card paint the wallpaper slice that sits beneath it.</summary>
 internal interface IWallpaperBackdrop
 {

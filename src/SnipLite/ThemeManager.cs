@@ -214,17 +214,18 @@ internal static class ThemeManager
     }
 
     /// <summary>Glass tint for controls that sit inside a frosted card.</summary>
-    public static Color GlassTint => Color.FromArgb(115, 255, 255, 255);
+    public static Color GlassTint => Color.FromArgb(95, 255, 255, 255);
     /// <summary>Soft white hairline of an inset glass field.</summary>
-    public static Color GlassEdge => Color.FromArgb(185, 255, 255, 255);
+    public static Color GlassEdge => Color.FromArgb(180, 255, 255, 255);
 
     /// <summary>
     /// Opaque stand-in for the glass tint: native editors (TextBox/NumericUpDown)
-    /// cannot be translucent, so they get the flat composite instead of pure white.
+    /// cannot be translucent, so they get the tint composited over the sampled
+    /// wallpaper colour instead of a flat white block.
     /// </summary>
     public static Color GlassField => _wallpaper is null
         ? AppTheme.Current.Field
-        : Blend(GlassTint, Blend(Color.FromArgb(185, 255, 255, 255), _wallpaperAverage));
+        : Blend(GlassTint, _wallpaperAverage);
 
     private static ThemePalette WallpaperPalette()
     {

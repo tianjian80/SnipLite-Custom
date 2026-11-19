@@ -1275,14 +1275,11 @@ internal sealed partial class PreferencesForm : ToolWindow
         var height = Math.Max(Px(22), TextRenderer.MeasureText(text, Font,
             new Size(ContentWidth(), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + Px(4));
 
-        _page.Controls.Add(new Label
+        _page.Controls.Add(new FluentHintLabel
         {
             Text = text,
-            AutoSize = false,
             Bounds = new Rectangle(_labelX, _y, ContentWidth(), height),
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Hint,
-            BackColor = Page
+            ForeColor = Hint
         });
 
         _y += height + Px(2);
