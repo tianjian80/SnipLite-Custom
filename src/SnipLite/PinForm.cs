@@ -51,6 +51,7 @@ internal sealed class PinForm : ToolWindow
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
         TopMost = true; DoubleBuffered = true; BackColor = Color.Black; KeyPreview = true; Text = UiText.T("SnipLite 贴图");
         Font = _settings.CreateInterfaceFont(); _opacity = Math.Clamp(opacityPercent, 10, 100) / 100d; Opacity = _opacity;
+        if (opacityPercent >= 100) Opacity = 1.0;
         var anchor = screenPoint ?? Win32.CursorPosition();
         _scale = Math.Min(1, _settings.PinMaxSize / (float)Math.Max(image.Width, image.Height));
         _windowSize = new Size(Math.Max(1, (int)(image.Width * _scale)), Math.Max(1, (int)(image.Height * _scale)));
@@ -62,8 +63,9 @@ internal sealed class PinForm : ToolWindow
         if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
         _flashTimer.Tick += (_, _) =>
         {
+            // Border-only flash: the window itself never changes opacity, so no
+            // translucent transition frame can ever appear.
             _flashTicks--;
-            Opacity = _settings.PinTranslucentFlash && _flashTicks > 0 && _flashTicks % 2 == 0 ? Math.Min(.65, _opacity) : _opacity;
             Invalidate(); if (_flashTicks <= 0) _flashTimer.Stop();
         };
         _zoomBadgeTimer.Tick += (_, _) => { _zoomBadgeTimer.Stop(); Invalidate(); };

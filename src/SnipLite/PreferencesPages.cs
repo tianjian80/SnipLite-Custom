@@ -1207,7 +1207,6 @@ internal sealed partial class PreferencesForm
         Cell("使用截屏时的位置", nameof(_s.PinAtCapturePosition));
         Cell("使用鼠标滚轮缩放", nameof(_s.PinWheelZoom)); Cell("以鼠标指针为中心缩放", nameof(_s.PinZoomAtCursor));
         Cell("平滑缩放", nameof(_s.PinSmoothScaling)); Cell("缩略图接受重置操作", nameof(_s.ThumbnailAcceptReset));
-        Cell("边框闪烁时使窗口半透明", nameof(_s.PinTranslucentFlash));
         Cell("切换分组时自动闪烁贴图", nameof(_s.FlashOnGroupSwitch));
         Cell("拖放操作时保留原始图", nameof(_s.KeepOriginalOnDrag));
         Cell("贴出新图片时闪烁", nameof(_s.FlashNewPin)); Cell("贴出新图片时激活", nameof(_s.ActivateNewPin));

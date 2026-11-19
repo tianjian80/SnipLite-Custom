@@ -121,7 +121,6 @@ internal sealed partial class AppSettings
     public bool PinZoomAtCursor { get; set; } = true;
     public bool PinSmoothScaling { get; set; } = true;
     public bool ThumbnailAcceptReset { get; set; } = true;
-    public bool PinTranslucentFlash { get; set; } = true;
     public bool FlashOnGroupSwitch { get; set; } = true;
     public bool KeepOriginalOnDrag { get; set; } = true;
     public bool FlashNewPin { get; set; } = true;
