@@ -14,6 +14,8 @@ internal sealed partial class AppSettings
 {
     public string DisplayLanguage { get; set; } = Localization.LanguageService.SystemDefault;
     public bool StartAsAdministrator { get; set; }
+    /// <summary>Hide the notification-area icon; hotkeys and a second launch still open the preferences.</summary>
+    public bool HideTrayIcon { get; set; }
     public bool AutoBackup { get; set; } = true;
     public bool KeepResponsive { get; set; } = true;
     public bool EnhancedTrayMenu { get; set; } = true;

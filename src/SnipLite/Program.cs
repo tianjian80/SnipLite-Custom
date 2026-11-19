@@ -17,10 +17,15 @@ internal static class Program
 
         Localization.LanguageService.Configure(AppSettings.Load().DisplayLanguage);
         using var mutex = new Mutex(false, @"Global\SnipLite.SingleInstance");
+        var waitForInstance = args.Contains("--wait-for-instance");
         try
         {
-            if (!mutex.WaitOne(args.Contains("--wait-for-instance") ? 5000 : 0))
+            if (!mutex.WaitOne(waitForInstance ? 5000 : 0))
             {
+                // A hidden tray icon still keeps the app reachable: wake the running
+                // instance and let it pop the preferences instead of starting a new one.
+                if (!waitForInstance && WakeRunningInstance()) return;
+
                 MessageBox.Show(Localization.LanguageService.Format("SnipLite 已有实例正在运行，本次没有启动新版。\n\n请先从托盘右键菜单退出旧版，再启动本文件。\n\n本文件版本：{0}\n本文件位置：{1}", AppInfo.Version, Application.ExecutablePath), UiText.T("SnipLite 已在运行"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -55,6 +60,24 @@ internal static class Program
             args.Contains("--capture"),
             prefsTab,
             args.Contains("--menu")));
+    }
+
+    /// <summary>
+    /// Signals the already running instance to open its preferences. Returns false
+    /// when no such instance is listening (e.g. an older build).
+    /// </summary>
+    private static bool WakeRunningInstance()
+    {
+        try
+        {
+            using var signal = EventWaitHandle.OpenExisting(@"Global\SnipLite.Activate");
+            signal.Set();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     internal static void Report(Exception? ex)

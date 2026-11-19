@@ -836,7 +836,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     private async void ResetAll()
     {
         var defaults = AppSettings.Reset();
-        if (_selected == 0 && !await ApplyStartupAsync(defaults.StartWithWindows, defaults.StartAsAdministrator)) return;
+        if (_selected == 0 && !await ApplyStartupAsync(defaults.StartAsAdministrator, true)) return;
         if (IsDisposed) return;
         foreach (var name in _sectionProperties)
         {

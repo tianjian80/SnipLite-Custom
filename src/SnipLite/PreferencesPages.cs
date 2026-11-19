@@ -273,7 +273,7 @@ internal sealed partial class PreferencesForm
         GridRow("免费翻译", freeChooser, "专业翻译", paidChooser, leftPercent: 50);
         SyncTranslationRows();
         Section("启动配置与日志", () => { });
-        Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator));
+        Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator)); Value(nameof(_s.HideTrayIcon));
         var gap = Px(10);
         var cardWidth = (ContentWidth() - gap) / 2;
         var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
@@ -309,18 +309,14 @@ internal sealed partial class PreferencesForm
             });
         }
 
-        StartupCell("开机启动", _s.StartWithWindows, async value =>
+        // Always the highest-privilege logon task; the old HKCU Run value is removed.
+        StartupCell("开机启动", _s.StartAsAdministrator, async value =>
         {
-            if (!await ApplyStartupAsync(value, _s.StartAsAdministrator)) return false;
-            Set(nameof(_s.StartWithWindows), value);
-            return true;
-        });
-        StartupCell("以管理员身份开机启动", _s.StartAsAdministrator, async value =>
-        {
-            if (_s.StartWithWindows && !await ApplyStartupAsync(true, value)) return false;
+            if (!await ApplyStartupAsync(value, true)) return false;
             Set(nameof(_s.StartAsAdministrator), value);
             return true;
         });
+        FlagCell("隐藏托盘图标", nameof(_s.HideTrayIcon));
         FlagCell("自动备份配置文件", nameof(_s.AutoBackup));
         FlagCell("保持快速响应", nameof(_s.KeepResponsive));
         if (column != 0) { column = 0; _y += height + gap; }

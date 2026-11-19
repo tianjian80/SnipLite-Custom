@@ -151,12 +151,28 @@ internal sealed class TrayContext : ApplicationContext
     private string _menuSignature = "";
     private bool _trayDisposed;
     private uint? _lastPasteSequence;
+    /// <summary>Signalled by a second launch so this hidden instance can open its preferences.</summary>
+    private readonly EventWaitHandle _activate = new(false, EventResetMode.AutoReset, @"Global\SnipLite.Activate");
+    /// <summary>Hidden control used to marshal the wake-up signal onto the UI thread.</summary>
+    private readonly Control _marshal = new();
 
     public TrayContext(bool captureOnStart = false, int openPreferencesTab = -1, bool openMenu = false)
     {
         _settings = AppSettings.Load();
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
-        _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = $"{AppInfo.ProductName}{AppInfo.Version}", Visible = true };
+        _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = $"{AppInfo.ProductName}{AppInfo.Version}", Visible = !_settings.HideTrayIcon };
+        _ = _marshal.Handle;
+        var wake = new Thread(() =>
+        {
+            while (true)
+            {
+                try { _activate.WaitOne(); }
+                catch { return; }
+                try { _marshal.BeginInvoke(new Action(ShowPreferencesFromWake)); }
+                catch { return; }
+            }
+        }) { IsBackground = true, Name = "SnipLite.Activate" };
+        wake.Start();
         // Watching the shared session keeps the red icon correct no matter which code
         // path started or stopped the recording (card, hotkey, duration limit, cancel).
         _recordWatch.Tick += (_, _) => SyncRecordingIcon();
@@ -470,6 +486,16 @@ internal sealed class TrayContext : ApplicationContext
         if (menu.IsHandleCreated) Win32.SetForegroundWindow(menu.Handle);
     }
 
+    /// <summary>
+    /// "隐藏托盘图标" fallback: launching SnipLite.exe again wakes this instance and
+    /// opens the preferences, so the settings stay reachable without a tray entry.
+    /// </summary>
+    private void ShowPreferencesFromWake()
+    {
+        if (_trayDisposed) return;
+        ShowPreferences(0);
+    }
+
     /// <summary>The preferences hotkey toggles: visible window closes, otherwise it opens.</summary>
     private void TogglePreferences()
     {
@@ -507,6 +533,7 @@ internal sealed class TrayContext : ApplicationContext
         var icon = TrayIcons.Create(_settings, _recordingIcon); var oldIcon = _tray.Icon; _tray.Icon = icon; oldIcon?.Dispose();
         // Tooltip is just the product name and version; hotkeys live in the menu.
         _tray.Text = $"{AppInfo.ProductName}{AppInfo.Version}";
+        _tray.Visible = !_settings.HideTrayIcon;
         var signature = $"{_settings.EnhancedTrayMenu}|{Localization.LanguageService.CurrentLanguage}|{_settings.InterfaceFont}|{_settings.InterfaceFontSize}|" + string.Join(',', HotkeyDefinitions.Items.Select(item => typeof(AppSettings).GetProperty(item.Name)!.GetValue(_settings)))
             + "|" + string.Join(',', typeof(AppSettings).GetProperties().Where(p => p.Name.StartsWith("TrayItem", StringComparison.Ordinal)).OrderBy(p => p.Name).Select(p => p.GetValue(_settings)));
         if (_menuSignature != signature)
@@ -878,6 +905,8 @@ internal sealed class TrayContext : ApplicationContext
         _tray.Visible = false;
         _tray.Dispose();
         icon?.Dispose();
+        _activate.Dispose();
+        _marshal.Dispose();
     }
     private void RefreshTheme()
     {
