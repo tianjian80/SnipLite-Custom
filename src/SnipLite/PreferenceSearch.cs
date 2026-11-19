@@ -123,15 +123,22 @@ internal sealed partial class PreferencesForm
                 var count = Math.Max(1, SubNames[t].Length);
                 for (var s = 0; s < count; s++)
                 {
-                    BuildForSearch(t, s);
-                    var path = SubNames[t].Length == 0
-                        ? _tabs[t]
-                        : $"{_tabs[t]} › {SubNames[t][s]}";
-                    foreach (var card in _page.Controls.OfType<FluentSettingRow>())
+                    try
                     {
-                        var text = ControlText(card);
-                        if (text.Length == 0) continue;
-                        entries.Add(new SearchEntry(t, s, path, text, AliasesFor(text)));
+                        BuildForSearch(t, s);
+                        var path = SubNames[t].Length == 0
+                            ? _tabs[t]
+                            : $"{_tabs[t]} › {SubNames[t][s]}";
+                        foreach (var card in _page.Controls.OfType<FluentSettingRow>())
+                        {
+                            var text = ControlText(card);
+                            if (text.Length == 0) continue;
+                            entries.Add(new SearchEntry(t, s, path, text, AliasesFor(text)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Write($"设置搜索索引构建失败：{_tabs[t]}", ex);
                     }
                     ClearPageControls();
                 }
@@ -174,22 +181,29 @@ internal sealed partial class PreferencesForm
 
             foreach (var group in hits.GroupBy(h => (h.Tab, h.Sub)))
             {
-                BuildForSearch(group.Key.Tab, group.Key.Sub);
-                var path = group.First().Path;
-                var cards = _page.Controls.OfType<FluentSettingRow>().ToList();
-                foreach (var card in cards)
+                try
                 {
-                    var text = ControlText(card);
-                    if (!Matches(new SearchEntry(group.Key.Tab, group.Key.Sub, path, text, AliasesFor(text)), q))
-                        continue;
+                    BuildForSearch(group.Key.Tab, group.Key.Sub);
+                    var path = group.First().Path;
+                    var cards = _page.Controls.OfType<FluentSettingRow>().ToList();
+                    foreach (var card in cards)
+                    {
+                        var text = ControlText(card);
+                        if (!Matches(new SearchEntry(group.Key.Tab, group.Key.Sub, path, text, AliasesFor(text)), q))
+                            continue;
 
-                    PathLabel(path, ref y);
-                    _page.Controls.Remove(card);
-                    card.Anchor = AnchorStyles.None;
-                    card.Bounds = new Rectangle(Px(PagePad + 4), y,
-                        Math.Max(Px(200), _searchHost.ClientSize.Width - Px(PagePad * 2 + 10)), card.Height);
-                    _searchHost.Controls.Add(card);
-                    y += card.Height + Px(10);
+                        PathLabel(path, ref y);
+                        _page.Controls.Remove(card);
+                        card.Anchor = AnchorStyles.None;
+                        card.Bounds = new Rectangle(Px(PagePad + 4), y,
+                            Math.Max(Px(200), _searchHost.ClientSize.Width - Px(PagePad * 2 + 10)), card.Height);
+                        _searchHost.Controls.Add(card);
+                        y += card.Height + Px(10);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Write("设置搜索结果构建失败", ex);
                 }
                 ClearPageControls();
             }
@@ -352,7 +366,8 @@ internal sealed class SearchBox : Control
     public SearchBox()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
-                 ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+                 ControlStyles.UserPaint | ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
         Cursor = Cursors.IBeam;
 
@@ -395,7 +410,8 @@ internal sealed class SearchBox : Control
         LayoutInput();
     }
 
-    private void LayoutInput() => _input.Bounds = new Rectangle(Px(30), Px(7), Math.Max(10, Width - Px(58)), Height - Px(14));
+    private void LayoutInput() => _input.Bounds = new Rectangle(Px(30), Px(7),
+        Math.Max(10, Width - Px(58)), Math.Max(10, Height - Px(14)));
 
     private int Px(int value) => (int)Math.Round(value * (DeviceDpi / 96f));
 

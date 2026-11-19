@@ -632,7 +632,14 @@ internal sealed partial class PreferencesForm : ToolWindow
         // Pages with a single group need no caption repeating the tab name.
         _captions = index is 0 or 1 or 5;
 
-        BuildPage(index);
+        try
+        {
+            BuildPage(index);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"设置页面 {_tabs[index]} 构建失败", ex);
+        }
 
         _page.AutoScrollMinSize = new Size(0, _y + Px(PagePad));
         _page.ResumeLayout();
