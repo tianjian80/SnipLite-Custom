@@ -907,7 +907,7 @@ internal sealed partial class PreferencesForm
         CheckCard(_labelX + (winWidth + winGap) * 2, winWidth, winHeight,
             ("鼠标穿透", nameof(_s.MouseThroughEnabled), "mouse"), on => PinForm.SetMouseThroughActive(on));
         // Extra breathing room separates the Win-key/mouse-through switches from the action rows below.
-        _y += winHeight + Px(16);
+        _y += winHeight + Px(30);
         ActionRow("左键双击", nameof(_s.DoubleClickAction), nameof(_s.DoubleClickExit));
         ActionRow("中键单击", nameof(_s.MiddleClickAction), nameof(_s.MiddleClickExit));
         ActionRow("回车键", nameof(_s.EnterAction), nameof(_s.EnterExit));
