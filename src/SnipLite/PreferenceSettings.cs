@@ -155,6 +155,10 @@ internal sealed partial class AppSettings
     /// whole monitor is always captured, taskbar included.
     /// </summary>
     public bool SmartFullScreenCapture { get; set; } = true;
+    /// <summary>Delay in seconds before the tray/hotkey delayed capture fires.</summary>
+    public int DelayCaptureSeconds { get; set; } = 5;
+    /// <summary>Show the small countdown badge; off means a silent background delay.</summary>
+    public bool DelayShowCountdown { get; set; } = true;
     public Keys PinHotkey { get; set; } = Keys.F3;
     public Keys TogglePinsHotkey { get; set; } = Keys.None;
     public Keys SwitchGroupHotkey { get; set; } = Keys.None;
@@ -200,6 +204,7 @@ internal sealed partial class AppSettings
         ThumbnailWidth = Math.Clamp(ThumbnailWidth, 20, 1000);
         ThumbnailHeight = Math.Clamp(ThumbnailHeight, 20, 1000);
         HistoryImageLimit = Math.Clamp(HistoryImageLimit, 0, 100);
+        if (DelayCaptureSeconds is not (3 or 5 or 10)) DelayCaptureSeconds = 5;
         if (string.IsNullOrWhiteSpace(QuickSaveDirectory)) QuickSaveDirectory = new AppSettings().QuickSaveDirectory;
         if (string.IsNullOrWhiteSpace(InterfaceFont)) InterfaceFont = "Microsoft YaHei UI";
         if (string.IsNullOrWhiteSpace(TextImageFont)) TextImageFont = "Microsoft YaHei UI";

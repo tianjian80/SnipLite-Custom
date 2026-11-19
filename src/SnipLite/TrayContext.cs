@@ -207,7 +207,7 @@ internal sealed class TrayContext : ApplicationContext
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
         Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), Key(_settings.CaptureHotkey));
-        Add(_settings.TrayItemDelay, "延时截图", () => StartDelayedCapture(5), Key(_settings.DelayCaptureHotkey));
+        Add(_settings.TrayItemDelay, "延时截图", StartDelayedCapture, Key(_settings.DelayCaptureHotkey));
         if (_settings.EnhancedTrayMenu)
         {
             Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), Key(_settings.CopyCaptureHotkey));
@@ -543,7 +543,7 @@ internal sealed class TrayContext : ApplicationContext
             [nameof(_settings.OcrHotkey)] = () => StartCapture(CaptureMode.Ocr),
             [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr),
             [nameof(_settings.RedactHotkey)] = RedactHotkey,
-            [nameof(_settings.DelayCaptureHotkey)] = () => StartDelayedCapture(5)
+            [nameof(_settings.DelayCaptureHotkey)] = StartDelayedCapture
         };
         // "截屏并自动复制" registers before the plain capture hotkey: if both were
         // assigned the same key (e.g. F1, which the plain capture owns by default),
@@ -659,15 +659,33 @@ internal sealed class TrayContext : ApplicationContext
                rect.Right >= screen.Bounds.Right && rect.Bottom >= screen.Bounds.Bottom;
     }
     private DelayCountdownForm? _countdown;
+    private System.Windows.Forms.Timer? _delayTimer;
 
     /// <summary>
-    /// Shows the countdown badge then grabs the full screen and saves silently:
-    /// no selection overlay is opened.
+    /// Runs the configured delay (3/5/10 s) then grabs the full screen and saves
+    /// silently. The badge is optional: with it off the wait leaves no footprint.
     /// </summary>
-    private void StartDelayedCapture(int seconds)
+    private void StartDelayedCapture()
     {
         if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.Activate(); return; }
-        if (_countdown is { IsDisposed: false }) return;
+        if (_countdown is { IsDisposed: false } || _delayTimer is not null) return;
+
+        var seconds = _settings.DelayCaptureSeconds is 3 or 5 or 10 ? _settings.DelayCaptureSeconds : 5;
+        if (!_settings.DelayShowCountdown)
+        {
+            var timer = new System.Windows.Forms.Timer { Interval = seconds * 1000 };
+            _delayTimer = timer;
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                if (ReferenceEquals(_delayTimer, timer)) _delayTimer = null;
+                DelayedFullScreenCapture();
+            };
+            timer.Start();
+            return;
+        }
+
         var form = new DelayCountdownForm(seconds);
         _countdown = form;
         form.Finished += () => { _countdown = null; DelayedFullScreenCapture(); };

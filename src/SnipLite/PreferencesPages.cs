@@ -917,6 +917,32 @@ internal sealed partial class PreferencesForm
         Choice("最大拼接高度", nameof(_s.LongCaptureMaxHeight),
             new[] { "50000 像素", "100000 像素", "无限制" },
             new object[] { 50000, 100000, 0 }, ChooserWidth, true);
+        Section("延时截图", () => { });
+
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+
+        // Left card: delay picker, right card: countdown badge switch.
+        var delayCard = NewSettingRow(_labelX, cardWidth, height);
+        var delays = new object[] { 3, 5, 10 };
+        var current = Convert.ToInt32(Value(nameof(_s.DelayCaptureSeconds)));
+        var dropWidth = Math.Max(Px(96), Math.Min(Px(156), cardWidth / 3 + Px(36)));
+        var chooser = MakeChooser(new[] { "3 秒", "5 秒", "10 秒" },
+            Math.Max(0, Array.IndexOf(delays, current)),
+            index => Set(nameof(_s.DelayCaptureSeconds), delays[index]), dropWidth, true);
+        chooser.SetBounds(cardWidth - Px(12) - dropWidth, Math.Max(0, (height - chooser.Height) / 2), dropWidth, chooser.Height);
+        delayCard.Controls.Add(chooser);
+        delayCard.Controls.Add(new Label
+        {
+            Text = "延时时长", AutoSize = false, AutoEllipsis = true,
+            Bounds = new Rectangle(Px(14), 0, Math.Max(Px(40), chooser.Left - Px(14) - Px(8)), height),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
+        });
+
+        CheckCard(_labelX + cardWidth + gap, cardWidth, height,
+            ("显示倒计时", nameof(_s.DelayShowCountdown), "timer"));
+        _y += height + Px(8);
     }
     /// <summary>Chooser bound to a property, sized for use inside a half-width grid cell.</summary>
     private Control MakeChoice(string name, string[] labels, object[] values, int width = 190, bool centeredRows = false,
