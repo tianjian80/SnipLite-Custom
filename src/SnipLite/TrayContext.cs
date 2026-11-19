@@ -52,6 +52,12 @@ internal sealed class TrayContext : ApplicationContext
         }
 
         private int Stride => CardHeight + Gap;
+
+        /// <summary>
+        /// The hosted item's preferred width is exactly the thumbnail plus the 4 px
+        /// frame on each side, so the drop-down adds no blank strip to the right.
+        /// </summary>
+        public override Size GetPreferredSize(Size proposedSize) => new(_cardWidth + 8, Height);
         /// <summary>
         /// Effective card height: the constructor's 16:9 height, capped so the visible
         /// cards always fit the hosted client area exactly (the drop-down keeps a
@@ -267,10 +273,10 @@ internal sealed class TrayContext : ApplicationContext
                 if (history.DropDown is ToolStripDropDownMenu drop)
                 {
                     // The hosted panel owns padding, painting and scrolling.
-                    drop.AutoSize = false;
+                    drop.AutoSize = true;
                     drop.ShowImageMargin = false;
                     drop.ShowCheckMargin = false;
-                    drop.Padding = Padding.Empty;
+                    drop.Padding = new Padding(2);
                     drop.Font = menu.Font;
                     drop.Renderer = menu.Renderer;
                     // The thumbnail popup is a plain drop-down, not a Form: strip its
@@ -301,11 +307,13 @@ internal sealed class TrayContext : ApplicationContext
                     // The tray menu is already on screen when its drop-down opens. Use its
                     // real left edge plus width, minus a 28 px safety gap for the popup
                     // border, so the submenu always has room and never flips left.
-                    var rightEdge = menu.Left + menu.Width;
-                    if (rightEdge <= 0) rightEdge = Cursor.Position.X;
-                    var maxRightWidth = Math.Max(80, screen.Right - rightEdge - 28);
+                    var menuRight = menu.Bounds.Width > 0 ? menu.Bounds.Right : Cursor.Position.X;
+                    // Total popup width that still fits between the tray menu and the
+                    // screen edge, leaving a 10 px safety margin for the drop border.
+                    var maxRightW = Math.Max(80, screen.Right - menuRight - 10);
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-                    var cardWidth = Math.Max(50, Math.Min(requested, maxRightWidth));
+                    // 8 px panel frame + 4 px drop padding are part of maxRightW.
+                    var cardWidth = Math.Clamp(requested, 50, Math.Max(50, maxRightW - 12));
                     var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
                     // The popup hugs the thumbnails: 4 px padding on both sides only.
                     var panelWidth = cardWidth + 8;
@@ -355,9 +363,10 @@ internal sealed class TrayContext : ApplicationContext
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    dropMenu.Padding = Padding.Empty;
+                    // AutoSize lets the drop-down hug the hosted panel exactly: no fixed
+                    // size, no reserved icon column, no extra blank strip on the right.
+                    dropMenu.Padding = new Padding(2);
                     dropMenu.AutoSize = true;
-                    dropMenu.Size = new Size(panelWidth, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Grey out both history entries when nothing is left: a disabled item
@@ -368,24 +377,22 @@ internal sealed class TrayContext : ApplicationContext
                     history.Enabled = any;
                     if (clearHistory is not null) clearHistory.Enabled = any;
                 };
-                // Re-check right after showing: the real menu bounds and screen gap are
-                // known then, so the submenu always ends flush with the screen edge.
+                // Windows may still flip the popup leftwards when the tray menu sits close
+                // to the right edge. Re-anchor on every open so it always hangs to the right.
                 history.DropDownOpening += (_, _) =>
                 {
                     FitHistory();
                     if (_history.Entries.Count == 0) history.Enabled = false;
+                    AnchorHistoryRight(history, menu);
                 };
-                // Bottom-align the panel with the tray menu (it grows upwards) and keep
-                // its right edge exactly on the screen edge.
+                // The final position is only reliable once the popup is open; pin the
+                // left edge to the tray menu's real right edge a second time.
                 history.DropDownOpened += (_, _) =>
                 {
-                    var dropDown = history.DropDown;
-                    if (dropDown is null) return;
+                    if (history.DropDown is not { } dropDown) return;
                     ToolWindow.HideTaskbarTab(dropDown.Handle);
                     HideScrollButtons(dropDown);
-                    var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
-                    var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
-                    dropDown.Location = new Point(menu.Bounds.Right, top);
+                    AnchorHistoryRight(history, menu);
                 };
                 menu.Items.Add(history);
             }
@@ -442,6 +449,24 @@ internal sealed class TrayContext : ApplicationContext
         {
             // Purely cosmetic: never let a layout quirk break the tray menu.
         }
+    }
+
+    /// <summary>
+    /// Pins the history popup to the right edge of the tray menu. Windows computes
+    /// the drop-down direction itself and flips it leftwards near the screen edge,
+    /// so the final location is overwritten once the popup is actually open. The
+    /// width is clamped in FitHistory, therefore the popup only ever touches the
+    /// screen edge and never crosses it.
+    /// </summary>
+    private static void AnchorHistoryRight(ToolStripMenuItem item, ContextMenuStrip owner)
+    {
+        if (item.DropDown is not { } drop) return;
+        var bounds = owner.Bounds;
+        if (bounds.Width <= 0) return;
+        var screen = Screen.FromRectangle(bounds).WorkingArea;
+        var top = bounds.Bottom - drop.Height;
+        top = Math.Max(screen.Top, Math.Min(top, screen.Bottom - drop.Height));
+        drop.Location = new Point(bounds.Right, top);
     }
 
     private static object? GetPrivate(object target, string name)
