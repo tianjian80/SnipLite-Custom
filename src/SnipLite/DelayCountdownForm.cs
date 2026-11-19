@@ -140,40 +140,53 @@ internal sealed class DelayCountdownForm : ToolWindow
     {
         if (!IsHandleCreated) return;
 
+        var digits = _remaining.ToString();
+        var h = DigitHeight * _scale;
+        var t = BarThickness * _scale / 2f;
+        var gap = SegmentGap * _scale;
+        var w = h / DigitAspect;
+        var spacing = w * 0.18f;
+
+        // Lay the digit(s) out at the origin first, then centre on the lit bars
+        // only, so "1" (right-hand strokes only) and "10" stay visually centred.
+        var bodies = new List<GraphicsPath>();
+        var x = 0f;
+        foreach (var ch in digits)
+        {
+            var figure = DigitPath(ch, x, 0, w, h, t, gap);
+            foreach (var segment in figure) bodies.Add(segment);
+            x += w + spacing;
+        }
+
+        using var lit = new GraphicsPath();
+        foreach (var segment in bodies) lit.AddPath(segment, false);
+
+        var active = lit.GetBounds();
+        var pad = (float)Math.Ceiling(48 * _scale);
+        var winW = Math.Max(1, (int)Math.Ceiling(active.Width + pad * 2));
+        var winH = Math.Max(1, (int)Math.Ceiling(active.Height + pad * 2));
+        if (Size.Width != winW || Size.Height != winH) Size = new Size(winW, winH);
+        // Re-centre on every redraw: the window is tight around the lit bars, so
+        // its centre is the digit's true visual centre.
+        CenterOnScreen();
+
+        using (var shift = new Matrix())
+        {
+            shift.Translate(pad - active.X, pad - active.Y);
+            lit.Transform(shift);
+            foreach (var segment in bodies) segment.Transform(shift);
+        }
+
         using var bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bitmap))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Color.Transparent);
 
-            var digits = _remaining.ToString();
-            var h = DigitHeight * _scale;
-            var t = BarThickness * _scale / 2f;
-            var gap = SegmentGap * _scale;
-            var w = h / DigitAspect;
-            var spacing = w * 0.18f;
-            var total = digits.Length * w + (digits.Length - 1) * spacing;
-            var x = (Width - total) / 2f;
-            var y = (Height - h) / 2f;
-
-            var lit = new GraphicsPath();
-            var bodies = new List<GraphicsPath>();
-            foreach (var ch in digits)
-            {
-                var figure = DigitPath(ch, x, y, w, h, t, gap);
-                foreach (var segment in figure) bodies.Add(segment);
-                x += w + spacing;
-            }
-
-            using (lit)
-            {
-                foreach (var segment in bodies) lit.AddPath(segment, false);
-
-                // 1. Silky halo: paint the lit bars small, then scale back up twice.
-                //    Bilinear down/up sampling acts as a true gaussian-ish blur, so
-                //    there are no stacked hard-edged rings around the digit.
-                PaintGlow(g, lit, glowColor: Color.FromArgb(145, 255, 20, 30));
-            }
+            // 1. Silky halo: paint the lit bars small, then scale back up twice.
+            //    Bilinear down/up sampling acts as a true gaussian-ish blur, so
+            //    there are no stacked hard-edged rings around the digit.
+            PaintGlow(g, lit, glowColor: Color.FromArgb(145, 255, 20, 30));
 
             // 2. Crisp LED body: sharp anti-aliased hexagons, gem red gradient,
             //    no inner blur so every 45 degree corner stays razor sharp.
@@ -258,7 +271,9 @@ internal sealed class DelayCountdownForm : ToolWindow
         var halfBar = w / 2f - gap;
         var vertHalf = h / 4f - 1.5f * t - gap;
         var left = x + t;
-        var right = x + w - t;
+        // "1" lights only the right strokes; centre them in the cell instead so
+        // the digit's own visual weight stays in the middle.
+        var right = digit == '1' ? x + w / 2f : x + w - t;
         var center = x + w / 2f;
 
         void Add(char segment, GraphicsPath path)
