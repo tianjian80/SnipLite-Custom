@@ -1537,6 +1537,7 @@ internal sealed partial class PreferencesForm
         Section("辅助识别", () => { });
         GridCheck(
             ("文字识别", nameof(_s.ShowToolOcr), "ocr"),
+            ("智能打码", nameof(_s.ShowToolRedact), "redact"),
             ("截图翻译", nameof(_s.ShowToolTranslate), "translate"),
             ("二维码识别", nameof(_s.ShowToolQr), "qr"),
             ("长截图", nameof(_s.ShowToolLong), "long"),
@@ -1556,6 +1557,7 @@ internal sealed partial class PreferencesForm
         // Five rows of short entries, then the long labels get a full-width card each.
         GridCheck(
             ("截屏", nameof(_s.TrayItemSnip), "capture"),
+            ("延时截图 (5秒)", nameof(_s.TrayItemDelay), "timer"),
             ("长截图", nameof(_s.TrayItemLong), "long"),
             ("禁用快捷键", nameof(_s.TrayItemDisableHotkeys), "keyboard"),
 

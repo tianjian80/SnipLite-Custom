@@ -207,6 +207,7 @@ internal sealed class TrayContext : ApplicationContext
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
         Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), Key(_settings.CaptureHotkey));
+        Add(_settings.TrayItemDelay, "延时截图 (5秒)", () => StartDelayedCapture(5));
         if (_settings.EnhancedTrayMenu)
         {
             Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), Key(_settings.CopyCaptureHotkey));
@@ -655,6 +656,23 @@ internal sealed class TrayContext : ApplicationContext
         return rect.Left <= screen.Bounds.Left && rect.Top <= screen.Bounds.Top &&
                rect.Right >= screen.Bounds.Right && rect.Bottom >= screen.Bounds.Bottom;
     }
+    private DelayCountdownForm? _countdown;
+
+    /// <summary>
+    /// Shows the translucent countdown in the top-right corner, then opens the
+    /// normal capture overlay so transient UI (menus, tooltips) can be framed.
+    /// </summary>
+    private void StartDelayedCapture(int seconds)
+    {
+        if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.Activate(); return; }
+        if (_countdown is { IsDisposed: false }) return;
+        var form = new DelayCountdownForm(seconds);
+        _countdown = form;
+        form.Finished += () => { _countdown = null; StartCapture(CaptureMode.Snip); };
+        form.FormClosed += (_, _) => { if (ReferenceEquals(_countdown, form)) _countdown = null; };
+        form.Show();
+    }
+
     private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null, bool longCapture = false)
     {
         if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.Activate(); return; }

@@ -230,6 +230,7 @@ internal sealed partial class CaptureForm : ToolWindow
             "undo" => _settings.ShowToolUndo,
             "redo" => _settings.ShowToolRedo,
             "ocr" => _settings.ShowToolOcr,
+            "redact" => _settings.ShowToolRedact,
             "translate" => _settings.ShowToolTranslate,
             "qr" => _settings.ShowToolQr,
             "close" => _settings.ShowToolClose,
@@ -1223,6 +1224,7 @@ internal sealed partial class CaptureForm : ToolWindow
             case "rec": StartRecording(false); return;
             case "gif": StartRecording(true); return;
             case "ocr": CloseTranslation(); _ = RecognizeSelectionAsync(ocr: true); return;
+            case "redact": CloseTranslation(); _ = SmartRedactAsync(); return;
             case "qr": CloseTranslation(); _ = RecognizeSelectionAsync(ocr: false); return;
             case "translate": if (TranslationVisible) CloseTranslation(); else _ = TranslateSelectionAsync(); return;
             case "resultcopy": CopyInlineQr(); return;
@@ -1704,6 +1706,79 @@ internal sealed partial class CaptureForm : ToolWindow
         {
             if (!IsDisposed && version == _recognitionVersion)
             {
+                UpdateCursor();
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs the OCR engine over the selection, matches phone / e-mail / ID / bank
+    /// card / token patterns and drops mosaic masks on every hit. The masks are a
+    /// normal shape edit, so undo and the eraser work unchanged.
+    /// </summary>
+    private async Task SmartRedactAsync()
+    {
+        if (!_hasSelection || _recognitionBusy || _ocrMode) return;
+        CommitText();
+        ClearQrResult();
+        var crop = Crop;
+        if (crop.Width < 1 || crop.Height < 1) return;
+        using var image = RenderComposite(crop);
+        var version = ++_recognitionVersion;
+        _recognitionBusy = true;
+        _bar.RedactBusy = true;
+        _ocrCrop = crop;
+        _ocrSourceSize = image.Size;
+        _bar.SetStatus(() => UiText.T("正在智能识别隐私信息…"));
+        UpdateCursor();
+        Invalidate();
+        try
+        {
+            var document = await Task.Run(() => Services.RecognizeTextAsync(image, _settings.OcrLanguage, _settings.OcrEngine));
+            if (IsDisposed || version != _recognitionVersion) return;
+            _recognitionBusy = false;
+            _bar.RedactBusy = false;
+            var hits = PrivacyRedactor.Find(document);
+            if (hits.Count == 0)
+            {
+                _bar.SetStatus(() => UiText.T("未检测到可打码的隐私信息，可按 Esc 返回后调整选区"));
+                return;
+            }
+
+            SaveUndo();
+            var block = Math.Max(6, _bar.MosaicBlock);
+            var selected = Crop;
+            foreach (var hit in hits)
+            {
+                var mapped = OcrToScreen(hit);
+                var rect = Rectangle.Round(RectangleF.Inflate(mapped, 2, 2));
+                rect = Rectangle.Intersect(rect, selected);
+                if (rect.Width < 2 || rect.Height < 2) continue;
+                _shapes.Add(new MosaicShape
+                {
+                    Rect = rect,
+                    Rectangular = true,
+                    Block = block,
+                    Color = _bar.Color,
+                    Width = _bar.StrokeWidth
+                });
+            }
+            InvalidateAnnotations();
+            _bar.SetStatus(() => Localization.LanguageService.Format("已打码 {0} 处隐私信息 · Ctrl+Z 撤销", hits.Count));
+        }
+        catch (Exception ex)
+        {
+            if (IsDisposed || version != _recognitionVersion) return;
+            _bar.SetStatus(() => UiText.T("智能打码失败：") + ex.Message);
+            Toast.Error(_bar.Status);
+        }
+        finally
+        {
+            if (!IsDisposed && version == _recognitionVersion)
+            {
+                _recognitionBusy = false;
+                _bar.RedactBusy = false;
                 UpdateCursor();
                 Invalidate();
             }

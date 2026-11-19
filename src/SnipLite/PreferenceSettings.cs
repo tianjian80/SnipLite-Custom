@@ -20,6 +20,7 @@ internal sealed partial class AppSettings
     // Which entries the tray context menu shows; every toggle defaults to on.
     // 首选项 / 退出 stay permanent so the menu can never lock the user out.
     public bool TrayItemSnip { get; set; } = true;
+    public bool TrayItemDelay { get; set; } = true;
     public bool TrayItemLong { get; set; } = true;
     public bool TrayItemSnipCopy { get; set; } = true;
     public bool TrayItemFullSave { get; set; } = true;
@@ -58,6 +59,7 @@ internal sealed partial class AppSettings
     public bool ShowToolUndo { get; set; } = true;
     public bool ShowToolRedo { get; set; } = true;
     public bool ShowToolOcr { get; set; } = true;
+    public bool ShowToolRedact { get; set; } = true;
     public bool ShowToolTranslate { get; set; } = true;
     public bool ShowToolQr { get; set; } = true;
     public bool ShowToolClose { get; set; } = true;

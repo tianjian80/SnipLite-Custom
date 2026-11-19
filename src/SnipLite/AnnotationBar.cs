@@ -66,6 +66,8 @@ internal sealed class AnnotationBar
     public bool TranslationMode { get; set; }
     public int AttachedPanelHeight { get; set; }
     public bool OcrCopyVisible { get; set; }
+    /// <summary>True while the smart-redaction pass is running: the shield shows its loading look.</summary>
+    public bool RedactBusy { get; set; }
     public string OcrEngineLabel { get; set; } = OcrEngines.Label(OcrEngineKind.SimdPaddle);
     public bool CanUndo { get; set; }
     public bool CanRedo { get; set; }
@@ -229,7 +231,7 @@ internal sealed class AnnotationBar
         {
             new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser" },
             new[] { "undo", "redo" },
-            new[] { "ocr", "translate", "qr", "long", "rec", "gif" },
+            new[] { "ocr", "translate", "qr", "redact", "long", "rec", "gif" },
             new[] { "close", "pin", "save", "copy" }
         };
 
@@ -523,7 +525,7 @@ internal sealed class AnnotationBar
         var groups = new[]
         {
             new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser" },
-            new[] { "ocr", "translate", "qr", "long", "rec", "gif" },
+            new[] { "ocr", "translate", "qr", "redact", "long", "rec", "gif" },
             new[] { "undo", "redo" },
             new[] { "close", "pin", "save", "copy" }
         };
@@ -624,6 +626,7 @@ internal sealed class AnnotationBar
         "rec" => UiText.T("录屏：录制选区为视频"),
         "gif" => UiText.T("录制 GIF 动画"),
         "translate" => UiText.T("截图翻译（默认英语 → 中文）"),
+        "redact" => UiText.T("智能打码：自动识别并遮挡手机号、邮箱、证件号、银行卡与密钥"),
         "copy" => ocrMode ? UiText.T("复制截图") : UiText.T("复制截图（Ctrl+C）"),
         "close" => ocrMode ? UiText.T("取消截图") : UiText.T("取消截图（Esc）"),
         "pin" => UiText.T("贴图（Ctrl+T）"), "save" => UiText.T("另存为（Ctrl+S）"),
@@ -753,6 +756,7 @@ internal sealed class AnnotationBar
                 "text" => Tool == ToolKind.Text,
                 "mosaic" => Tool == ToolKind.Mosaic,
                 "ocr" => OcrMode,
+                "redact" => RedactBusy,
                 "translate" => TranslationMode,
                 "bold" => Bold,
                 "italic" => Italic,
@@ -1114,6 +1118,31 @@ internal sealed class AnnotationBar
                                 g.FillRectangle(brush, box);
                             else
                                 g.DrawRectangle(pen, box.X, box.Y, box.Width, box.Height);
+                        }
+                    }
+                }
+                break;
+
+            case "redact":
+                {
+                    // Shield outline with a 3x2 mosaic grid inside.
+                    var shield = new[]
+                    {
+                        new PointF(cx, cy - 8.5f * s), new PointF(cx + 7 * s, cy - 6 * s),
+                        new PointF(cx + 7 * s, cy), new PointF(cx + 5.5f * s, cy + 3.5f * s),
+                        new PointF(cx + 2.5f * s, cy + 6.5f * s), new PointF(cx, cy + 8 * s),
+                        new PointF(cx - 2.5f * s, cy + 6.5f * s), new PointF(cx - 5.5f * s, cy + 3.5f * s),
+                        new PointF(cx - 7 * s, cy), new PointF(cx - 7 * s, cy - 6 * s)
+                    };
+                    g.DrawPolygon(pen, shield);
+                    var cell = 2.6f * s;
+                    for (var row = 0; row < 2; row++)
+                    {
+                        for (var col = 0; col < 3; col++)
+                        {
+                            var box = new RectangleF(cx - cell * 1.5f + col * cell, cy - cell + row * cell, cell, cell);
+                            if ((row + col) % 2 == 0) g.FillRectangle(brush, box);
+                            else g.DrawRectangle(pen, box.X, box.Y, box.Width, box.Height);
                         }
                     }
                 }

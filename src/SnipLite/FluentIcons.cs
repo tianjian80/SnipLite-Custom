@@ -5,7 +5,7 @@ namespace SnipLite;
 /// <summary>Resolution-independent 24-unit line icons shared by navigation, menus and capture tools.</summary>
 internal static class FluentIcons
 {
-    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy" or "gear" or "mouse" or "layout" or "long" or "video" or "rec" or "gif";
+    public static bool Supports(string id) => id is "rect" or "ellipse" or "arrow" or "pen" or "marker" or "eraser" or "text" or "mosaic" or "ocr" or "redact" or "timer" or "qr" or "translate" or "undo" or "redo" or "close" or "pin" or "save" or "copy" or "gear" or "mouse" or "layout" or "long" or "video" or "rec" or "gif";
 
     public static void Draw(Graphics g, string id, RectangleF bounds, Color color)
     {
@@ -34,6 +34,15 @@ internal static class FluentIcons
                 case "eraser": Lines(new(4, 13), new(13, 4), new(21, 12), new(12, 21), new(8, 21), new(4, 17), new(4, 13)); Line(8, 9, 16, 17); Line(12, 21, 21, 21); break;
                 case "text": Line(4, 5, 20, 5); Line(12, 5, 12, 20); Line(8, 20, 16, 20); break;
                 case "mosaic": Box(4, 4, 16, 16); Line(12, 4, 12, 20); Line(4, 12, 20, 12); break;
+                case "redact":
+                    // Shield outline with a pixelated mosaic inside.
+                    Lines(new(12, 2.5f), new(20, 5.5f), new(20, 12), new(18.5f, 16),
+                          new(15, 19.5f), new(12, 21.5f), new(9, 19.5f), new(5.5f, 16),
+                          new(4, 12), new(4, 5.5f), new(12, 2.5f));
+                    Line(9, 10, 9, 10); Line(12, 10, 12, 10); Line(15, 10, 15, 10);
+                    Line(9, 13, 9, 13); Line(12, 13, 12, 13); Line(15, 13, 15, 13);
+                    break;
+                case "timer": g.DrawEllipse(pen, 4.5f, 5.5f, 15, 15); Line(12, 3, 14, 3); Line(12, 5.5f, 12, 9.5f); Line(12, 13, 15.5f, 13); break;
                 case "ocr": Corners(); Line(7, 8, 17, 8); Line(12, 8, 12, 17); Line(9, 17, 15, 17); break;
                 case "qr": Box(3, 3, 6, 6, 1); Box(15, 3, 6, 6, 1); Box(3, 15, 6, 6, 1); Lines(new(15, 14), new(15, 18), new(19, 18), new(19, 21)); Line(21, 14, 21, 16); Line(14, 21, 16, 21); break;
                 case "translate": Line(3, 5, 15, 5); Line(9, 2, 9, 5); g.DrawArc(pen, 4, 1, 9, 12, 0, 90); Line(6, 8, 12, 14); Lines(new(12, 21), new(17, 10), new(22, 21)); Line(14, 17, 20, 17); break;
