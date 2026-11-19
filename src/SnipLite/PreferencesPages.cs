@@ -916,8 +916,8 @@ internal sealed partial class PreferencesForm
             new[] { "50000 像素", "100000 像素", "无限制" },
             new object[] { 50000, 100000, 0 }, ChooserWidth, true);
 
-        // 20 px of breathing room (6 px row gap + 14 px) separates the two sections.
-        _y += Px(14);
+        // 30 px total gap (6 px row gap + 24 px) matches the 按键 page section rhythm.
+        _y += Px(24);
         TitleCard("延时截图功能", "timer");
 
         var gap = Px(10);
