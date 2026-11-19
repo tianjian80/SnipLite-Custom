@@ -205,9 +205,10 @@ internal sealed class TrayContext : ApplicationContext
 
     private ContextMenuStrip BuildMenu()
     {
-        // Compact tray panel: 9.75pt rows, thin padding and small glyphs.
+        // Compact tray panel: 9.5pt rows, thin padding and small glyphs. The font is
+        // pinned so a large 界面字体 preference never inflates the context menu.
         var menu = SnipMenu.CreateTray(compact: true);
-        menu.Font = new Font(menu.Font.FontFamily, 9.75f);
+        menu.Font = new Font("Microsoft YaHei UI", 9.5f);
         // Entries are added through the per-item flags from 首选项 → 布局 → 托盘菜单.
         void Add(bool visible, string text, Action action, string key = "")
         {
@@ -320,7 +321,7 @@ internal sealed class TrayContext : ApplicationContext
                         }
                         history.DropDown?.Close();
                         menu.Close();
-                        PinImage(entry.Image(), entry.Bounds);
+                        PinImage(entry.Image(), entry.Bounds, exact: true);
                     });
                     history.DropDownItems.Add(new ToolStripControlHost(panel)
                     {
@@ -856,10 +857,24 @@ internal sealed class TrayContext : ApplicationContext
         catch (Exception ex) { AppLog.Write("截图输出失败", ex); Toast.Error(UiText.T("截图输出失败：") + ex.Message); }
         finally { if (!transferred) result.Image.Dispose(); }
     }
-    private void PinImage(Bitmap image, Rectangle? bounds = null, bool stagger = false)
+    private void PinImage(Bitmap image, Rectangle? bounds = null, bool stagger = false, bool exact = false)
     {
-        Point? point = _settings.PinAtCapturePosition && bounds is Rectangle r ? new Point(r.X + r.Width / 2, r.Y + r.Height / 2) : null;
-        var pin = new PinForm(image, point, _settings.PinOpacityPercent, _settings);
+        Point? point;
+        int opacity;
+        if (exact)
+        {
+            // Restoring from 截屏历史: the image is pinned at its own pixel size,
+            // fully opaque and centred on the working area of the current screen.
+            var area = Screen.FromPoint(Cursor.Position).WorkingArea;
+            point = new Point(area.X + area.Width / 2, area.Y + area.Height / 2);
+            opacity = 100;
+        }
+        else
+        {
+            point = _settings.PinAtCapturePosition && bounds is Rectangle r ? new Point(r.X + r.Width / 2, r.Y + r.Height / 2) : null;
+            opacity = _settings.PinOpacityPercent;
+        }
+        var pin = new PinForm(image, point, opacity, _settings);
         if (stagger) pin.ShowBesideExisting(); else pin.Show();
     }
     private void PasteFromClipboard()

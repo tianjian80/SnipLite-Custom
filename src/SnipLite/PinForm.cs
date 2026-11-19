@@ -405,7 +405,9 @@ internal sealed class PinForm : ToolWindow
     }
     private ContextMenuStrip BuildMenu()
     {
-        var menu = SnipMenu.Create(); menu.Font = _settings.CreateInterfaceFont();
+        // Fixed menu font: the pin window itself inherits the large 界面字体, which
+        // must not scale the context menu up with it.
+        var menu = SnipMenu.Create(); menu.Font = new Font("Microsoft YaHei UI", 9.5f);
         ToolStripMenuItem Item(string text, Action action, string key = "") => SnipMenu.Item(text, action, _settings.PinMenuShortcuts ? key : "");
         menu.Items.Add(Item("复制图像", Copy, "Ctrl+C")); menu.Items.Add(Item("另存为…", SaveAs, "Ctrl+S"));
         menu.Items.Add(Item("识别文字", () => _ = RecognizeText())); menu.Items.Add(Item("识别二维码", ScanQr));
