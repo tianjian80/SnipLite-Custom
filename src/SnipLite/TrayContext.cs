@@ -159,6 +159,7 @@ internal sealed class TrayContext : ApplicationContext
     public TrayContext(bool captureOnStart = false, int openPreferencesTab = -1, bool openMenu = false)
     {
         _settings = AppSettings.Load();
+        ThemeManager.Apply(_settings.Skin);
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
         _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = $"{AppInfo.ProductName}{AppInfo.Version}", Visible = !_settings.HideTrayIcon };
         _ = _marshal.Handle;
@@ -528,6 +529,7 @@ internal sealed class TrayContext : ApplicationContext
     }
     private void ApplySettings()
     {
+        ThemeManager.Apply(_settings.Skin);
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
         Toast.Notifications = _settings.ShowToast; AppLog.Level = _settings.LogLevel;
         var icon = TrayIcons.Create(_settings, _recordingIcon); var oldIcon = _tray.Icon; _tray.Icon = icon; oldIcon?.Dispose();

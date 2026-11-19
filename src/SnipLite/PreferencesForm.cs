@@ -179,6 +179,8 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         if (IsDisposed) return;
         AppTheme.Apply(this);
+        BackColor = Chrome;
+        _page.BackColor = Page;
         _searchHost.BackColor = Page;
         _search.Invalidate();
         if (_ready) PrepareTree(_page);   // labels back to opaque card colour
@@ -518,7 +520,7 @@ internal sealed partial class PreferencesForm : ToolWindow
             TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         var footerY = ClientSize.Height - Px(FooterH) + Px(13);
         FluentIcons.Draw(g, "check", new Rectangle(PageRect().X + Px(6), footerY, Px(17), Px(17)), palette.Accent);
-        var themeText = palette.HighContrast ? "跟随 Windows · 高对比度" : palette.Dark ? "跟随 Windows · 深色" : "跟随 Windows · 浅色";
+        var themeText = $"{UiText.T("皮肤", _s.DisplayLanguage)} · {UiText.T(ThemeManager.Current.Name, _s.DisplayLanguage)}";
         TextRenderer.DrawText(g, UiText.T(themeText, _s.DisplayLanguage), Font,
             new Rectangle(PageRect().X + Px(30), footerY - Px(2), Px(260), Px(23)), Muted, TextFormatFlags.VerticalCenter);
     }
@@ -836,7 +838,8 @@ internal sealed partial class PreferencesForm : ToolWindow
     private async void ResetAll()
     {
         var defaults = AppSettings.Reset();
-        if (_selected == 0 && !await ApplyStartupAsync(defaults.StartAsAdministrator, true)) return;
+        var startupVisible = _selected == 1 && _subPages[1] == 0;
+        if (startupVisible && !await ApplyStartupAsync(defaults.StartAsAdministrator, true)) return;
         if (IsDisposed) return;
         foreach (var name in _sectionProperties)
         {

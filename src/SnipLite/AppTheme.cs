@@ -3,20 +3,20 @@ using System.Runtime.InteropServices;
 
 namespace SnipLite;
 
-internal sealed record ThemePalette(bool Dark, bool TaskbarDark, bool HighContrast = false)
+internal sealed record ThemePalette(bool Dark, bool TaskbarDark, bool HighContrast = false, SkinColors? Colors = null)
 {
-    public Color Window => HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(32, 32, 32) : Color.FromArgb(247, 247, 249);
-    public Color Sidebar => HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(27, 27, 29) : Color.FromArgb(240, 241, 244);
-    public Color Card => HighContrast ? SystemColors.Window : Dark ? Color.FromArgb(43, 43, 46) : Color.White;
-    public Color Field => HighContrast ? SystemColors.Window : Dark ? Color.FromArgb(51, 51, 55) : Color.FromArgb(253, 253, 253);
-    public Color Text => HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(245, 245, 245) : Color.FromArgb(32, 32, 34);
-    public Color Muted => HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(184, 184, 190) : Color.FromArgb(100, 100, 108);
-    public Color Border => HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(65, 65, 70) : Color.FromArgb(225, 225, 231);
-    public Color Hover => HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(58, 58, 63) : Color.FromArgb(232, 233, 237);
-    public Color Accent => HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(117, 185, 255) : Color.FromArgb(0, 103, 192);
-    public Color AccentSoft => HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(43, 60, 78) : Color.FromArgb(229, 240, 251);
-    public Color OnAccent => HighContrast ? SystemColors.HighlightText : Dark ? Color.FromArgb(12, 33, 52) : Color.White;
-    public Color Disabled => HighContrast ? SystemColors.GrayText : Dark ? Color.FromArgb(126, 126, 134) : Color.FromArgb(156, 156, 164);
+    public Color Window => Colors is { } c ? c.Window : HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(32, 32, 32) : Color.FromArgb(247, 247, 249);
+    public Color Sidebar => Colors is { } c ? c.Sidebar : HighContrast ? SystemColors.Control : Dark ? Color.FromArgb(27, 27, 29) : Color.FromArgb(240, 241, 244);
+    public Color Card => Colors is { } c ? c.Card : HighContrast ? SystemColors.Window : Dark ? Color.FromArgb(43, 43, 46) : Color.White;
+    public Color Field => Colors is { } c ? c.Field : HighContrast ? SystemColors.Window : Dark ? Color.FromArgb(51, 51, 55) : Color.FromArgb(253, 253, 253);
+    public Color Text => Colors is { } c ? c.Text : HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(245, 245, 245) : Color.FromArgb(32, 32, 34);
+    public Color Muted => Colors is { } c ? c.Muted : HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(184, 184, 190) : Color.FromArgb(100, 100, 108);
+    public Color Border => Colors is { } c ? c.Border : HighContrast ? SystemColors.WindowText : Dark ? Color.FromArgb(65, 65, 70) : Color.FromArgb(225, 225, 231);
+    public Color Hover => Colors is { } c ? c.Hover : HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(58, 58, 63) : Color.FromArgb(232, 233, 237);
+    public Color Accent => Colors is { } c ? c.Accent : HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(117, 185, 255) : Color.FromArgb(0, 103, 192);
+    public Color AccentSoft => Colors is { } c ? c.AccentSoft : HighContrast ? SystemColors.Highlight : Dark ? Color.FromArgb(43, 60, 78) : Color.FromArgb(229, 240, 251);
+    public Color OnAccent => Colors is { } c ? c.OnAccent : HighContrast ? SystemColors.HighlightText : Dark ? Color.FromArgb(12, 33, 52) : Color.White;
+    public Color Disabled => Colors is { } c ? c.Disabled : HighContrast ? SystemColors.GrayText : Dark ? Color.FromArgb(126, 126, 134) : Color.FromArgb(156, 156, 164);
 }
 
 internal static class AppTheme
@@ -48,7 +48,7 @@ internal static class AppTheme
 
     public static void Refresh()
     {
-        var next = _override ?? ReadSystem();
+        var next = _override ?? ThemeManager.Palette();
         if (Current == next) return;
         Current = next;
         // WinForms does not automatically re-evaluate System color mode at runtime.

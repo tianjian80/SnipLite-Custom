@@ -272,51 +272,20 @@ internal sealed partial class PreferencesForm
         paidChooser = MakeChooser(paidLabels, PaidIndex(), ChoosePaid, 0, true, true);
         GridRow("免费翻译", freeChooser, "专业翻译", paidChooser, leftPercent: 50);
         SyncTranslationRows();
-        Section("启动配置与日志", () => { });
-        Value(nameof(_s.StartWithWindows)); Value(nameof(_s.StartAsAdministrator)); Value(nameof(_s.HideTrayIcon));
+        Section("配置与日志", () => { });
         var gap = Px(10);
         var cardWidth = (ContentWidth() - gap) / 2;
         var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
         var column = 0;
 
-        // Two equal cards per row: the four run options fit on two compact lines.
+        // Two equal cards per row: the run options fit on one compact line.
         void Cell(Action<int, int> place)
         {
             place(_labelX + column * (cardWidth + gap), cardWidth);
             if (++column == 2) { column = 0; _y += height + gap; }
         }
         void FlagCell(string label, string name) => Cell((left, width) => CheckCell(left, width, height, label, name));
-        void StartupCell(string label, bool initial, Func<bool, Task<bool>> apply)
-        {
-            Cell((left, width) =>
-            {
-                var card = NewSettingRow(left, width, height);
-                AddRowIcon(card, label);
-                var box = new FluentToggle
-                {
-                    Text = label,
-                    AutoSize = false,
-                    Bounds = new Rectangle(Px(48), Px(6), Math.Max(Px(60), width - Px(62)), height - Px(12)),
-                    BackColor = AppTheme.Current.Card,
-                    ForeColor = Ink,
-                    Checked = initial
-                };
-                box.CheckedChanged += async (_, _) =>
-                {
-                    if (!await apply(box.Checked) && !IsDisposed) ShowTab(_selected);
-                };
-                card.Controls.Add(box);
-            });
-        }
 
-        // Always the highest-privilege logon task; the old HKCU Run value is removed.
-        StartupCell("开机启动", _s.StartAsAdministrator, async value =>
-        {
-            if (!await ApplyStartupAsync(value, true)) return false;
-            Set(nameof(_s.StartAsAdministrator), value);
-            return true;
-        });
-        FlagCell("隐藏托盘图标", nameof(_s.HideTrayIcon));
         FlagCell("自动备份配置文件", nameof(_s.AutoBackup));
         FlagCell("保持快速响应", nameof(_s.KeepResponsive));
         if (column != 0) { column = 0; _y += height + gap; }
@@ -580,7 +549,7 @@ internal sealed partial class PreferencesForm
 
     private void InterfacePage()
     {
-        HintText("界面与图标跟随 Windows 浅色 / 深色模式，切换后即时生效。");
+        HintText("皮肤与图标即时生效；开机启动使用最高权限的登录任务计划。");
         var systemLanguages = new object[] { "zh-Hans", "en-US", "" };
         var systemLanguage = MakeChooser(new[] { "简体中文", "English", "跟随系统" },
             Math.Max(0, Array.IndexOf(systemLanguages, (string)Value(nameof(_s.OcrLanguage)))),
@@ -590,11 +559,30 @@ internal sealed partial class PreferencesForm
         var closeAction = MakeChooser(new[] { "最小化到托盘", "直接关闭" },
             Math.Max(0, Array.IndexOf(closeActions, Value(nameof(_s.CloseButtonAction)))),
             index => Set(nameof(_s.CloseButtonAction), closeActions[index]), 0, true, true);
-        // Two compact cards on the first line, then the font picker spans the full row
-        // so "Microsoft YaHei UI, 13.875" can never be truncated.
+        Value(nameof(_s.StartAsAdministrator)); Value(nameof(_s.HideTrayIcon));
+
+        // First line: startup and tray visibility, two equal cards.
+        var gap = Px(10);
+        var cardWidth = (ContentWidth() - gap) / 2;
+        var height = AdaptiveRowHeight(Math.Max(TextHeight, Px(38)));
+        // Always the highest-privilege logon task; the old HKCU Run value is removed.
+        StartupCard(_labelX, cardWidth, height, "开机启动", _s.StartAsAdministrator, async value =>
+        {
+            if (!await ApplyStartupAsync(value, true)) return false;
+            Set(nameof(_s.StartAsAdministrator), value);
+            return true;
+        });
+        CheckCell(_labelX + cardWidth + gap, cardWidth, height, "隐藏托盘图标", nameof(_s.HideTrayIcon));
+        _y += height + gap;
+
         GridRow("系统语言", systemLanguage, "关闭程序", closeAction, leftPercent: 50);
         fontButton.Width = FillWidth();
         Row("界面字体", fontButton);
+        var skinKeys = ThemeManager.Skins.Select(skin => skin.Key).ToArray();
+        var skinChooser = MakeChooser(ThemeManager.Skins.Select(skin => skin.Name).ToArray(),
+            Math.Max(0, Array.IndexOf(skinKeys, ThemeManager.Normalize((string)Value(nameof(_s.Skin))))),
+            index => Set(nameof(_s.Skin), skinKeys[index]), FillWidth(), true, true);
+        Row("皮肤", skinChooser);
         ColorRow("主题颜色", nameof(_s.AccentArgb));
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
@@ -787,6 +775,27 @@ internal sealed partial class PreferencesForm
             Checked = (bool)Value(name)
         };
         box.CheckedChanged += (_, _) => Set(name, box.Checked);
+        card.Controls.Add(box);
+    }
+
+    /// <summary>Half-width card whose switch awaits the elevated logon-task update.</summary>
+    private void StartupCard(int left, int width, int height, string label, bool initial, Func<bool, Task<bool>> apply)
+    {
+        var card = NewSettingRow(left, width, height);
+        AddRowIcon(card, label);
+        var box = new FluentToggle
+        {
+            Text = label,
+            AutoSize = false,
+            Bounds = new Rectangle(Px(48), Px(6), Math.Max(Px(60), width - Px(62)), height - Px(12)),
+            BackColor = AppTheme.Current.Card,
+            ForeColor = Ink,
+            Checked = initial
+        };
+        box.CheckedChanged += async (_, _) =>
+        {
+            if (!await apply(box.Checked) && !IsDisposed) ShowTab(_selected);
+        };
         card.Controls.Add(box);
     }
 

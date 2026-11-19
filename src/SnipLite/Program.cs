@@ -15,7 +15,9 @@ internal static class Program
             return;
         }
 
-        Localization.LanguageService.Configure(AppSettings.Load().DisplayLanguage);
+        var startupSettings = AppSettings.Load();
+        ThemeManager.Apply(startupSettings.Skin);
+        Localization.LanguageService.Configure(startupSettings.DisplayLanguage);
         using var mutex = new Mutex(false, @"Global\SnipLite.SingleInstance");
         var waitForInstance = args.Contains("--wait-for-instance");
         try

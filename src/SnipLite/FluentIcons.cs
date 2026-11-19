@@ -102,6 +102,7 @@ internal static class FluentIcons
         if (label.Contains("翻译")) return "translate";
         if (label.Contains("识别") || label.Contains("语言")) return "ocr";
         if (label.Contains("字体") || label.Contains("文字") || label.Contains("文件名")) return "text";
+        if (label.Contains("皮肤")) return "palette";
         if (label.Contains("颜色") || label.Contains("界面")) return "palette";
         if (label.Contains("快捷") || label.Contains("按键")) return "keyboard";
         if (label.Contains("文件") || label.Contains("路径") || label.Contains("保存")) return "output";

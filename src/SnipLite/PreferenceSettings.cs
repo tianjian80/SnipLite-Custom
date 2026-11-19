@@ -16,6 +16,8 @@ internal sealed partial class AppSettings
     public bool StartAsAdministrator { get; set; }
     /// <summary>Hide the notification-area icon; hotkeys and a second launch still open the preferences.</summary>
     public bool HideTrayIcon { get; set; }
+    /// <summary>Global skin key; see <see cref="ThemeManager"/> (Light / Dark / Warm / Tech).</summary>
+    public string Skin { get; set; } = ThemeManager.DefaultKey;
     public bool AutoBackup { get; set; } = true;
     public bool KeepResponsive { get; set; } = true;
     public bool EnhancedTrayMenu { get; set; } = true;
@@ -192,6 +194,7 @@ internal sealed partial class AppSettings
     private void NormalizePreferences()
     {
         DisplayLanguage = Localization.LanguageService.NormalizePreference(DisplayLanguage);
+        Skin = ThemeManager.Normalize(Skin);
         if (!Enum.IsDefined(OcrEngine)) OcrEngine = OcrEngineKind.SimdPaddle;
         TranslationSourceLanguage = TranslationLanguages.Normalize(TranslationSourceLanguage, allowAuto: true, "en");
         TranslationTargetLanguage = TranslationLanguages.Normalize(TranslationTargetLanguage, allowAuto: false, "zh-CN");
