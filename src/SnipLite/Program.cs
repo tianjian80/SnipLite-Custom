@@ -5,8 +5,27 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Hook the crash handlers before anything else so a failure in static
+        // initialisation or the very first theme pass is reported, not swallowed.
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => Fatal(e.Exception, "界面线程异常");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Fatal(e.ExceptionObject as Exception, "未处理异常");
+
+        try
+        {
+            Start(args);
+        }
+        catch (Exception ex)
+        {
+            Fatal(ex, "启动异常");
+        }
+    }
+
+    private static void Start(string[] args)
+    {
         ApplicationConfiguration.Initialize();
-        Application.SetColorMode(SystemColorMode.System);
+        // AppTheme.Refresh sets the colour mode once, from the saved skin. Calling
+        // SetColorMode twice during startup aborted older builds.
         AppTheme.Refresh();
 
         if (args.Any(arg => arg.StartsWith("--startup-admin:")))
@@ -33,12 +52,6 @@ internal static class Program
             }
         }
         catch (AbandonedMutexException) { }
-
-        // A capture overlay must never die behind a modal exception dialog;
-        // log it and show a passive toast instead.
-        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => Report(e.Exception);
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => Report(e.ExceptionObject as Exception);
 
         // --capture starts a snip as soon as the message loop runs. It gives
         // other tools (and the test scripts) a way in when F1 belongs to
@@ -79,6 +92,32 @@ internal static class Program
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>Startup or global crash: log the full stack to disk and show it once.</summary>
+    private static void Fatal(Exception? ex, string title)
+    {
+        AppLog.Write(title, ex);
+        var log = Path.Combine(Path.GetTempPath(), "SnipLite", "startup-error.log");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+            File.AppendAllText(log,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title} version={AppInfo.Version} exe={Application.ExecutablePath}\r\n{ex}\r\n\r\n");
+        }
+        catch
+        {
+            // logging must never throw
+        }
+
+        try
+        {
+            MessageBox.Show($"{title}\n\n{ex}\n\n日志：{log}", "SnipLite " + title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch
+        {
+            // Headless run: the log above is the only report.
         }
     }
 

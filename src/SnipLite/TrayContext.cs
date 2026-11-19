@@ -509,6 +509,19 @@ internal sealed class TrayContext : ApplicationContext
     }
     private void ShowPreferences(int tab)
     {
+        try
+        {
+            OpenPreferences(tab);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("无法打开首选项窗口", ex);
+            try { Toast.Error(UiText.T("无法打开首选项，详情见日志。")); } catch { }
+        }
+    }
+
+    private void OpenPreferences(int tab)
+    {
         if (_prefs is { IsDisposed: false })
         {
             if (!_prefs.Visible) _prefs.Show();
@@ -912,10 +925,19 @@ internal sealed class TrayContext : ApplicationContext
     }
     private void RefreshTheme()
     {
-        var old = _tray.Icon;
-        _tray.Icon = TrayIcons.Create(_settings, _recordingIcon);
-        old?.Dispose();
-        _overlay?.Invalidate();
+        if (_trayDisposed) return;
+        try
+        {
+            var old = _tray.Icon;
+            _tray.Icon = TrayIcons.Create(_settings, _recordingIcon);
+            old?.Dispose();
+            _overlay?.Invalidate();
+        }
+        catch (Exception ex)
+        {
+            // A failed repaint must never take the whole application down.
+            AppLog.Write("刷新托盘图标失败", ex);
+        }
     }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();

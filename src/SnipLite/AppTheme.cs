@@ -46,14 +46,41 @@ internal static class AppTheme
         return new ThemePalette(dark, taskbarDark, SystemInformation.HighContrast);
     }
 
+    /// <summary>The built-in light palette; a failed skin lookup must never crash startup.</summary>
+    public static ThemePalette Fallback { get; } = new(false, false);
+
     public static void Refresh()
     {
-        var next = _override ?? ThemeManager.Palette();
+        ThemePalette next;
+        try { next = _override ?? ThemeManager.Palette(); }
+        catch (Exception ex)
+        {
+            AppLog.Write("读取皮肤配色失败，已回退简约浅灰", ex);
+            next = Fallback;
+        }
+
         if (Current == next) return;
+
+        // SetColorMode is only meaningful when light/dark flips. Calling it on every
+        // repaint (or twice during startup) is unnecessary and used to abort the app.
+        var modeChanged = Current.Dark != next.Dark || Current.HighContrast != next.HighContrast;
         Current = next;
-        // WinForms does not automatically re-evaluate System color mode at runtime.
-        Application.SetColorMode(next.Dark && !next.HighContrast ? SystemColorMode.Dark : SystemColorMode.Classic);
-        Changed?.Invoke();
+        if (modeChanged) ApplyColorMode(next);
+        try { Changed?.Invoke(); }
+        catch (Exception ex) { AppLog.Write("主题刷新回调失败", ex); }
+    }
+
+    private static void ApplyColorMode(ThemePalette palette)
+    {
+        try
+        {
+            Application.SetColorMode(palette.Dark && !palette.HighContrast ? SystemColorMode.Dark : SystemColorMode.Classic);
+        }
+        catch (Exception ex)
+        {
+            // Styling still applies; only the native title bar keeps its previous mode.
+            AppLog.Write("系统颜色模式切换失败", ex);
+        }
     }
 
     // Diagnostics exercise both modes without changing the user's Windows preferences.

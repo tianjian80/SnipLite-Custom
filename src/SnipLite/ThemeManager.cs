@@ -60,27 +60,56 @@ internal static class ThemeManager
 
     public static string CurrentKey => _key;
 
-    public static SkinDefinition Current => Find(_key) ?? Skins[0];
+    public static SkinDefinition Current
+    {
+        get
+        {
+            // Painting and search-index building read this on hot paths: never throw,
+            // an unknown key simply resolves to the default skin.
+            try { return Find(_key) ?? Skins[0]; }
+            catch { return Skins[0]; }
+        }
+    }
 
     public static SkinDefinition? Find(string? key) =>
         Skins.FirstOrDefault(skin => string.Equals(skin.Key, key, StringComparison.OrdinalIgnoreCase));
 
-    public static string Normalize(string? key) => Find(key)?.Key ?? DefaultKey;
+    /// <summary>A missing or unknown key (old settings.json) falls back to 简约浅灰.</summary>
+    public static string Normalize(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return DefaultKey;
+        try { return Find(key!)?.Key ?? DefaultKey; }
+        catch { return DefaultKey; }
+    }
 
-    public static string Name(string? key) => (Find(key) ?? Skins[0]).Name;
+    public static string Name(string? key) => Find(Normalize(key))?.Name ?? "简约浅灰";
 
     /// <summary>Switches the global skin; a changed palette raises <see cref="AppTheme.Changed"/>.</summary>
     public static void Apply(string? key)
     {
         _key = Normalize(key);
-        AppTheme.Refresh();
+        try { AppTheme.Refresh(); }
+        catch (Exception ex)
+        {
+            // A skin must never take the whole application down.
+            AppLog.Write("应用皮肤失败", ex);
+            _key = DefaultKey;
+        }
     }
 
     internal static ThemePalette Palette()
     {
-        // Windows high contrast always wins: readability beats styling.
-        if (SystemInformation.HighContrast) return new ThemePalette(false, false, true);
-        var skin = Current;
-        return new ThemePalette(skin.Dark, skin.Dark, false, skin.Colors);
+        try
+        {
+            // Windows high contrast always wins: readability beats styling.
+            if (SystemInformation.HighContrast) return new ThemePalette(false, false, true);
+            var skin = Current;
+            return new ThemePalette(skin.Dark, skin.Dark, false, skin.Colors);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("解析皮肤失败", ex);
+            return AppTheme.Fallback;
+        }
     }
 }
