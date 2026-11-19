@@ -214,7 +214,7 @@ internal static class ThemeManager
     }
 
     /// <summary>Glass tint for controls that sit inside a frosted card.</summary>
-    public static Color GlassTint => Color.FromArgb(105, 255, 255, 255);
+    public static Color GlassTint => Color.FromArgb(115, 255, 255, 255);
     /// <summary>Soft white hairline of an inset glass field.</summary>
     public static Color GlassEdge => Color.FromArgb(185, 255, 255, 255);
 
@@ -224,7 +224,7 @@ internal static class ThemeManager
     /// </summary>
     public static Color GlassField => _wallpaper is null
         ? AppTheme.Current.Field
-        : Blend(Color.FromArgb(105, 255, 255, 255), Blend(Color.FromArgb(185, 255, 255, 255), _wallpaperAverage));
+        : Blend(GlassTint, Blend(Color.FromArgb(185, 255, 255, 255), _wallpaperAverage));
 
     private static ThemePalette WallpaperPalette()
     {
@@ -239,11 +239,11 @@ internal static class ThemeManager
             Over(Color.FromArgb(228, 255, 255, 255)),
             Over(Color.FromArgb(238, 255, 255, 255)),
             Over(Color.FromArgb(150, 205, 213, 223)),
-            Color.FromArgb(30, 35, 42),
-            Color.FromArgb(90, 100, 112),
+            Color.FromArgb(20, 24, 31),
+            Color.FromArgb(72, 80, 90),
             Over(Color.FromArgb(205, 240, 243, 248)),
             accent.Accent, accent.AccentSoft, accent.OnAccent,
-            Over(Color.FromArgb(170, 205, 212, 220)));
+            Color.FromArgb(85, 92, 102));
         return new ThemePalette(false, false, false, colors, _wallpaperVersion);
     }
 

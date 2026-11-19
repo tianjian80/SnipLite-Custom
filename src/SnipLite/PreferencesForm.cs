@@ -1410,7 +1410,7 @@ internal sealed partial class PreferencesForm : ToolWindow
             Maximum = max,
             Value = Math.Clamp(value, min, max),
             Width = Px(width),
-            BackColor = Field,
+            BackColor = ThemeManager.GlassField,
             ForeColor = Ink,
             TextAlign = HorizontalAlignment.Right
         };
@@ -1424,7 +1424,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         Text = value,
         Width = width,
-        BackColor = Field,
+        BackColor = ThemeManager.GlassField,
         ForeColor = Ink,
         BorderStyle = BorderStyle.FixedSingle
     };

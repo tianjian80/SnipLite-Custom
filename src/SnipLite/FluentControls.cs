@@ -236,7 +236,7 @@ internal sealed class FluentButton : Button
     protected override void OnPaint(PaintEventArgs e)
     {
         var p = AppTheme.Current; var s = DeviceDpi / 96f; var g = e.Graphics;
-        var glass = !Segment && GlassPaint.UnderWallpaper(this);
+        var glass = !Segment && !(Tag as string is "color-swatch" or "accent-button") && GlassPaint.UnderWallpaper(this);
         if (glass) GlassPaint.PaintBackdrop(this, g, ClientRectangle);
         else g.Clear(Parent?.BackColor ?? p.Window);
         g.SmoothingMode = SmoothingMode.AntiAlias;
