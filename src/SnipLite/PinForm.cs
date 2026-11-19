@@ -53,10 +53,6 @@ internal sealed class PinForm : ToolWindow
         Font = _settings.CreateInterfaceFont(); _opacity = Math.Clamp(opacityPercent, 10, 100) / 100d; Opacity = _opacity;
         var anchor = screenPoint ?? Win32.CursorPosition();
         _scale = Math.Min(1, _settings.PinMaxSize / (float)Math.Max(image.Width, image.Height));
-        // Oversized images start at 80% of the working area at most, so the pin never
-        // pops up as a full-screen sheet before any manual zoom.
-        var work = Screen.FromPoint(anchor).WorkingArea;
-        _scale = Math.Min(_scale, Math.Min(work.Width * .8f / image.Width, work.Height * .8f / image.Height));
         _windowSize = new Size(Math.Max(1, (int)(image.Width * _scale)), Math.Max(1, (int)(image.Height * _scale)));
         _location = new Point(anchor.X - _windowSize.Width / 2, anchor.Y - _windowSize.Height / 2); ClampIntoVirtualScreen();
         // Final geometry is applied before the window is ever shown; nothing moves or
@@ -187,7 +183,23 @@ internal sealed class PinForm : ToolWindow
     }
     public static void ResetAllScale() { foreach (var pin in Open.ToArray()) pin.Reset(); }
     public static void ResetAllOpacity() { foreach (var pin in Open.ToArray()) { pin._opacity = 1; pin.Opacity = 1; } }
-    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); ApplyLayout(); }
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        // DWMWA_TRANSITIONS_FORCEDISABLED (3): Windows' open/close fade + scale
+        // animation is what produced the translucent flash on the first frame.
+        var disable = 1;
+        try { DwmSetWindowAttribute(Handle, 3, ref disable, sizeof(int)); } catch { }
+        ApplyLayout();
+    }
+
+    /// <summary>No erase: the double-buffered OnPaint draws the image over the whole
+    /// client area, so the window must never flash a background colour first.</summary>
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e); ApplyLayout();
