@@ -885,7 +885,7 @@ internal sealed partial class PreferencesForm : ToolWindow
     private void GridRow(string leftLabel, Control? left, string rightLabel, Control? right,
         int leftLabelWidth = 0, int rightLabelWidth = 0, int leftPercent = 42,
         bool leftFixed = false, bool rightFixed = false,
-        bool leftAnchorRight = false, bool rightAnchorRight = false)
+        bool leftAnchorRight = false, bool rightAnchorRight = false, int leftWidth = 0)
     {
         var gap = Px(10);
         // Left column is mostly short labels (MOV, 25 FPS, 立体声); the right column
@@ -899,13 +899,13 @@ internal sealed partial class PreferencesForm : ToolWindow
         _page.Controls.Add(first);
         _page.Controls.Add(second);
 
-        if (left is not null) FillGridCell(first, leftLabel, left, leftLabelWidth, leftFixed, false, leftAnchorRight);
+        if (left is not null) FillGridCell(first, leftLabel, left, leftLabelWidth, leftFixed, false, leftAnchorRight, leftWidth);
         if (right is not null) FillGridCell(second, rightLabel, right, rightLabelWidth, false, rightFixed, rightAnchorRight);
         _y += height + gap;
     }
 
     private void FillGridCell(Control card, string label, Control control, int labelWidth = 0,
-        bool fixedLayout = false, bool fixedRight = false, bool rightAnchor = false)
+        bool fixedLayout = false, bool fixedRight = false, bool rightAnchor = false, int fixedWidth = 0)
     {
         if (label.Length > 0) AddRowIcon(card, FluentIcons.ForLabel(label));
         var x = Px(48);
@@ -1025,7 +1025,7 @@ internal sealed partial class PreferencesForm : ToolWindow
         var needed = labelWidth > 0
             ? Px(labelWidth)
             : Math.Min(TextRenderer.MeasureText(label, Font).Width + Px(6), Math.Max(Px(56), room - Px(84)));
-        var available = Math.Max(Px(84), room - needed - Px(8));
+        var available = fixedWidth > 0 ? fixedWidth : Math.Max(Px(84), room - needed - Px(8));
         control.Width = available;
         if (control.Height > card.Height - Px(10)) control.Height = Math.Max(Px(28), card.Height - Px(10));
 
@@ -1047,9 +1047,11 @@ internal sealed partial class PreferencesForm : ToolWindow
 
         // Right edge first: a picker capped by MaximumSize still lines up with its
         // neighbours instead of floating away from the card edge.
-        var left = label.Length > 0
-            ? Math.Max(x + labelRect + Px(8), card.Width - Px(12) - control.Width)
-            : x;
+        var left = fixedWidth > 0
+            ? x + labelRect + Px(8)
+            : label.Length > 0
+                ? Math.Max(x + labelRect + Px(8), card.Width - Px(12) - control.Width)
+                : x;
         control.Location = new Point(left, Math.Max(0, (card.Height - control.Height) / 2));
         card.Controls.Add(control);
     }

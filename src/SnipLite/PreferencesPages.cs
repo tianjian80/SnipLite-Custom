@@ -568,9 +568,12 @@ internal sealed partial class PreferencesForm
         var gridWidth = Math.Max(Px(180), (ContentWidth() - gap) * 50 / 100);
         var pickerLeft = Px(48) + Px(pickerLabelW) + Px(8);
         var pickerWidth = gridWidth - Px(48) - Px(12) - Px(pickerLabelW) - Px(8);
+        // Width of the 关闭程序 picker: the right cell pins it 12 px inside the card.
+        var rightCardWidth = ContentWidth() - gridWidth - gap;
+        var closeWidth = Math.Min(Px(190), Math.Max(Px(84), rightCardWidth - Px(12) - Px(40) - Px(8)));
 
         // The font field is centred on the card's midline instead of filling the row.
-        var fontWidth = Math.Min(Px(330), ContentWidth() - Px(LabelW + ControlGap + 16));
+        var fontWidth = Math.Min(Px(420), ContentWidth() - Px(LabelW + ControlGap + 16));
         var fontHeight = AdaptiveRowHeight(Math.Max(TextHeight, fontButton.Height));
         var fontCard = NewSettingRow(fontHeight);
         AddRowIcon(fontCard, FluentIcons.ForLabel("界面字体"));
@@ -581,7 +584,7 @@ internal sealed partial class PreferencesForm
         _y += fontHeight + Px(6);
 
         GridRow("系统语言", systemLanguage, "关闭程序", closeAction,
-            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true);
+            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true, leftWidth: closeWidth);
 
         var skinKeys = ThemeManager.Skins.Select(skin => skin.Key).ToArray();
         var skinChooser = MakeChooser(ThemeManager.Skins.Select(skin => skin.Name).ToArray(),
@@ -596,7 +599,7 @@ internal sealed partial class PreferencesForm
             Set(nameof(_s.AccentArgb), dialog.Color.ToArgb());
         };
         GridRow("皮肤", skinChooser, "托盘图标颜色", accentButton,
-            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true);
+            leftLabelWidth: pickerLabelW, leftPercent: 50, rightAnchorRight: true, leftWidth: closeWidth);
 
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
@@ -621,10 +624,10 @@ internal sealed partial class PreferencesForm
         var trayCard = NewSettingRow(trayHeight);
         AddRowIcon(trayCard, FluentIcons.ForLabel("托盘图标"));
         trayCard.Controls.Add(CardLabel("托盘图标", Px(48), Px(pickerLabelW), trayHeight));
-        // Stretch the picker right up to the card's midline, which is also the gap
-        // between the two cards above.
-        trayChooser.Width = Math.Max(pickerWidth, trayCard.Width / 2 - pickerLeft);
-        trayChooser.Location = new Point(pickerLeft, (trayHeight - trayChooser.Height) / 2);
+        // Centred on the card's midline, mirroring the font field on the first row.
+        var trayWidth = Math.Clamp(Math.Max(closeWidth, Px(240)), Px(120), trayCard.Width - Px(24));
+        trayChooser.Width = trayWidth;
+        trayChooser.Location = new Point((trayCard.Width - trayWidth) / 2, (trayHeight - trayChooser.Height) / 2);
         trayCard.Controls.Add(trayChooser);
         // Pinned to the card's 12 px inner padding so its right edge lines up with
         // the 选择颜色 button in the row above.
