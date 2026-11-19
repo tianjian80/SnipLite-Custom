@@ -312,9 +312,13 @@ internal sealed class RecordingSession
             }
             else
             {
+                // Cancelled: release the encoder, then remove every artefact this run
+                // produced. MP4/MOV records into a ".rec.mp4" temp file and only renames
+                // it on completion, so the temp path has to be removed here as well.
                 writer.Dispose();
                 writer = null;
                 TryDelete(finalPath);
+                if (tempPath is not null) TryDelete(tempPath);
             }
         }
         catch (Exception ex)
@@ -382,9 +386,25 @@ internal sealed class RecordingSession
         return Services.UniqueFilePath(folder, name, extension);
     }
 
+    /// <summary>True once the run was cancelled instead of completed.</summary>
+    public bool Canceled => !_save;
+
     private static void TryDelete(string path)
     {
-        try { if (File.Exists(path)) File.Delete(path); } catch { }
+        // The encoder may still be releasing its handle for a few milliseconds after
+        // Dispose, so retry briefly instead of silently leaving the file behind.
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) { Thread.Sleep(60); }
+            catch (UnauthorizedAccessException) { Thread.Sleep(60); }
+            catch { return; }
+        }
     }
 
     [DllImport("ole32.dll")]

@@ -38,6 +38,8 @@ internal sealed class RecordingForm : ToolWindow
     private string _tipKey = "";
     private bool _closing;
     private bool _stopped;
+    /// <summary>Set when the × / Esc path abandoned the recording; the output is discarded.</summary>
+    private bool _canceled;
     private IntPtr _hook;
     private HookProc? _hookProc;
 
@@ -273,6 +275,7 @@ internal sealed class RecordingForm : ToolWindow
     {
         if (_closing) return;
         _closing = true;
+        if (!save) _canceled = true;
         _stopped = true;
         _timer.Stop();
         _ring?.Close();
@@ -297,9 +300,10 @@ internal sealed class RecordingForm : ToolWindow
             Toast.Show(UiText.T("录制失败：") + session.Error);
             return;
         }
-        if (session.FilePath is null)
+        if (session.FilePath is null || _canceled || session.Canceled)
         {
-            Toast.Show(UiText.T("已取消录制"));
+            // Cancelled: the session already deleted its output. Exit silently — no
+            // toast, no history entry, no clipboard write.
             return;
         }
         var message = (session.LimitReached ? UiText.T("已达到设定时长，已保存：") : UiText.T("已保存："))
