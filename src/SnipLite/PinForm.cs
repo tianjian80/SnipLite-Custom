@@ -188,6 +188,20 @@ internal sealed class PinForm : ToolWindow
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            // Strip every Win32 frame bit: WS_CAPTION | WS_THICKFRAME | WS_BORDER.
+            // Without this the system paints its own white border on the very first
+            // frame of a borderless form, before our double-buffered image appears.
+            cp.Style &= ~(0x00C00000 | 0x00040000 | 0x00800000);
+            cp.ExStyle |= 0x00000080 | 0x00000008; // WS_EX_TOOLWINDOW | WS_EX_TOPMOST
+            return cp;
+        }
+    }
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
@@ -195,6 +209,10 @@ internal sealed class PinForm : ToolWindow
         // animation is what produced the translucent flash on the first frame.
         var disable = 1;
         try { DwmSetWindowAttribute(Handle, 3, ref disable, sizeof(int)); } catch { }
+        // DWMWA_NCRENDERING_POLICY (2) = DWMNCRP_DISABLED (1): the DWM must not
+        // draw the non-client frame or its outer shadow, so no white ring shows.
+        var noNc = 1;
+        try { DwmSetWindowAttribute(Handle, 2, ref noNc, sizeof(int)); } catch { }
         ApplyLayout();
     }
 
