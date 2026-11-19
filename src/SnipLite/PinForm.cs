@@ -33,6 +33,8 @@ internal sealed class PinForm : ToolWindow
     private bool _mouseThrough;
     private bool _suppressContext;
     private int _pinGroup;
+    /// <summary>Pins restored from 截屏历史 must not open the pin context menu.</summary>
+    internal bool DisableContextMenu;
     private PinShadowWindow? _shadow;
     private Size _shadowSize;
     private int _shadowColor;
@@ -386,10 +388,20 @@ internal sealed class PinForm : ToolWindow
         }
         _location.Offset(now.X - _grab.X, now.Y - _grab.Y); _grab = now; ApplyLayout();
     }
-    protected override void OnMouseUp(MouseEventArgs e) { _dragging = false; Capture = false; UpdateShadow(); }
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _dragging = false; Capture = false; UpdateShadow();
+        // A history-restored pin never answers a click with its context menu.
+        if (DisableContextMenu) { _suppressContext = false; }
+    }
     protected override void WndProc(ref Message m)
     {
-        if (m.Msg == 0x007B && _suppressContext) { _suppressContext = false; return; }
+        // WM_CONTEXTMENU: WinForms turns this into the pin menu for either button.
+        if (m.Msg == 0x007B && (DisableContextMenu || _suppressContext))
+        {
+            _suppressContext = false;
+            return;
+        }
         base.WndProc(ref m);
     }
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -514,6 +526,8 @@ internal sealed class PinForm : ToolWindow
         // Fixed menu font: the pin window itself inherits the large 界面字体, which
         // must not scale the context menu up with it.
         var menu = SnipMenu.Create(); menu.Font = new Font("Microsoft YaHei UI", 9.5f);
+        // Read live: the flag is set after construction for history-restored pins.
+        menu.Opening += (_, e) => { if (DisableContextMenu) e.Cancel = true; };
         ToolStripMenuItem Item(string text, Action action, string key = "") => SnipMenu.Item(text, action, _settings.PinMenuShortcuts ? key : "");
         menu.Items.Add(Item("复制图像", Copy, "Ctrl+C")); menu.Items.Add(Item("另存为…", SaveAs, "Ctrl+S"));
         menu.Items.Add(Item("识别文字", () => _ = RecognizeText())); menu.Items.Add(Item("识别二维码", ScanQr));

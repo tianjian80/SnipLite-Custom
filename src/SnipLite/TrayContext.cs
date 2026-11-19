@@ -957,6 +957,8 @@ internal sealed class TrayContext : ApplicationContext
             opacity = _settings.PinOpacityPercent;
         }
         var pin = new PinForm(image, point, opacity, _settings);
+        // Restored from 截屏历史: both mouse buttons must not open the pin menu.
+        if (exact) pin.DisableContextMenu = true;
         if (stagger) pin.ShowBesideExisting(); else pin.Show();
     }
     private void PasteFromClipboard()
