@@ -115,6 +115,8 @@ internal sealed class TrayContext : ApplicationContext
         {
             base.OnMouseLeave(e);
             Cursor = Cursors.Default;
+            // Leaving drops any half-finished press, so a later release can never pin.
+            _pressed = -1;
             if (_hover < 0) return;
             _hover = -1;
             Invalidate();
