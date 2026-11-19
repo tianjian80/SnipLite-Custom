@@ -708,6 +708,9 @@ internal sealed class TrayContext : ApplicationContext
             var path = Services.SaveCaptureFile(image, _settings, DefaultCaptureFolder());
             _history.Add(image, bounds, _settings.HistoryImageLimit, path);
             AppLog.Write($"延时截图：{bounds.Width}×{bounds.Height} → {path}");
+
+            // Shutter flash only after the frame is saved, so the white burst is never captured.
+            new CameraFlashForm(bounds).Play();
             if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
         }
         catch (Exception ex)

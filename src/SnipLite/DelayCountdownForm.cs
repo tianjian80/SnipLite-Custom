@@ -1,18 +1,19 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
 namespace SnipLite;
 
 /// <summary>
-/// Tiny translucent countdown badge shown in the top-right corner before a
-/// delayed capture. Tool window, never in the taskbar, never takes focus, and
-/// Esc anywhere cancels it.
+/// Large glass-style digit in the middle of the screen before a delayed capture.
+/// Painted per pixel through UpdateLayeredWindow so the glyph keeps clean edges
+/// on any desktop background. Never in the taskbar, never takes focus, click
+/// through, and Esc anywhere cancels it.
 /// </summary>
 internal sealed class DelayCountdownForm : ToolWindow
 {
-    private static readonly Color CardFill = Color.FromArgb(0xF4, 0xF9, 0xFF);
-    private static readonly Color CardEdge = Color.FromArgb(0x00, 0x67, 0xC0);
-    private static readonly Color CardInk = Color.FromArgb(0x00, 0x67, 0xC0);
+    private const int LogicalSize = 400;
+    private const float EmSize = 150f;
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private readonly int _total;
@@ -35,11 +36,9 @@ internal sealed class DelayCountdownForm : ToolWindow
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         TopMost = true;
-        DoubleBuffered = true;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = CardFill;
-        Opacity = 0.88;
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                 ControlStyles.UserPaint | ControlStyles.Opaque, true);
 
         _timer.Tick += (_, _) => Tick();
     }
@@ -51,7 +50,9 @@ internal sealed class DelayCountdownForm : ToolWindow
         get
         {
             var cp = base.CreateParams;
-            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE: never steal focus from the desktop
+            cp.ExStyle |= 0x00080000; // WS_EX_LAYERED: per-pixel alpha
+            cp.ExStyle |= 0x00000020; // WS_EX_TRANSPARENT: clicks fall through
+            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE: never steal focus
             return cp;
         }
     }
@@ -60,22 +61,25 @@ internal sealed class DelayCountdownForm : ToolWindow
     {
         base.OnLoad(e);
         _scale = DeviceDpi / 96f;
-        var size = (int)Math.Round(42 * _scale);
+        var size = (int)Math.Round(LogicalSize * _scale);
         Size = new Size(size, size);
-        var area = Screen.PrimaryScreen?.WorkingArea ?? Screen.GetWorkingArea(Cursor.Position);
-        Location = new Point(area.Right - Width - (int)Math.Round(16 * _scale),
-            area.Top + (int)Math.Round(16 * _scale));
-        using var path = Rounded(new Rectangle(0, 0, Width, Height), (int)Math.Round(12 * _scale));
-        Region = new Region(path);
+        CenterOnScreen();
+    }
+
+    private void CenterOnScreen()
+    {
+        var area = Screen.FromPoint(Cursor.Position).Bounds;
+        Location = new Point(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
     }
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        // A global hook lets Esc cancel even though the badge is not activated.
+        // A global hook lets Esc cancel even though the digit is not activated.
         _hook = SetWindowsHookEx(13, _callback, GetModuleHandle(null), 0);
+        CenterOnScreen();
+        Render();
         _timer.Start();
-        Invalidate();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -103,13 +107,13 @@ internal sealed class DelayCountdownForm : ToolWindow
         _remaining--;
         if (_remaining > 0)
         {
-            Invalidate();
+            Render();
             return;
         }
 
         _timer.Stop();
         Hide();
-        // One compositor frame so the badge is gone before the screen is frozen.
+        // One compositor frame so the digit is gone before the screen is frozen.
         var settle = new System.Windows.Forms.Timer { Interval = 90 };
         settle.Tick += (_, _) =>
         {
@@ -121,42 +125,174 @@ internal sealed class DelayCountdownForm : ToolWindow
         settle.Start();
     }
 
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-        g.Clear(CardFill);
+    // Painting is fully manual (layered bitmap); keep the base paint from flashing.
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+    protected override void OnPaint(PaintEventArgs e) { }
 
-        using (var edge = new Pen(CardEdge, Math.Max(1f, _scale)))
+    /// <summary>Draws the glass digit into an ARGB bitmap and pushes it to the layered window.</summary>
+    private void Render()
+    {
+        if (!IsHandleCreated) return;
+
+        var size = new Size(Width, Height);
+        using var bitmap = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(bitmap))
         {
-            var half = edge.Width / 2f;
-            g.DrawPath(edge, Rounded(new RectangleF(half, half, Width - edge.Width, Height - edge.Width),
-                (int)Math.Round(11.5f * _scale)));
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.Clear(Color.Transparent);
+
+            using var path = GlyphPath(_remaining.ToString(), g);
+            if (path is null) return;
+
+            // Soft dark drop shadow underneath keeps the glyph readable on white.
+            using (var shadow = (GraphicsPath)path.Clone())
+            using (var offset = new Matrix())
+            {
+                offset.Translate(0, 10 * _scale);
+                shadow.Transform(offset);
+                using var brush = new SolidBrush(Color.FromArgb(90, 0, 20, 45));
+                g.FillPath(brush, shadow);
+            }
+
+            // Frosted white-to-ice vertical gradient inside the glyph.
+            var bounds = path.GetBounds();
+            using (var fill = new LinearGradientBrush(bounds,
+                       Color.FromArgb(220, 255, 255, 255), Color.FromArgb(120, 220, 238, 255), LinearGradientMode.Vertical))
+            {
+                g.FillPath(fill, path);
+            }
+
+            // Thin bright rim so the glass edge stays crisp on any background.
+            using (var rim = new Pen(Color.FromArgb(235, 255, 255, 255), Math.Max(1.5f, 1.5f * _scale)))
+            {
+                rim.LineJoin = LineJoin.Round;
+                g.DrawPath(rim, path);
+            }
         }
 
-        using var font = new Font("Segoe UI", 14f, FontStyle.Bold, GraphicsUnit.Point);
-        TextRenderer.DrawText(g, _remaining.ToString(), font, ClientRectangle, CardInk,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+        PushLayered(bitmap);
     }
 
-    private static GraphicsPath Rounded(Rectangle bounds, int radius) =>
-        Rounded(new RectangleF(bounds.X, bounds.Y, bounds.Width, bounds.Height), radius);
-
-    private static GraphicsPath Rounded(RectangleF bounds, int radius)
+    private GraphicsPath GlyphPath(string digit, Graphics g)
     {
+        using var family = new FontFamily("Segoe UI");
         var path = new GraphicsPath();
-        var d = Math.Min(radius * 2f, Math.Min(bounds.Width, bounds.Height));
-        path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
-        path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
-        path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
-        path.AddArc(bounds.X, bounds.Bottom - d, d, d, 90, 90);
-        path.CloseFigure();
+
+        var em = EmSize * _scale;
+        path.AddString(digit, family, (int)FontStyle.Bold, em, PointF.Empty, StringFormat.GenericTypographic);
+
+        if (path.PointCount == 0) { path.Dispose(); return null!; }
+
+        // Centre the measured glyph (and leave room for its shadow) in the window.
+        var b = path.GetBounds();
+        using var m = new Matrix();
+        m.Translate((Width - b.Width) / 2f - b.X, (Height - b.Height) / 2f - b.Y - 6 * _scale);
+        path.Transform(m);
         return path;
     }
 
+    private void PushLayered(Bitmap bitmap)
+    {
+        var screenDc = GetDC(IntPtr.Zero);
+        var memDc = CreateCompatibleDC(screenDc);
+        var hBitmap = bitmap.GetHbitmap(Color.FromArgb(0));
+        var old = SelectObject(memDc, hBitmap);
+        try
+        {
+            var dst = new NativePoint { X = Left, Y = Top };
+            var src = new NativePoint();
+            var size = new NativeSize { Cx = Width, Cy = Height };
+            var blend = new BlendFunction { Op = 0, Flags = 0, Alpha = 255, Format = 1 };
+            UpdateLayeredWindow(Handle, screenDc, ref dst, ref size, memDc, ref src, 0, ref blend, 2);
+        }
+        finally
+        {
+            SelectObject(memDc, old);
+            DeleteObject(hBitmap);
+            DeleteDC(memDc);
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X, Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeSize { public int Cx, Cy; }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct BlendFunction { public byte Op, Flags, Alpha, Format; }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst,
+        ref NativePoint dst, ref NativeSize size, IntPtr hdcSrc,
+        ref NativePoint src, int key, ref BlendFunction blend, int flags);
+
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
     [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int id, HookProc callback, IntPtr module, uint threadId);
     [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
     [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string? name);
+}
+
+/// <summary>
+/// White camera-shutter flash played right after a silent capture has been saved,
+/// so the burst of light never lands in the picture itself.
+/// </summary>
+internal sealed class CameraFlashForm : Form
+{
+    private readonly System.Windows.Forms.Timer _fade = new() { Interval = 15 };
+    private double _alpha = 0.85;
+
+    public CameraFlashForm(Rectangle bounds)
+    {
+        ShowInTaskbar = false;
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.Manual;
+        Bounds = bounds;
+        BackColor = Color.White;
+        Opacity = _alpha;
+        TopMost = true;
+        AutoScaleMode = AutoScaleMode.None;
+        SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+
+        _fade.Tick += (_, _) =>
+        {
+            _alpha -= 0.06;
+            if (_alpha <= 0)
+            {
+                _fade.Stop();
+                _fade.Dispose();
+                Close();
+                return;
+            }
+            Opacity = _alpha;
+        };
+    }
+
+    protected override bool ShowWithoutActivation => true;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW
+            cp.ExStyle |= 0x00000020; // WS_EX_TRANSPARENT
+            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
+            return cp;
+        }
+    }
+
+    public void Play()
+    {
+        Show();
+        _fade.Start();
+    }
 }
