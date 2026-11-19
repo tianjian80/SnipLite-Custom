@@ -229,9 +229,9 @@ internal sealed class AnnotationBar
         // remaining buttons pack left with no gap in between.
         var groups = new[]
         {
-            new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser" },
+            new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser", "qr" },
             new[] { "undo", "redo" },
-            new[] { "ocr", "translate", "qr", "redact", "long", "rec", "gif" },
+            new[] { "ocr", "translate", "redact", "long", "rec", "gif" },
             new[] { "close", "pin", "save", "copy" }
         };
 
@@ -524,8 +524,8 @@ internal sealed class AnnotationBar
         // undo/redo, then the finish actions.
         var groups = new[]
         {
-            new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser" },
-            new[] { "ocr", "translate", "qr", "redact", "long", "rec", "gif" },
+            new[] { "rect", "ellipse", "arrow", "pen", "marker", "mosaic", "text", "eraser", "qr" },
+            new[] { "ocr", "translate", "redact", "long", "rec", "gif" },
             new[] { "undo", "redo" },
             new[] { "close", "pin", "save", "copy" }
         };

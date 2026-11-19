@@ -1533,13 +1533,13 @@ internal sealed partial class PreferencesForm
             ("马克笔（H）", nameof(_s.ShowToolMarker), "marker"),
             ("马赛克（M）", nameof(_s.ShowToolMosaic), "mosaic"),
             ("文字（T）", nameof(_s.ShowToolText), "text"),
-            ("橡皮擦（X）", nameof(_s.ShowToolEraser), "eraser"));
+            ("橡皮擦（X）", nameof(_s.ShowToolEraser), "eraser"),
+            ("二维码识别", nameof(_s.ShowToolQr), "qr"));
         Section("辅助识别", () => { });
         GridCheck(
             ("文字识别", nameof(_s.ShowToolOcr), "ocr"),
             ("智能打码", nameof(_s.ShowToolRedact), "redact"),
             ("截图翻译", nameof(_s.ShowToolTranslate), "translate"),
-            ("二维码识别", nameof(_s.ShowToolQr), "qr"),
             ("长截图", nameof(_s.ShowToolLong), "long"),
             ("录屏", nameof(_s.ShowToolRec), "rec"),
             ("录制 GIF", nameof(_s.ShowToolGif), "gif"));
@@ -1574,8 +1574,7 @@ internal sealed partial class PreferencesForm
             ("截屏历史", nameof(_s.TrayItemHistory), "capture"),
 
             ("首选项", nameof(_s.TrayItemPreferences), "gear"),
-            ("关于", nameof(_s.TrayItemAbout), "about"),
-            ("重新启动", nameof(_s.TrayItemRestart), "update"));
+            ("关于", nameof(_s.TrayItemAbout), "about"));
 
         // Same vertical breath as Section() leaves between the toolbar page groups.
         _y += Px(14);
@@ -1584,7 +1583,8 @@ internal sealed partial class PreferencesForm
             ("全屏截图并自动保存", nameof(_s.TrayItemFullSave), "save"),
             ("贴图 / 恢复贴图", nameof(_s.TrayItemPin), "pin"),
             ("隐藏 / 显示所有贴图", nameof(_s.TrayItemTogglePins), "pin"),
-            ("切换到另一贴图分组", nameof(_s.TrayItemSwitchGroup), "layout"));
+            ("切换到另一贴图分组", nameof(_s.TrayItemSwitchGroup), "layout"),
+            ("重新启动", nameof(_s.TrayItemRestart), "update"));
     }
     private static void OpenFile(string path)
     {
