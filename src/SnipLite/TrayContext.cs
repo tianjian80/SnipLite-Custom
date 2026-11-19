@@ -35,6 +35,7 @@ internal sealed class TrayContext : ApplicationContext
         private readonly int _cardWidth;
         private readonly int _cardHeight;
         private readonly Action<CaptureHistory.Entry> _click;
+        private readonly long _shownAt;
         private int _offset;
         private int _hover = -1;
 
@@ -44,6 +45,9 @@ internal sealed class TrayContext : ApplicationContext
             _cardWidth = cardWidth;
             _cardHeight = cardHeight;
             _click = click;
+            // Any mouse activity during the first 150 ms after the popup appears is an
+            // artefact of opening it, never a deliberate choice of a thumbnail.
+            _shownAt = Environment.TickCount64;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                 | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             BackColor = SnipMenuRenderer.Back;
@@ -84,7 +88,8 @@ internal sealed class TrayContext : ApplicationContext
             return index;
         }
 
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+        // Hovering only moves the highlight; it must never restore a picture.
+        protected override void OnMouseEnter(EventArgs e) => base.OnMouseEnter(e);
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
@@ -111,10 +116,13 @@ internal sealed class TrayContext : ApplicationContext
             _offset = next;
             Invalidate();
         }
-        protected override void OnMouseDown(MouseEventArgs e)
+        // Only a real left click restores a picture: MouseClick (not MouseDown) and a
+        // short guard after opening, so opening the popup can never pin anything.
+        protected override void OnMouseClick(MouseEventArgs e)
         {
-            base.OnMouseDown(e);
+            base.OnMouseClick(e);
             if (e.Button != MouseButtons.Left) return;
+            if (Environment.TickCount64 - _shownAt < 150) return;
             var hit = IndexAt(e.Y);
             if (hit >= 0) _click(_entries[hit]);
         }
