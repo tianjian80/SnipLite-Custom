@@ -674,12 +674,7 @@ internal sealed partial class PreferencesForm
             Set(name, dialog.Color.ToArgb());
         };
         card.Controls.Add(button);
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), button.Left - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        card.Controls.Add(CardLabel(label, Px(48), Math.Max(Px(60), button.Left - Px(48) - Px(8)), height));
     }
 
     /// <summary>Half-width card with a right-aligned number field, no unit caption.</summary>
@@ -692,12 +687,7 @@ internal sealed partial class PreferencesForm
         var field = MakeCompactNumber(Convert.ToInt32(Value(name)), min, max, fieldWidth, value => Set(name, value));
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        card.Controls.Add(CardLabel(label, Px(48), Math.Max(Px(60), field.Left - Px(48) - Px(8)), height));
     }
 
     /// <summary>
@@ -837,12 +827,7 @@ internal sealed partial class PreferencesForm
         var field = MakeCompactNumber(Convert.ToInt32(Value(name)), min, max, fieldWidth, value => Set(name, value));
         field.SetBounds(width - Px(14) - field.Width, Math.Max(0, (height - field.Height) / 2), field.Width, field.Height);
         card.Controls.Add(field);
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), field.Left - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        card.Controls.Add(CardLabel(label, Px(48), Math.Max(Px(60), field.Left - Px(48) - Px(8)), height));
     }
 
     private void ActionRow(string label, string action, string exit)
@@ -945,12 +930,7 @@ internal sealed partial class PreferencesForm
             index => Set(nameof(_s.DelayCaptureSeconds), delays[index]), dropWidth, true);
         chooser.SetBounds(cardWidth - Px(12) - dropWidth, Math.Max(0, (height - chooser.Height) / 2), dropWidth, chooser.Height);
         delayCard.Controls.Add(chooser);
-        delayCard.Controls.Add(new Label
-        {
-            Text = "延时时长", AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(14), 0, Math.Max(Px(40), chooser.Left - Px(14) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        delayCard.Controls.Add(CardLabel("延时时长", Px(14), Math.Max(Px(40), chooser.Left - Px(14) - Px(8)), height));
 
         CheckCard(_labelX + cardWidth + gap, cardWidth, height,
             ("显示倒计时", nameof(_s.DelayShowCountdown), "timer"));
@@ -1240,7 +1220,7 @@ internal sealed partial class PreferencesForm
             var box = new CapsuleFrame
             {
                 HoverHighlight = true, Cursor = Cursors.Hand,
-                Padding = new Padding(Px(4), 0, Px(4), 0), Height = Px(30)
+                Padding = new Padding(Px(4), Px(3), Px(4), Px(3)), Height = Px(30)
             };
             box.Controls.Add(text);
             void Hover(bool on) => box.Hovered = on;
@@ -1334,7 +1314,7 @@ internal sealed partial class PreferencesForm
                 var nameLabel = new Label
                 {
                     Text = label, AutoSize = false, AutoEllipsis = true,
-                    Bounds = new Rectangle(Px(14), 0, Px(LabelW - 16), cardHeight),
+                    Bounds = new Rectangle(Px(14), Px(4), Px(LabelW - 16), Math.Max(Px(16), cardHeight - Px(8))),
                     TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
                 };
                 card.Controls.Add(nameLabel);
@@ -1395,7 +1375,7 @@ internal sealed partial class PreferencesForm
             half.Controls.Add(new Label
             {
                 Text = label, AutoSize = false, AutoEllipsis = true,
-                Bounds = new Rectangle(Px(14), 0, Math.Max(Px(40), box.Left - Px(14) - Px(8)), cardHeight),
+                Bounds = new Rectangle(Px(14), Px(4), Math.Max(Px(40), box.Left - Px(14) - Px(8)), Math.Max(Px(16), cardHeight - Px(8))),
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
             });
         }
@@ -1476,7 +1456,7 @@ internal sealed partial class PreferencesForm
             var plus = new Label
             {
                 Text = "+", AutoSize = false, ForeColor = Muted, BackColor = Color.Transparent,
-                Bounds = new Rectangle(mod.Right + (action.Left - mod.Right - Px(18)) / 2, 0, Px(18), height),
+                Bounds = new Rectangle(mod.Right + (action.Left - mod.Right - Px(18)) / 2, Px(4), Px(18), Math.Max(Px(16), height - Px(8))),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             card.Controls.Add(mod);
@@ -1484,12 +1464,7 @@ internal sealed partial class PreferencesForm
             card.Controls.Add(action);
         }
 
-        card.Controls.Add(new Label
-        {
-            Text = label, AutoSize = false, AutoEllipsis = true,
-            Bounds = new Rectangle(Px(48), 0, Math.Max(Px(60), first - Px(48) - Px(8)), height),
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Ink, BackColor = Color.Transparent
-        });
+        card.Controls.Add(CardLabel(label, Px(48), Math.Max(Px(60), first - Px(48) - Px(8)), height));
         _y += height + Px(6);
     }
     private void MousePage()

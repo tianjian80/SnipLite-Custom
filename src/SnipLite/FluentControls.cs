@@ -166,7 +166,8 @@ internal sealed class FluentInputFrame : UserControl
             return;
         }
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using var path = FluentDrawing.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), Px(5));
+        // Inset a full pixel so the 1 px rounded edge stays inside the client area.
+        using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), Px(5));
         using var fill = new SolidBrush(p.Field); e.Graphics.FillPath(fill, path);
         using var edge = new Pen(ContainsFocus ? p.Accent : _hover ? p.Muted : p.Border); e.Graphics.DrawPath(edge, path);
         if (ContainsFocus)
@@ -248,7 +249,7 @@ internal sealed class FluentButton : Button
         var accent = Tag as string is "color-swatch" or "accent-button";
         var onGold = accent && _hover && Enabled;
         var surface = Selected ? p.AccentSoft : _hover ? (accent ? Color.FromArgb(245, 184, 0) : p.Hover) : BackColor;
-        using var path = FluentDrawing.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), 5 * s);
+        using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), 5 * s);
         using var fill = new SolidBrush(surface); g.FillPath(fill, path);
         using var edge = new Pen(Selected ? p.Accent : p.Border); g.DrawPath(edge, path);
         var text = Rectangle.Inflate(ClientRectangle, -(int)(9 * s), 0);
@@ -309,7 +310,7 @@ internal sealed class CapsuleFrame : Panel
         var g = e.Graphics;
         g.Clear(Parent?.BackColor ?? p.Card);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var path = FluentDrawing.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), Px(5));
+        using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), Px(5));
         using var fill = new SolidBrush(HoverHighlight && Hovered ? p.Hover : p.Field);
         g.FillPath(fill, path);
         using var edge = new Pen(p.Border);

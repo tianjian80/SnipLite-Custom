@@ -920,7 +920,7 @@ internal sealed partial class PreferencesForm : ToolWindow
                 AutoSize = false,
                 // Full-height single line: its middle is the card's middle, exactly
                 // like the picker next to it.
-                Bounds = new Rectangle(Px(42), 0, Math.Max(minLabel, ctrlLeft - Px(42)), card.Height),
+                Bounds = new Rectangle(Px(42), Px(4), Math.Max(minLabel, ctrlLeft - Px(42)), Math.Max(Px(16), card.Height - Px(8))),
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Ink,
                 BackColor = Color.Transparent
@@ -949,7 +949,7 @@ internal sealed partial class PreferencesForm : ToolWindow
                 Text = label,
                 AutoSize = false,
                 AutoEllipsis = false,
-                Bounds = new Rectangle(Px(40), 0, Math.Max(Px(56), ctrlLeft - Px(40) - Px(8)), card.Height),
+                Bounds = new Rectangle(Px(40), Px(4), Math.Max(Px(56), ctrlLeft - Px(40) - Px(8)), Math.Max(Px(16), card.Height - Px(8))),
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Ink,
                 BackColor = Color.Transparent
@@ -1072,6 +1072,17 @@ internal sealed partial class PreferencesForm : ToolWindow
     }
 
     private FluentSettingRow NewSettingRow(int height) => NewSettingRow(_labelX, ContentWidth(), height);
+
+    /// <summary>
+    /// Card caption inset 4 px from the card's top and bottom: a full-height label
+    /// paints over the 1 px rounded border and visibly breaks the outline.
+    /// </summary>
+    private Label CardLabel(string text, int left, int width, int height, ContentAlignment align = ContentAlignment.MiddleLeft) => new()
+    {
+        Text = text, AutoSize = false, AutoEllipsis = true,
+        Bounds = new Rectangle(left, Px(4), Math.Max(Px(30), width), Math.Max(Px(16), height - Px(8))),
+        TextAlign = align, ForeColor = Ink, BackColor = Color.Transparent
+    };
 
     /// <summary>A card at an explicit column position, used by the two-column grids.</summary>
     private FluentSettingRow NewSettingRow(int x, int width, int height)
