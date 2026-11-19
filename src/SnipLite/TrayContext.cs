@@ -35,9 +35,11 @@ internal sealed class TrayContext : ApplicationContext
         private readonly int _cardWidth;
         private readonly int _cardHeight;
         private readonly Action<CaptureHistory.Entry> _click;
-        private readonly long _shownAt;
+        private long _shownAt;
         private int _offset;
         private int _hover = -1;
+        private int _pressed = -1;
+        private long _pressedAt;
 
         public HistoryPanel(IReadOnlyList<CaptureHistory.Entry> entries, Size size, int cardWidth, int cardHeight, Action<CaptureHistory.Entry> click)
         {
@@ -90,6 +92,16 @@ internal sealed class TrayContext : ApplicationContext
 
         // Hovering only moves the highlight; it must never restore a picture.
         protected override void OnMouseEnter(EventArgs e) => base.OnMouseEnter(e);
+
+        /// <summary>Restarts the anti-misclick window each time the popup really appears.</summary>
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (!Visible) { _pressed = -1; return; }
+            _shownAt = Environment.TickCount64;
+            _pressed = -1;
+            _hover = -1;
+        }
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
@@ -116,15 +128,26 @@ internal sealed class TrayContext : ApplicationContext
             _offset = next;
             Invalidate();
         }
-        // Only a real left click restores a picture: MouseClick (not MouseDown) and a
-        // short guard after opening, so opening the popup can never pin anything.
-        protected override void OnMouseClick(MouseEventArgs e)
+        // A picture is restored only by a real left press + release on the same thumbnail:
+        // a stray click synthesised while the popup is still appearing cannot pin anything.
+        protected override void OnMouseDown(MouseEventArgs e)
         {
-            base.OnMouseClick(e);
-            if (e.Button != MouseButtons.Left) return;
+            base.OnMouseDown(e);
+            _pressed = e.Button == MouseButtons.Left ? IndexAt(e.Y) : -1;
+            _pressedAt = Environment.TickCount64;
+        }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            var pressed = _pressed;
+            _pressed = -1;
+            if (e.Button != MouseButtons.Left || pressed < 0) return;
+            // Ignore the release that arrives with the popup (first 150 ms) and any
+            // release that lands on a different thumbnail than the one pressed.
+            if (_pressedAt - _shownAt < 150) return;
             if (Environment.TickCount64 - _shownAt < 150) return;
-            var hit = IndexAt(e.Y);
-            if (hit >= 0) _click(_entries[hit]);
+            if (IndexAt(e.Y) != pressed) return;
+            _click(_entries[pressed]);
         }
 
         protected override void OnPaint(PaintEventArgs e)
