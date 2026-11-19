@@ -9,7 +9,8 @@ internal static class HotkeyDefinitions
         ("全屏截图并自动保存", nameof(AppSettings.CustomCaptureHotkey)), ("长截图", nameof(AppSettings.LongCaptureHotkey)), ("录屏", nameof(AppSettings.RecordHotkey)),
         ("录制 GIF", nameof(AppSettings.GifHotkey)), ("贴图", nameof(AppSettings.PinHotkey)),
         ("隐藏 / 显示所有贴图", nameof(AppSettings.TogglePinsHotkey)), ("切换到另一贴图分组", nameof(AppSettings.SwitchGroupHotkey)),
-        ("鼠标穿透开关", nameof(AppSettings.MouseThroughHotkey)), ("文字识别", nameof(AppSettings.OcrHotkey)), ("截图翻译", nameof(AppSettings.TranslationHotkey)), ("二维码识别", nameof(AppSettings.QrHotkey)), ("复制坐标", nameof(AppSettings.CopyCoordinatesHotkey))
+        ("鼠标穿透开关", nameof(AppSettings.MouseThroughHotkey)), ("文字识别", nameof(AppSettings.OcrHotkey)), ("截图翻译", nameof(AppSettings.TranslationHotkey)), ("二维码识别", nameof(AppSettings.QrHotkey)), ("复制坐标", nameof(AppSettings.CopyCoordinatesHotkey)),
+        ("智能打码", nameof(AppSettings.RedactHotkey)), ("延时截图", nameof(AppSettings.DelayCaptureHotkey))
     };
     public const Keys WindowsModifier = (Keys)0x80000;
     public static Keys WithWindowsKey(Keys keys) =>

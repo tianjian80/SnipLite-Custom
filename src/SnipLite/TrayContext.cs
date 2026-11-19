@@ -207,7 +207,7 @@ internal sealed class TrayContext : ApplicationContext
         static string Key(Keys key) => key == Keys.None ? "" : HotkeyDefinitions.Format(key);
 
         Add(_settings.TrayItemSnip, "截屏", () => StartCapture(CaptureMode.Snip), Key(_settings.CaptureHotkey));
-        Add(_settings.TrayItemDelay, "延时截图 (5秒)", () => StartDelayedCapture(5));
+        Add(_settings.TrayItemDelay, "延时截图 (5秒)", () => StartDelayedCapture(5), Key(_settings.DelayCaptureHotkey));
         if (_settings.EnhancedTrayMenu)
         {
             Add(_settings.TrayItemSnipCopy, "截屏并自动复制", () => StartCapture(CaptureMode.Snip, true), Key(_settings.CopyCaptureHotkey));
@@ -541,7 +541,9 @@ internal sealed class TrayContext : ApplicationContext
             [nameof(_settings.MouseThroughHotkey)] = PinForm.ToggleMouseThroughActive,
             [nameof(_settings.TranslationHotkey)] = () => StartCapture(CaptureMode.Translation),
             [nameof(_settings.OcrHotkey)] = () => StartCapture(CaptureMode.Ocr),
-            [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr)
+            [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr),
+            [nameof(_settings.RedactHotkey)] = RedactHotkey,
+            [nameof(_settings.DelayCaptureHotkey)] = () => StartDelayedCapture(5)
         };
         // "截屏并自动复制" registers before the plain capture hotkey: if both were
         // assigned the same key (e.g. F1, which the plain capture owns by default),
@@ -724,14 +726,21 @@ internal sealed class TrayContext : ApplicationContext
         return Path.GetTempPath();
     }
 
-    private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null, bool longCapture = false)
+    /// <summary>Redacts the current selection, or starts a capture that redacts once framed.</summary>
+    private void RedactHotkey()
+    {
+        if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.RequestAutoRedact(); return; }
+        StartCapture(CaptureMode.Snip, autoRedact: true);
+    }
+
+    private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null, bool longCapture = false, bool autoRedact = false)
     {
         if (_overlay is { IsDisposed: false, Visible: true }) { _overlay.Activate(); return; }
         _overlay?.Dispose();
         try
         {
             if (forceCopy) AppLog.Write("截屏并自动复制：打开遮罩，框选松手即复制并退出");
-            var overlay = new CaptureForm(SystemInformation.VirtualScreen, mode, _settings, preset, forceCopy, longCapture); _overlay = overlay;
+            var overlay = new CaptureForm(SystemInformation.VirtualScreen, mode, _settings, preset, forceCopy, longCapture, autoRedact); _overlay = overlay;
             overlay.Done += result =>
             {
                 if (result is null || !result.KeepOpen) if (ReferenceEquals(_overlay, overlay)) _overlay = null;

@@ -92,6 +92,7 @@ internal sealed partial class CaptureForm : ToolWindow
     private readonly Rectangle? _preset;
     /// <summary>"截屏并自动复制": finish (copy and close) as soon as a region is framed.</summary>
     private readonly bool _autoCopy;
+    private bool _autoRedact;
     private readonly bool _longCapture;
     private readonly bool _recordCapture;
     private readonly bool _gifCapture;
@@ -143,10 +144,11 @@ internal sealed partial class CaptureForm : ToolWindow
     /// <summary>Raised the moment an explicit save succeeds, so the tray can record history.</summary>
     public event Action<Bitmap, Rectangle, string>? Saved;
 
-    public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null, bool autoCopy = false, bool longCapture = false)
+    public CaptureForm(Rectangle virtualScreen, CaptureMode mode, AppSettings settings, Rectangle? preset = null, bool autoCopy = false, bool longCapture = false, bool autoRedact = false)
     {
         _virtual = virtualScreen;
         _autoCopy = autoCopy;
+        _autoRedact = autoRedact;
         _longCapture = longCapture;
         _recordCapture = mode == CaptureMode.Record;
         _gifCapture = mode == CaptureMode.Gif;
@@ -936,6 +938,8 @@ internal sealed partial class CaptureForm : ToolWindow
                 return;
             }
 
+            if (_autoRedact && _hasSelection && Crop.Width > 0 && Crop.Height > 0) { _ = SmartRedactAsync(); return; }
+
             if (_hasSelection && _settings.CopyAfterCapture && !_ocrCapture && !_qrCaptureOnly && !_translationCapture)
                 CopySelectionToClipboard();
             if (_translationCapture && _hasSelection && !TranslationVisible) _ = TranslateSelectionAsync();
@@ -1710,6 +1714,14 @@ internal sealed partial class CaptureForm : ToolWindow
                 Invalidate();
             }
         }
+    }
+
+    /// <summary>Runs smart redaction now, or as soon as the user frames a region.</summary>
+    public void RequestAutoRedact()
+    {
+        _autoRedact = true;
+        if (_ocrMode) ExitRecognition();
+        if (_hasSelection) _ = SmartRedactAsync();
     }
 
     /// <summary>

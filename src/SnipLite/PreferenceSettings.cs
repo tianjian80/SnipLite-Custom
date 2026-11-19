@@ -163,6 +163,8 @@ internal sealed partial class AppSettings
     public Keys TranslationHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.T;
     public Keys OcrHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.O;
     public Keys QrHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.Q;
+    public Keys RedactHotkey { get; set; } = Keys.None;
+    public Keys DelayCaptureHotkey { get; set; } = Keys.None;
     /// <summary>Toggles a screen recording at the configured preset resolution.</summary>
     public Keys RecordHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.R;
     /// <summary>Toggles a GIF recording.</summary>
