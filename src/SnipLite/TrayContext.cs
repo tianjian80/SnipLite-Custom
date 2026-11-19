@@ -29,9 +29,8 @@ internal sealed class TrayContext : ApplicationContext
     /// </summary>
     private sealed class HistoryPanel : Control
     {
-        // 2 px symmetric frame around the whole preview and 3 px between pictures.
-        private const int Pad = 2;
-        private const int Gap = 3;
+        private const int Pad = 6;
+        private const int Gap = 6;
         private readonly IReadOnlyList<CaptureHistory.Entry> _entries;
         private readonly int _cardWidth;
         private readonly int _cardHeight;
@@ -168,7 +167,17 @@ internal sealed class TrayContext : ApplicationContext
                 var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
                 var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-                var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
+                // Visible part of this control: the popup may clip it by a few pixels on
+                // the right when it sits against the screen edge, so centre on what the
+                // user can actually see — both side margins then match to the pixel.
+                var visible = ClientSize.Width;
+                if (Parent is ToolStrip strip && strip.ClientSize.Width > 0)
+                    visible = Math.Max(1, Math.Min(visible, strip.ClientSize.Width - Left));
+                var rect = new Rectangle(
+                    Math.Max(0, (visible - width) / 2),
+                    card.Y + (card.Height - height) / 2,
+                    width,
+                    height);
                 // Whole source in pixel units, so no edge (close button / clock) is cut.
                 g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
                 // No card frame: only a hover outline hugging the thumbnail itself,
@@ -317,18 +326,22 @@ internal sealed class TrayContext : ApplicationContext
                     var screen = menu.Bounds.Width > 0
                         ? Screen.FromRectangle(menu.Bounds).WorkingArea
                         : Screen.FromPoint(Cursor.Position).WorkingArea;
-                    // Right limit: the tray menu's real right edge, minus the 4 px frame
-                    // and a 4 px safety gap, so the preview never crosses the screen edge.
-                    var maxRightW = Math.Max(80, screen.Right - menu.Bounds.Right - 8);
+                    var available = menu.Bounds.Width > 0 ? screen.Right - menu.Bounds.Right : 240;
+                    if (menu.Visible && available < 220)
+                    {
+                        menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
+                        available = screen.Right - menu.Bounds.Right;
+                    }
+                    available = Math.Max(160, available);
                     var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-                    var cardWidth = Math.Max(50, Math.Min(requested, maxRightW));
+                    var cardWidth = Math.Max(50, Math.Min(requested, available - 12));
                     var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
-                    // 2 px frame on all four sides, 3 px between pictures.
-                    var panelWidth = cardWidth + 4;
+                    // The popup hugs the thumbnails: 6 px padding on both sides only.
+                    var panelWidth = cardWidth + 12;
                     var entries = _history.Entries;
-                    var contentHeight = 4 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 3;
+                    var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
                     // At most five cards are visible; the rest scroll with the wheel.
-                    var maxHeight = Math.Min(4 + 5 * cardHeight + 4 * 3, screen.Height - 8);
+                    var maxHeight = Math.Min(5 * cardHeight + 36, screen.Height - 16);
                     var height = Math.Min(contentHeight, maxHeight);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
                     var key = $"{signature}@{panelWidth}x{cardHeight}";
@@ -343,9 +356,10 @@ internal sealed class TrayContext : ApplicationContext
                         dropMenu.Size = new Size(panelWidth, 40);
                         return;
                     }
-                    // The hosted canvas owns the whole popup: its own 2 px frame is the
-                    // only border, so no menu strip shows on any side.
-                    var panelHeight = Math.Max(40, height);
+                    // The hosted item must stay a couple of pixels shorter than the
+                    // drop-down: ToolStripDropDownMenu reserves that strip for its own
+                    // border and would otherwise enable its ▲ / ▼ overflow bars.
+                    var panelHeight = Math.Max(60, height - 4);
                     var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), cardWidth, cardHeight, entry =>
                     {
                         // The file may have been deleted after the menu was filled.

@@ -978,9 +978,24 @@ internal sealed partial class CaptureForm : ToolWindow
         }
     }
 
-    // Double-click inside the selection used to copy + save automatically; that easily
-    // fired by accident and produced duplicate history records, so it is gone. Single
-    // clicks, the toolbar buttons and the hotkeys are unchanged.
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        if (_ocrMode || _recognitionBusy) return;
+        if (_bar.Tool == ToolKind.Text || _activeText is not null) return;
+        if (!_hasSelection || _ime != null) return;
+
+        var p = Clamp(CursorToLocal());
+
+        // A double-click on the toolbar is the user cycling the line width (or
+        // picking two colours in a row), not "copy this selection" — committing
+        // here used to close the overlay right after the first real click.
+        if (_bar.HitTest(p) != null) return;
+
+        // Same for the dimmed desktop outside the selection.
+        if (!_selection.Contains(p)) return;
+
+        ExecuteAction(_settings.DoubleClickAction, _settings.DoubleClickExit);
+    }
 
     protected override bool ProcessCmdKey(ref Message m, Keys keyData)
     {
