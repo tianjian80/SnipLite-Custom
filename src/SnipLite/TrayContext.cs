@@ -132,15 +132,19 @@ internal sealed class TrayContext : ApplicationContext
                 if (top + cardHeight < 0) continue;
                 if (top > Height) break;
                 var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
-                using (var canvas = new SolidBrush(Color.FromArgb(245, 245, 245))) g.FillRectangle(canvas, card);
                 var thumb = _entries[index].Thumbnail;
-                var scale = Math.Min((card.Width - 2) / (float)thumb.Width, (card.Height - 2) / (float)thumb.Height);
+                var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
                 var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
                 var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
                 g.DrawImage(thumb, rect);
-                using var border = new Pen(index == _hover ? AppTheme.Current.Accent : Color.FromArgb(208, 208, 208), 1f);
-                g.DrawRectangle(border, card.X, card.Y, card.Width - 1, card.Height - 1);
+                // No card frame: only a hover outline hugging the thumbnail itself,
+                // so no grey rules run across the popup between entries.
+                if (index == _hover)
+                {
+                    using var border = new Pen(AppTheme.Current.Accent, 1f);
+                    g.DrawRectangle(border, rect.X, rect.Y, rect.Width - 1, rect.Height - 1);
+                }
             }
         }
     }
@@ -287,16 +291,18 @@ internal sealed class TrayContext : ApplicationContext
                         available = screen.Right - menu.Bounds.Right;
                     }
                     available = Math.Max(160, available);
-                    var requested = Math.Clamp(_settings.HistoryThumbSize, 30, 300);
-                    var cardWidth = Math.Max(60, Math.Min(requested, available - 12));
-                    var cardHeight = Math.Max(34, (int)Math.Round(cardWidth * 9 / 16.0));
+                    var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
+                    var cardWidth = Math.Max(50, Math.Min(requested, available - 12));
+                    var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
+                    // The popup hugs the thumbnails: 6 px padding on both sides only.
+                    var panelWidth = cardWidth + 12;
                     var entries = _history.Entries;
                     var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
                     // At most five cards are visible; the rest scroll with the wheel.
                     var maxHeight = Math.Min(5 * cardHeight + 36, screen.Height - 16);
                     var height = Math.Min(contentHeight, maxHeight);
                     var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
-                    var key = $"{signature}@{available}x{cardHeight}";
+                    var key = $"{signature}@{panelWidth}x{cardHeight}";
                     if (history.Tag as string == key) return;
                     history.Tag = key;
                     var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
@@ -305,14 +311,14 @@ internal sealed class TrayContext : ApplicationContext
                     if (entries.Count == 0)
                     {
                         history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
-                        dropMenu.Size = new Size(available, 40);
+                        dropMenu.Size = new Size(panelWidth, 40);
                         return;
                     }
                     // The hosted item must stay a couple of pixels shorter than the
                     // drop-down: ToolStripDropDownMenu reserves that strip for its own
                     // border and would otherwise enable its ▲ / ▼ overflow bars.
                     var panelHeight = Math.Max(60, height - 4);
-                    var panel = new HistoryPanel(entries, new Size(available, panelHeight), cardWidth, cardHeight, entry =>
+                    var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), cardWidth, cardHeight, entry =>
                     {
                         // The file may have been deleted after the menu was filled.
                         if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
@@ -329,11 +335,11 @@ internal sealed class TrayContext : ApplicationContext
                     history.DropDownItems.Add(new ToolStripControlHost(panel)
                     {
                         AutoSize = false,
-                        Size = new Size(available, panelHeight),
+                        Size = new Size(panelWidth, panelHeight),
                         Margin = Padding.Empty,
                         Padding = Padding.Empty
                     });
-                    dropMenu.Size = new Size(available, height);
+                    dropMenu.Size = new Size(panelWidth, height);
                 }
                 menu.Opening += (_, _) => FitHistory();
                 // Grey out both history entries when nothing is left: a disabled item

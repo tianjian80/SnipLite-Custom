@@ -5,7 +5,7 @@ namespace SnipLite;
 internal sealed class CaptureHistory
 {
     /// <summary>Longest edge of the cached preview; the menu never loads the full PNG.</summary>
-    private const int ThumbEdge = 256;
+    private const int ThumbEdge = 640;
 
     internal sealed record Entry(byte[] Png, Rectangle Bounds, DateTime Time, Bitmap Thumbnail, string? FilePath = null)
     {

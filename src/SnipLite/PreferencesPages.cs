@@ -605,7 +605,7 @@ internal sealed partial class PreferencesForm
         SliderCard("托盘字体大小", 50, 250, 5, (int)Math.Round((double)Value(nameof(_s.TrayFontSize)) * 10),
             value => $"{value / 10d:0.#} pt",
             value => Set(nameof(_s.TrayFontSize), value / 10d));
-        SliderCard("历史缩略图大小", 30, 300, 5, (int)Value(nameof(_s.HistoryThumbSize)),
+        SliderCard("历史缩略图大小", 50, 600, 5, (int)Value(nameof(_s.HistoryThumbSize)),
             value => value + " px",
             value => Set(nameof(_s.HistoryThumbSize), value));
 
