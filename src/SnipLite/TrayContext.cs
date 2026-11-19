@@ -167,7 +167,17 @@ internal sealed class TrayContext : ApplicationContext
                 var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
                 var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
                 var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-                var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
+                // Visible part of this control: the popup may clip it by a few pixels on
+                // the right when it sits against the screen edge, so centre on what the
+                // user can actually see — both side margins then match to the pixel.
+                var visible = ClientSize.Width;
+                if (Parent is ToolStrip strip && strip.ClientSize.Width > 0)
+                    visible = Math.Max(1, Math.Min(visible, strip.ClientSize.Width - Left));
+                var rect = new Rectangle(
+                    Math.Max(0, (visible - width) / 2),
+                    card.Y + (card.Height - height) / 2,
+                    width,
+                    height);
                 // Whole source in pixel units, so no edge (close button / clock) is cut.
                 g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
                 // No card frame: only a hover outline hugging the thumbnail itself,
