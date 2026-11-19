@@ -549,7 +549,6 @@ internal sealed partial class PreferencesForm
 
     private void InterfacePage()
     {
-        HintText("皮肤与图标即时生效；开机启动使用最高权限的登录任务计划。");
         var systemLanguages = new object[] { "zh-Hans", "en-US", "" };
         var systemLanguage = MakeChooser(new[] { "简体中文", "English", "跟随系统" },
             Math.Max(0, Array.IndexOf(systemLanguages, (string)Value(nameof(_s.OcrLanguage)))),
@@ -581,9 +580,16 @@ internal sealed partial class PreferencesForm
         var skinKeys = ThemeManager.Skins.Select(skin => skin.Key).ToArray();
         var skinChooser = MakeChooser(ThemeManager.Skins.Select(skin => skin.Name).ToArray(),
             Math.Max(0, Array.IndexOf(skinKeys, ThemeManager.Normalize((string)Value(nameof(_s.Skin))))),
-            index => Set(nameof(_s.Skin), skinKeys[index]), FillWidth(), true, true);
-        Row("皮肤", skinChooser);
-        ColorRow("主题颜色", nameof(_s.AccentArgb));
+            index => Set(nameof(_s.Skin), skinKeys[index]), 0, true, true);
+        var accentButton = new FluentButton { Tag = "color-swatch" }; StyleButton(accentButton, "选择颜色");
+        StyleAccent(accentButton);
+        accentButton.Click += (_, _) =>
+        {
+            using var dialog = new ColorDialog { Color = Color.FromArgb((int)Value(nameof(_s.AccentArgb))), FullOpen = true };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            Set(nameof(_s.AccentArgb), dialog.Color.ToArgb());
+        };
+        GridRow("皮肤", skinChooser, "托盘图标颜色", accentButton, leftPercent: 50, rightAnchorRight: true);
         var trayStyle = Value(nameof(_s.TrayIconStyle));
         // The theme pass repaints plain buttons, so tag the picker to keep its accent fill.
         var iconButton = new FluentButton { Tag = "accent-button" }; StyleButton(iconButton, "选择图标文件");
