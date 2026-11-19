@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
 namespace SnipLite;
@@ -32,8 +33,6 @@ internal sealed class PinForm : ToolWindow
     private bool _mouseThrough;
     private bool _suppressContext;
     private int _pinGroup;
-    private int _flashTicks;
-    private readonly System.Windows.Forms.Timer _flashTimer = new() { Interval = 120 };
     private PinShadowWindow? _shadow;
     private Size _shadowSize;
     private int _shadowColor;
@@ -50,8 +49,8 @@ internal sealed class PinForm : ToolWindow
         // the image: no white/black erase frame flashes at the default position.
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
         TopMost = true; DoubleBuffered = true; BackColor = Color.Black; KeyPreview = true; Text = UiText.T("SnipLite 贴图");
-        Font = _settings.CreateInterfaceFont(); _opacity = Math.Clamp(opacityPercent, 10, 100) / 100d; Opacity = _opacity;
-        if (opacityPercent >= 100) Opacity = 1.0;
+        Font = _settings.CreateInterfaceFont(); _opacity = Math.Clamp(opacityPercent, 10, 100) / 100d;
+        if (opacityPercent >= 100) _opacity = 1.0;
         var anchor = screenPoint ?? Win32.CursorPosition();
         _scale = Math.Min(1, _settings.PinMaxSize / (float)Math.Max(image.Width, image.Height));
         _windowSize = new Size(Math.Max(1, (int)(image.Width * _scale)), Math.Max(1, (int)(image.Height * _scale)));
@@ -61,13 +60,6 @@ internal sealed class PinForm : ToolWindow
         Bounds = new Rectangle(_location, _windowSize);
         ContextMenuStrip = BuildMenu(); Open.Add(this);
         if (MouseThroughActive || _settings.MouseThroughEnabled) { MouseThroughActive = true; ApplyMouseThrough(true); }
-        _flashTimer.Tick += (_, _) =>
-        {
-            // Border-only flash: the window itself never changes opacity, so no
-            // translucent transition frame can ever appear.
-            _flashTicks--;
-            Invalidate(); if (_flashTicks <= 0) _flashTimer.Stop();
-        };
         _zoomBadgeTimer.Tick += (_, _) => { _zoomBadgeTimer.Stop(); Invalidate(); };
         VisibleChanged += (_, _) =>
         {
@@ -101,7 +93,7 @@ internal sealed class PinForm : ToolWindow
         _group = _group % 3 + 1;
         foreach (var pin in Open.ToArray())
         {
-            if (pin._pinGroup == _group) { pin.Show(); if (pin._settings.FlashOnGroupSwitch) pin.Flash(); }
+            if (pin._pinGroup == _group) { pin.Show(); }
             else pin.Hide();
         }
         Toast.Show(Localization.LanguageService.Format("贴图分组 {0}", _group));
@@ -184,9 +176,92 @@ internal sealed class PinForm : ToolWindow
         Show();
     }
     public static void ResetAllScale() { foreach (var pin in Open.ToArray()) pin.Reset(); }
-    public static void ResetAllOpacity() { foreach (var pin in Open.ToArray()) { pin._opacity = 1; pin.Opacity = 1; } }
+    public static void ResetAllOpacity() { foreach (var pin in Open.ToArray()) { pin._opacity = 1; pin.CommitLayered(); } }
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    // ---- native layered-window compositing -------------------------------
+    [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct NativeSize { public int Cx, Cy; }
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct BlendFunction { public byte BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat; }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr dstDc, IntPtr dstPoint,
+        ref NativeSize size, IntPtr srcDc, ref NativePoint srcPoint, int colorKey,
+        ref BlendFunction blend, int flags);
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
+
+    /// <summary>
+    /// Pushes the finished picture straight into the DWM compositor as a layered
+    /// window surface. The window never paints through GDI, so there is no first
+    /// frame in which Windows could show a default background or a system frame.
+    /// </summary>
+    private void CommitLayered()
+    {
+        if (!IsHandleCreated || IsDisposed || _windowSize.Width <= 0 || _windowSize.Height <= 0) return;
+        try
+        {
+            var width = _windowSize.Width;
+            var height = _windowSize.Height;
+            using var frame = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(frame))
+            {
+                g.InterpolationMode = _settings.PinSmoothScaling ? InterpolationMode.HighQualityBicubic : InterpolationMode.NearestNeighbor;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
+                g.DrawImage(_image, new Rectangle(0, 0, width, height));
+                if (_zoomBadgeTimer.Enabled)
+                {
+                    var label = $"{_scale:P0}";
+                    var padding = Math.Max(3, DeviceDpi / 24);
+                    var size = TextRenderer.MeasureText(label, Font);
+                    var badge = new Rectangle(padding, padding, size.Width + padding * 2, size.Height + padding);
+                    using var background = new SolidBrush(Color.FromArgb(220, 25, 25, 25));
+                    g.FillRectangle(background, badge);
+                    TextRenderer.DrawText(g, label, Font, badge, Color.White,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                }
+            }
+
+            // Opacity is baked into the alpha channel: form-level Opacity would make
+            // Windows switch to SetLayeredWindowAttributes and discard this surface.
+            using var output = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(output))
+            {
+                g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                var matrix = new ColorMatrix { Matrix33 = (float)_opacity };
+                using var attributes = new ImageAttributes();
+                attributes.SetColorMatrix(matrix);
+                g.DrawImage(frame, new Rectangle(0, 0, width, height), 0, 0, width, height, GraphicsUnit.Pixel, attributes);
+            }
+
+            var screenDc = GetDC(IntPtr.Zero);
+            var memoryDc = CreateCompatibleDC(screenDc);
+            var hBitmap = output.GetHbitmap(Color.FromArgb(0));
+            var previous = SelectObject(memoryDc, hBitmap);
+            try
+            {
+                var size = new NativeSize { Cx = width, Cy = height };
+                var source = new NativePoint();
+                var blend = new BlendFunction { SourceConstantAlpha = 255, AlphaFormat = 1 };
+                // A null destination point keeps the current window position untouched.
+                UpdateLayeredWindow(Handle, IntPtr.Zero, IntPtr.Zero, ref size, memoryDc, ref source, 0, ref blend, 2);
+            }
+            finally
+            {
+                SelectObject(memoryDc, previous);
+                DeleteObject(hBitmap);
+                DeleteDC(memoryDc);
+                ReleaseDC(IntPtr.Zero, screenDc);
+            }
+        }
+        catch (Exception ex) { AppLog.Write("贴图分层窗口提交失败", ex); }
+    }
 
     protected override CreateParams CreateParams
     {
@@ -197,7 +272,8 @@ internal sealed class PinForm : ToolWindow
             // Without this the system paints its own white border on the very first
             // frame of a borderless form, before our double-buffered image appears.
             cp.Style &= ~(0x00C00000 | 0x00040000 | 0x00800000);
-            cp.ExStyle |= 0x00000080 | 0x00000008; // WS_EX_TOOLWINDOW | WS_EX_TOPMOST
+            // WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED
+            cp.ExStyle |= 0x00000080 | 0x00000008 | 0x00080000;
             return cp;
         }
     }
@@ -213,6 +289,8 @@ internal sealed class PinForm : ToolWindow
         // draw the non-client frame or its outer shadow, so no white ring shows.
         var noNc = 1;
         try { DwmSetWindowAttribute(Handle, 2, ref noNc, sizeof(int)); } catch { }
+        // The final picture is submitted before the window is ever mapped.
+        CommitLayered();
         ApplyLayout();
     }
 
@@ -224,22 +302,20 @@ internal sealed class PinForm : ToolWindow
     {
         base.OnShown(e); ApplyLayout();
         if (_settings.ActivateNewPin) Win32.SetForegroundWindow(Handle);
-        if (_settings.FlashNewPin) Flash();
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        Open.Remove(this); _flashTimer.Dispose(); _zoomBadgeTimer.Dispose(); _shadow?.Close(); _shadow?.Dispose();
+        Open.Remove(this); _zoomBadgeTimer.Dispose(); _shadow?.Close(); _shadow?.Dispose();
         if (_historyEntry is not null) _historyEntry.Location = _location;
         _image.Dispose(); base.OnFormClosed(e);
     }
-    private void Flash() { _flashTicks = 6; _flashTimer.Start(); Invalidate(); }
     private void ApplyLayout()
     {
         _scale = Math.Min(_scale, MaxScale);
         _windowSize = new Size(Math.Max(1, (int)Math.Round(_image.Width * _scale)), Math.Max(1, (int)Math.Round(_image.Height * _scale)));
         ClampIntoVirtualScreen();
         Win32.SetWindowPos(Handle, Win32.HWND_TOPMOST, _location.X, _location.Y, _windowSize.Width, _windowSize.Height, Win32.SWP_NOACTIVATE);
-        UpdateShadow(); Invalidate();
+        UpdateShadow(); Invalidate(); CommitLayered();
     }
     private void UpdateShadow()
     {
@@ -269,25 +345,11 @@ internal sealed class PinForm : ToolWindow
         _location.X = Math.Clamp(_location.X, screen.Left, Math.Max(screen.Left, screen.Right - _windowSize.Width));
         _location.Y = Math.Clamp(_location.Y, screen.Top, Math.Max(screen.Top, screen.Bottom - _windowSize.Height));
     }
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        g.InterpolationMode = _settings.PinSmoothScaling ? InterpolationMode.HighQualityBicubic : InterpolationMode.NearestNeighbor;
-        g.PixelOffsetMode = PixelOffsetMode.Half; g.DrawImage(_image, new Rectangle(Point.Empty, _windowSize));
-        if (_zoomBadgeTimer.Enabled)
-        {
-            var label = $"{_scale:P0}";
-            var padding = Math.Max(3, DeviceDpi / 24);
-            var size = TextRenderer.MeasureText(label, Font);
-            var badge = new Rectangle(padding, padding, size.Width + padding * 2, size.Height + padding);
-            using var background = new SolidBrush(Color.FromArgb(220, 25, 25, 25));
-            g.FillRectangle(background, badge);
-            TextRenderer.DrawText(g, label, Font, badge, Color.White,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-        }
-        if (_flashTicks > 0 && _flashTicks % 2 == 0)
-        { using var border = new Pen(_settings.Accent, Math.Max(2, 2 * DeviceDpi / 96f)); g.DrawRectangle(border, 1, 1, Math.Max(1, _windowSize.Width - 2), Math.Max(1, _windowSize.Height - 2)); }
-    }
+    /// <summary>
+    /// Every repaint funnels into the layered surface instead of the window DC, so
+    /// nothing is ever drawn by GDI on screen.
+    /// </summary>
+    protected override void OnPaint(PaintEventArgs e) => CommitLayered();
     private bool Gesture(MouseBinding binding, PointerGesture gesture) => binding.Gesture == gesture && binding.Modifiers == ModifierKeys;
     private bool HandleGesture(PointerGesture gesture)
     {
@@ -335,7 +397,7 @@ internal sealed class PinForm : ToolWindow
         if (ModifierKeys == _settings.PinOpacityModifiers) { AdjustOpacity(Math.Sign(e.Delta)); return; }
         if (_settings.PinWheelZoom && ModifierKeys == _settings.PinZoomModifiers) Zoom(e.Delta > 0 ? 1.1f : 1 / 1.1f);
     }
-    private void AdjustOpacity(int direction) { _opacity = Math.Clamp(_opacity + direction * .1, .1, 1); Opacity = _opacity; }
+    private void AdjustOpacity(int direction) { _opacity = Math.Clamp(_opacity + direction * .1, .1, 1); CommitLayered(); }
     private void Zoom(float factor)
     {
         var previous = _scale; var anchor = _settings.PinZoomAtCursor ? Win32.CursorPosition() : new Point(_location.X + _windowSize.Width / 2, _location.Y + _windowSize.Height / 2);
@@ -460,7 +522,7 @@ internal sealed class PinForm : ToolWindow
         var groups = new ToolStripMenuItem(UiText.T("移动到分组"));
         for (var i = 1; i <= 3; i++) { var group = i; groups.DropDownItems.Add(Item(Localization.LanguageService.Format("分组 {0}", group), () => { _pinGroup = group; if (_pinGroup != _group) Hide(); })); }
         menu.Items.Add(groups); menu.Items.Add(Item("关闭", Close, "Esc")); menu.Items.Add(Item("关闭全部贴图", CloseAll));
-        menu.Items.Add(Item("隐藏 / 显示所有贴图", ToggleAll)); menu.Items.Add(Item("恢复 100% 不透明度", () => { _opacity = 1; Opacity = 1; }));
+        menu.Items.Add(Item("隐藏 / 显示所有贴图", ToggleAll)); menu.Items.Add(Item("恢复 100% 不透明度", () => { _opacity = 1; CommitLayered(); }));
         UiText.Apply(menu, _settings.DisplayLanguage); return menu;
     }
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
