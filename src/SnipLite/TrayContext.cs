@@ -141,6 +141,14 @@ internal sealed class TrayContext : ApplicationContext
                 var history = new ToolStripMenuItem(UiText.T("截屏历史"));
                 history.MouseEnter += (_, _) => ShowHistoryPreview(history);
                 menu.Closed += (_, _) => CloseHistoryPreview();
+                // The preview is a separate top-level window. If Windows still reports a
+                // focus change while the pointer is over the thumbnails, keep the menu
+                // open so the pointer can travel to them and click.
+                menu.Closing += (_, e) =>
+                {
+                    if (e.CloseReason != ToolStripDropDownCloseReason.AppFocusChange) return;
+                    if (_historyPreview is { IsDisposed: false } popup && popup.Bounds.Contains(Cursor.Position)) e.Cancel = true;
+                };
                 menu.Opening += (_, _) => _history.PruneMissing();
                 // Grey out both history entries when nothing is left.
                 menu.Opening += (_, _) =>

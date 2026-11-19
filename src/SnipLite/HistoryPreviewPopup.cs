@@ -47,13 +47,15 @@ internal sealed class HistoryPreviewPopup : Form
         Height = Math.Min(ContentHeight, Math.Max(80, maxHeight));
     }
 
-    /// <summary>No taskbar button and no Alt+Tab entry for the floating preview.</summary>
+    /// <summary>No taskbar button, no Alt+Tab entry and no activation at all.</summary>
     protected override CreateParams CreateParams
     {
         get
         {
             var cp = base.CreateParams;
-            cp.ExStyle |= 0x80;   // WS_EX_TOOLWINDOW
+            // WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST: showing the preview
+            // must never deactivate the open ContextMenuStrip (which would close it).
+            cp.ExStyle |= 0x08000000 | 0x00000080 | 0x00000008;
             return cp;
         }
     }
