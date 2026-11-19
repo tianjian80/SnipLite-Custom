@@ -23,132 +23,11 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ThemeMonitor _themeMonitor = new();
     private readonly Localization.LanguageMonitor _languageMonitor;
     private readonly CaptureHistory _history = new();
-    /// <summary>
-    /// Scrollable thumbnail list for the history dropdown. Cards keep a 16:9 shape,
-    /// the wheel scrolls smoothly and no native scrollbar is shown.
-    /// </summary>
-    private sealed class HistoryPanel : Control
-    {
-        private const int Pad = 6;
-        private const int Gap = 6;
-        private readonly IReadOnlyList<CaptureHistory.Entry> _entries;
-        private readonly int _cardWidth;
-        private readonly int _cardHeight;
-        private readonly Action<CaptureHistory.Entry> _click;
-        private int _offset;
-        private int _hover = -1;
-
-        public HistoryPanel(IReadOnlyList<CaptureHistory.Entry> entries, Size size, int cardWidth, int cardHeight, Action<CaptureHistory.Entry> click)
-        {
-            _entries = entries;
-            _cardWidth = cardWidth;
-            _cardHeight = cardHeight;
-            _click = click;
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
-                | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
-            BackColor = SnipMenuRenderer.Back;
-            Size = size;
-            TabStop = true;
-        }
-
-        private int Stride => CardHeight + Gap;
-        /// <summary>
-        /// Effective card height: the constructor's 16:9 height, capped so the visible
-        /// cards always fit the hosted client area exactly (the drop-down keeps a
-        /// couple of pixels for its own border, which used to trigger ▲ / ▼ bars).
-        /// </summary>
-        private int CardHeight
-        {
-            get
-            {
-                var count = Math.Max(1, Math.Min(_entries.Count, 5));
-                var fit = (Height - Pad * 2 - (count - 1) * Gap) / count;
-                return Math.Min(_cardHeight, Math.Max(24, fit));
-            }
-        }
-        private int ContentHeight
-        {
-            get
-            {
-                var card = CardHeight;
-                return Pad * 2 + _entries.Count * card + Math.Max(0, _entries.Count - 1) * Gap;
-            }
-        }
-
-        private int IndexAt(int y)
-        {
-            y += _offset - Pad;
-            if (y < 0) return -1;
-            var index = y / Stride;
-            if (index >= _entries.Count || y % Stride >= CardHeight) return -1;
-            return index;
-        }
-
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            var hit = IndexAt(e.Y);
-            Cursor = hit >= 0 ? Cursors.Hand : Cursors.Default;
-            if (hit == _hover) return;
-            _hover = hit;
-            Invalidate();
-        }
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-            Cursor = Cursors.Default;
-            if (_hover < 0) return;
-            _hover = -1;
-            Invalidate();
-        }
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            base.OnMouseWheel(e);
-            var max = Math.Max(0, ContentHeight - Height);
-            var next = Math.Clamp(_offset - e.Delta / 2, 0, max);
-            if (next == _offset) return;
-            _offset = next;
-            Invalidate();
-        }
-        protected override void OnMouseDown(MouseEventArgs e)
-        {
-            base.OnMouseDown(e);
-            if (e.Button != MouseButtons.Left) return;
-            var hit = IndexAt(e.Y);
-            if (hit >= 0) _click(_entries[hit]);
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            var g = e.Graphics;
-            g.Clear(BackColor);
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            var cardHeight = CardHeight;
-            for (var index = 0; index < _entries.Count; index++)
-            {
-                var top = Pad + index * Stride - _offset;
-                if (top + cardHeight < 0) continue;
-                if (top > Height) break;
-                var card = new Rectangle(Pad, top, _cardWidth, cardHeight);
-                var thumb = _entries[index].Thumbnail;
-                var scale = Math.Min(card.Width / (float)thumb.Width, card.Height / (float)thumb.Height);
-                var width = Math.Max(1, (int)Math.Round(thumb.Width * scale));
-                var height = Math.Max(1, (int)Math.Round(thumb.Height * scale));
-                var rect = new Rectangle(card.X + (card.Width - width) / 2, card.Y + (card.Height - height) / 2, width, height);
-                // Whole source in pixel units, so no edge (close button / clock) is cut.
-                g.DrawImage(thumb, rect, new Rectangle(0, 0, thumb.Width, thumb.Height), GraphicsUnit.Pixel);
-                // No card frame: only a hover outline hugging the thumbnail itself,
-                // so no grey rules run across the popup between entries.
-                if (index == _hover)
-                {
-                    using var border = new Pen(AppTheme.Current.Accent, 1f);
-                    g.DrawRectangle(border, rect.X, rect.Y, rect.Width - 1, rect.Height - 1);
-                }
-            }
-        }
-    }
+    /// <summary>Borderless floating thumbnail list shown right of the tray menu.</summary>
+    private HistoryPreviewPopup? _historyPreview;
+    private ToolStripMenuItem? _historyItem;
+    /// <summary>Closes the preview once the pointer leaves both the item and the popup.</summary>
+    private readonly System.Windows.Forms.Timer _historyWatch = new() { Interval = 120 };
     private CaptureForm? _overlay;
     private PreferencesForm? _prefs;
     private bool _editingHotkey;
@@ -183,6 +62,10 @@ internal sealed class TrayContext : ApplicationContext
         // path started or stopped the recording (card, hotkey, duration limit, cancel).
         _recordWatch.Tick += (_, _) => SyncRecordingIcon();
         _recordWatch.Start();
+        // The preview floats beside the menu, so it must disappear as soon as the
+        // pointer leaves both the history item and the popup itself.
+        _historyWatch.Tick += (_, _) => SyncHistoryPreview();
+        _historyWatch.Start();
         Application.ApplicationExit += (_, _) => DisposeTrayIcon();
         AppTheme.Changed += RefreshTheme;
         // The menu is shown manually so it can always open towards the right of
@@ -253,122 +136,18 @@ internal sealed class TrayContext : ApplicationContext
             ToolStripMenuItem? clearHistory = null;
             if (_settings.TrayItemHistory)
             {
-                var history = new ToolStripMenuItem(UiText.T("截屏历史"))
-                {
-                    // Always unfold to the right of the tray panel.
-                    DropDownDirection = ToolStripDropDownDirection.Right
-                };
-                if (history.DropDown is ToolStripDropDownMenu drop)
-                {
-                    // The hosted panel owns padding, painting and scrolling.
-                    drop.AutoSize = false;
-                    drop.ShowImageMargin = false;
-                    drop.ShowCheckMargin = false;
-                    drop.Padding = Padding.Empty;
-                    drop.Font = menu.Font;
-                    drop.Renderer = menu.Renderer;
-                    // The thumbnail popup is a plain drop-down, not a Form: strip its
-                    // taskbar button at the window level as soon as it exists.
-                    drop.HandleCreated += (_, _) => ToolWindow.HideTaskbarTab(drop.Handle);
-                    // WinForms adds ▲ / ▼ overflow strips when the hosted item is even a
-                    // pixel taller than the display rectangle. Hide them: the panel has
-                    // its own wheel scrolling, and the bars clip the first/last card.
-                    drop.Layout += (_, _) => HideScrollButtons(drop);
-                }
-                // Size the column to the real gap between the open tray menu and the
-                // right screen edge; the panel scrolls instead of growing off-screen.
-                void FitHistory()
-                {
-                    // Files deleted outside the app disappear from the list before it opens.
-                    _history.PruneMissing();
-                    var dropMenu = (ToolStripDropDownMenu)history.DropDown!;
-                    var screen = menu.Bounds.Width > 0
-                        ? Screen.FromRectangle(menu.Bounds).WorkingArea
-                        : Screen.FromPoint(Cursor.Position).WorkingArea;
-                    var available = menu.Bounds.Width > 0 ? screen.Right - menu.Bounds.Right : 240;
-                    if (menu.Visible && available < 220)
-                    {
-                        menu.Left = Math.Max(screen.Left, screen.Right - 240 - menu.Width);
-                        available = screen.Right - menu.Bounds.Right;
-                    }
-                    available = Math.Max(160, available);
-                    var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
-                    var cardWidth = Math.Max(50, Math.Min(requested, available - 12));
-                    var cardHeight = Math.Max(30, (int)Math.Round(cardWidth * 9 / 16.0));
-                    // The popup hugs the thumbnails: 6 px padding on both sides only.
-                    var panelWidth = cardWidth + 12;
-                    var entries = _history.Entries;
-                    var contentHeight = 12 + entries.Count * cardHeight + Math.Max(0, entries.Count - 1) * 6;
-                    // At most five cards are visible; the rest scroll with the wheel.
-                    var maxHeight = Math.Min(5 * cardHeight + 36, screen.Height - 16);
-                    var height = Math.Min(contentHeight, maxHeight);
-                    var signature = string.Join('|', entries.Select(entry => entry.Time.Ticks));
-                    var key = $"{signature}@{panelWidth}x{cardHeight}";
-                    if (history.Tag as string == key) return;
-                    history.Tag = key;
-                    var stale = history.DropDownItems.Cast<ToolStripItem>().ToArray();
-                    history.DropDownItems.Clear();
-                    foreach (var item in stale) item.Dispose();
-                    if (entries.Count == 0)
-                    {
-                        history.DropDownItems.Add(new ToolStripMenuItem(UiText.T("暂无截屏历史")) { Enabled = false });
-                        dropMenu.Size = new Size(panelWidth, 40);
-                        return;
-                    }
-                    // The hosted item must stay a couple of pixels shorter than the
-                    // drop-down: ToolStripDropDownMenu reserves that strip for its own
-                    // border and would otherwise enable its ▲ / ▼ overflow bars.
-                    var panelHeight = Math.Max(60, height - 4);
-                    var panel = new HistoryPanel(entries, new Size(panelWidth, panelHeight), cardWidth, cardHeight, entry =>
-                    {
-                        // The file may have been deleted after the menu was filled.
-                        if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
-                        {
-                            _history.Remove(entry);
-                            history.DropDown?.Close();
-                            menu.Close();
-                            return;
-                        }
-                        history.DropDown?.Close();
-                        menu.Close();
-                        PinImage(entry.Image(), entry.Bounds, exact: true);
-                    });
-                    history.DropDownItems.Add(new ToolStripControlHost(panel)
-                    {
-                        AutoSize = false,
-                        Size = new Size(panelWidth, panelHeight),
-                        Margin = Padding.Empty,
-                        Padding = Padding.Empty
-                    });
-                    dropMenu.Size = new Size(panelWidth, height);
-                }
-                menu.Opening += (_, _) => FitHistory();
-                // Grey out both history entries when nothing is left: a disabled item
-                // never opens its drop-down, so no empty box / stray arrow appears.
+                // No drop-down at all: hovering the item opens a borderless floating
+                // thumbnail window, so there is no white frame and no automatic flip.
+                var history = new ToolStripMenuItem(UiText.T("截屏历史"));
+                history.MouseEnter += (_, _) => ShowHistoryPreview(history);
+                menu.Closed += (_, _) => CloseHistoryPreview();
+                menu.Opening += (_, _) => _history.PruneMissing();
+                // Grey out both history entries when nothing is left.
                 menu.Opening += (_, _) =>
                 {
                     var any = _history.Entries.Count > 0;
                     history.Enabled = any;
                     if (clearHistory is not null) clearHistory.Enabled = any;
-                };
-                // Re-check right after showing: the real menu bounds and screen gap are
-                // known then, so the submenu always ends flush with the screen edge.
-                history.DropDownOpening += (_, _) =>
-                {
-                    FitHistory();
-                    if (_history.Entries.Count == 0) history.Enabled = false;
-                };
-                // Bottom-align the panel with the tray menu (it grows upwards) and keep
-                // its right edge exactly on the screen edge.
-                history.DropDownOpened += (_, _) =>
-                {
-                    var dropDown = history.DropDown;
-                    if (dropDown is null) return;
-                    ToolWindow.HideTaskbarTab(dropDown.Handle);
-                    HideScrollButtons(dropDown);
-                    var screen = Screen.FromRectangle(menu.Bounds).WorkingArea;
-                    var top = Math.Max(screen.Top, menu.Bounds.Bottom - dropDown.Height);
-                    dropDown.Location = new Point(menu.Bounds.Right, top);
                 };
                 menu.Items.Add(history);
             }
@@ -395,77 +174,71 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Hides the internal ▲ / ▼ overflow strips that a drop-down creates when its
-    /// hosted item is a pixel taller than the display rectangle. Their items are
-    /// private, so they are located through the type hierarchy. The hosted panel
-    /// keeps handling the mouse wheel itself.
+    /// Opens the floating thumbnail list to the right of the open tray menu. The width
+    /// is capped by both the slider and the room left before the screen edge, so the
+    /// popup never covers the menu, never flips left and never crops a picture.
     /// </summary>
-    private static void HideScrollButtons(ToolStripDropDown drop)
+    private void ShowHistoryPreview(ToolStripMenuItem item)
     {
-        try
+        _history.PruneMissing();
+        var entries = _history.Entries;
+        var menu = _trayMenu;
+        if (entries.Count == 0 || menu is null || !menu.Visible) return;
+        var bounds = menu.Bounds;
+        if (bounds.Width <= 0) return;
+        CloseHistoryPreview();
+        var screen = Screen.FromPoint(bounds.Location).WorkingArea;
+        var menuRight = bounds.Right;
+        var maxRightW = Math.Max(80, screen.Right - menuRight - 4);
+        var requested = Math.Clamp(_settings.HistoryThumbSize, 50, 600);
+        var finalW = Math.Min(requested, maxRightW);
+        var popup = new HistoryPreviewPopup(entries, finalW, screen.Height - 16, entry =>
         {
-            SetPrivate(drop, "RequiresScrollButtons", false);
-            foreach (var name in new[] { "UpScrollButton", "DownScrollButton" })
+            CloseHistoryPreview();
+            menu.Close();
+            // The file may have been deleted after the list was filled.
+            if (entry.FilePath is { Length: > 0 } path && !File.Exists(path))
             {
-                switch (GetPrivate(drop, name))
-                {
-                    case ToolStripItem item:
-                        item.Visible = false;
-                        item.Available = false;
-                        item.Height = 0;
-                        break;
-                    case Control control:
-                        control.Visible = false;
-                        control.Height = 0;
-                        break;
-                }
-            }
-        }
-        catch
-        {
-            // Purely cosmetic: never let a layout quirk break the tray menu.
-        }
-    }
-
-    private static object? GetPrivate(object target, string name)
-    {
-        for (var type = target.GetType(); type is not null; type = type.BaseType)
-        {
-            const System.Reflection.BindingFlags Flags =
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.Public |
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.DeclaredOnly;
-            var property = type.GetProperty(name, Flags);
-            if (property is not null) return property.GetValue(target);
-            var field = type.GetField(name, Flags);
-            if (field is not null) return field.GetValue(target);
-        }
-        return null;
-    }
-
-    private static void SetPrivate(object target, string name, object value)
-    {
-        for (var type = target.GetType(); type is not null; type = type.BaseType)
-        {
-            const System.Reflection.BindingFlags Flags =
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.Public |
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.DeclaredOnly;
-            var property = type.GetProperty(name, Flags);
-            if (property is { CanWrite: true })
-            {
-                property.SetValue(target, value);
+                _history.Remove(entry);
                 return;
             }
-            var field = type.GetField(name, Flags);
-            if (field is not null)
-            {
-                field.SetValue(target, value);
-                return;
-            }
+            PinImage(entry.Image(), entry.Bounds, exact: true);
+        });
+        var top = bounds.Bottom - popup.Height;
+        top = Math.Max(screen.Top, Math.Min(top, screen.Bottom - popup.Height));
+        popup.Location = new Point(menuRight, top);
+        popup.FormClosed += (_, _) =>
+        {
+            if (!ReferenceEquals(_historyPreview, popup)) return;
+            _historyPreview = null;
+            _historyItem = null;
+        };
+        _historyItem = item;
+        _historyPreview = popup;
+        popup.Show();
+        ToolWindow.HideTaskbarTab(popup.Handle);
+    }
+
+    private void CloseHistoryPreview()
+    {
+        _historyItem = null;
+        var popup = _historyPreview;
+        _historyPreview = null;
+        if (popup is not null && !popup.IsDisposed) popup.Close();
+    }
+
+    /// <summary>Closes the preview when the pointer is over neither the item nor the popup.</summary>
+    private void SyncHistoryPreview()
+    {
+        if (_historyPreview is null) return;
+        var cursor = Cursor.Position;
+        if (_historyPreview.Bounds.Contains(cursor)) return;
+        if (_historyItem is { } item && _trayMenu is { } menu && menu.Visible)
+        {
+            var itemBounds = new Rectangle(menu.Left + item.Bounds.X, menu.Top + item.Bounds.Y, item.Bounds.Width, item.Bounds.Height);
+            if (itemBounds.Contains(cursor)) return;
         }
+        CloseHistoryPreview();
     }
 
     /// <summary>Drops separators left dangling when the items around them are hidden.</summary>
@@ -970,6 +743,9 @@ internal sealed class TrayContext : ApplicationContext
         _trayDisposed = true;
         _recordWatch.Stop();
         _recordWatch.Dispose();
+        _historyWatch.Stop();
+        _historyWatch.Dispose();
+        CloseHistoryPreview();
         var icon = _tray.Icon;
         _tray.Visible = false;
         _tray.Dispose();
