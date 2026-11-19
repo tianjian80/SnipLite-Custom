@@ -156,7 +156,7 @@ internal sealed class TrayContext : ApplicationContext
     {
         _settings = AppSettings.Load();
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
-        _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = "SnipLite", Visible = true };
+        _tray = new NotifyIcon { Icon = TrayIcons.Create(_settings), Text = $"{AppInfo.ProductName}{AppInfo.Version}", Visible = true };
         // Watching the shared session keeps the red icon correct no matter which code
         // path started or stopped the recording (card, hotkey, duration limit, cancel).
         _recordWatch.Tick += (_, _) => SyncRecordingIcon();
@@ -505,8 +505,8 @@ internal sealed class TrayContext : ApplicationContext
         Localization.LanguageService.Configure(_settings.DisplayLanguage);
         Toast.Notifications = _settings.ShowToast; AppLog.Level = _settings.LogLevel;
         var icon = TrayIcons.Create(_settings, _recordingIcon); var oldIcon = _tray.Icon; _tray.Icon = icon; oldIcon?.Dispose();
-        var tip = Localization.LanguageService.Format("SnipLite {0} | {1} 截图 | {2} 贴图", AppInfo.Version, HotkeyDefinitions.Format(_settings.CaptureHotkey), HotkeyDefinitions.Format(_settings.PinHotkey));
-        _tray.Text = tip[..Math.Min(tip.Length, 63)];
+        // Tooltip is just the product name and version; hotkeys live in the menu.
+        _tray.Text = $"{AppInfo.ProductName}{AppInfo.Version}";
         var signature = $"{_settings.EnhancedTrayMenu}|{Localization.LanguageService.CurrentLanguage}|{_settings.InterfaceFont}|{_settings.InterfaceFontSize}|" + string.Join(',', HotkeyDefinitions.Items.Select(item => typeof(AppSettings).GetProperty(item.Name)!.GetValue(_settings)))
             + "|" + string.Join(',', typeof(AppSettings).GetProperties().Where(p => p.Name.StartsWith("TrayItem", StringComparison.Ordinal)).OrderBy(p => p.Name).Select(p => p.GetValue(_settings)));
         if (_menuSignature != signature)
