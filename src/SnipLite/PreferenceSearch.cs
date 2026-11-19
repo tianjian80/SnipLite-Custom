@@ -355,7 +355,6 @@ internal sealed class SearchBox : Control
     private readonly TextBox _input = new()
     {
         BorderStyle = BorderStyle.None,
-        PlaceholderText = "搜索设置项...",
         AutoSize = false
     };
     private bool _hot;
@@ -410,8 +409,8 @@ internal sealed class SearchBox : Control
         LayoutInput();
     }
 
-    private void LayoutInput() => _input.Bounds = new Rectangle(Px(30), Px(7),
-        Math.Max(10, Width - Px(58)), Math.Max(10, Height - Px(14)));
+    private void LayoutInput() => _input.Bounds = new Rectangle(Px(30), Px(6),
+        Math.Max(10, Width - Px(58)), Math.Max(10, Height - Px(12)));
 
     private int Px(int value) => (int)Math.Round(value * (DeviceDpi / 96f));
 
@@ -438,7 +437,7 @@ internal sealed class SearchBox : Control
         FocusInput();
     }
 
-    private Rectangle ClearBounds() => new(Width - Px(26), Px(6), Px(20), Height - Px(12));
+    private Rectangle ClearBounds() => new(Width - Px(28), Px(8), Px(20), Height - Px(16));
 
     protected override void OnPaint(PaintEventArgs e)
     {

@@ -331,12 +331,13 @@ internal sealed partial class PreferencesForm : ToolWindow
     {
         _page.Bounds = PageRect();
 
+        // Right edge matches the card column (page padding + reserved scrollbar).
         var area = PageRect();
         _search.Bounds = new Rectangle(
-            area.Right - Px(PagePad) - Px(232),
-            Px(20) + (Px(44) - Px(32)) / 2,
+            area.Right - Px(PagePad) - Px(SystemInformation.VerticalScrollBarWidth) - Px(232),
+            Px(20) + (Px(44) - Px(38)) / 2,
             Px(232),
-            Px(32));
+            Px(38));
         _searchHost.Bounds = area;
 
         var footer = ClientSize.Height - Px(FooterH);
