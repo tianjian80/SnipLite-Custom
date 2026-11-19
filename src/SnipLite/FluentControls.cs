@@ -355,25 +355,33 @@ internal sealed class FluentToggle : CheckBox
     }
 }
 
+/// <summary>Lets a translucent card paint the wallpaper slice that sits beneath it.</summary>
+internal interface IWallpaperBackdrop
+{
+    void PaintWallpaperFor(Graphics g, Rectangle clip, Point childInPage);
+}
+
 internal sealed class FluentSettingRow : Panel
 {
     public FluentSettingRow()
     {
         DoubleBuffered = true; ResizeRedraw = true; BackColor = AppTheme.Current.Card;
-        // With a wallpaper the card lets the parent paint behind its rounded corners.
-        SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer |
+                 ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
     }
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         var s = DeviceDpi / 96f; var p = AppTheme.Current;
+        var glass = ThemeManager.HasWallpaper && Parent is IWallpaperBackdrop;
         // Inset a full pixel for both fill and stroke so the 1px border is never
         // clipped by the card's own edge, even when siblings sit right above it.
-        // Transparent BackColor on a double-buffered panel paints black, so the
-        // card clears with the page colour and draws its own frosted fill.
-        e.Graphics.Clear(Parent?.BackColor ?? p.Window);
+        if (glass) ((IWallpaperBackdrop)Parent!).PaintWallpaperFor(e.Graphics, ClientRectangle, Location);
+        else e.Graphics.Clear(Parent?.BackColor ?? p.Window);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), 7 * s);
-        using var fill = new SolidBrush(p.Card); e.Graphics.FillPath(fill, path);
-        using var border = new Pen(p.Border); e.Graphics.DrawPath(border, path);
+        using var fill = new SolidBrush(glass ? Color.FromArgb(185, 255, 255, 255) : p.Card);
+        e.Graphics.FillPath(fill, path);
+        using var border = new Pen(glass ? Color.FromArgb(210, 255, 255, 255) : p.Border);
+        e.Graphics.DrawPath(border, path);
     }
 }
