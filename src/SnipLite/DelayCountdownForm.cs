@@ -13,7 +13,7 @@ namespace SnipLite;
 internal sealed class DelayCountdownForm : ToolWindow
 {
     private const int LogicalSize = 400;
-    private const float EmSize = 150f;
+    private const float EmSize = 170f;
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private readonly int _total;
@@ -129,7 +129,11 @@ internal sealed class DelayCountdownForm : ToolWindow
     protected override void OnPaintBackground(PaintEventArgs e) { }
     protected override void OnPaint(PaintEventArgs e) { }
 
-    /// <summary>Draws the glass digit into an ARGB bitmap and pushes it to the layered window.</summary>
+    /// <summary>
+    /// Draws the neon / jelly-glass digit into an ARGB bitmap and pushes it to the
+    /// layered window. Four stacked passes: outer neon glow, translucent glass
+    /// body, inner highlights, then a sharp neon tube rim.
+    /// </summary>
     private void Render()
     {
         if (!IsHandleCreated) return;
@@ -142,29 +146,74 @@ internal sealed class DelayCountdownForm : ToolWindow
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.Clear(Color.Transparent);
 
-            using var path = GlyphPath(_remaining.ToString(), g);
+            using var path = GlyphPath(_remaining.ToString());
             if (path is null) return;
 
-            // Soft dark drop shadow underneath keeps the glyph readable on white.
-            using (var shadow = (GraphicsPath)path.Clone())
-            using (var offset = new Matrix())
-            {
-                offset.Translate(0, 10 * _scale);
-                shadow.Transform(offset);
-                using var brush = new SolidBrush(Color.FromArgb(90, 0, 20, 45));
-                g.FillPath(brush, shadow);
-            }
-
-            // Frosted white-to-ice vertical gradient inside the glyph.
             var bounds = path.GetBounds();
-            using (var fill = new LinearGradientBrush(bounds,
-                       Color.FromArgb(220, 255, 255, 255), Color.FromArgb(120, 220, 238, 255), LinearGradientMode.Vertical))
+            var glowArea = RectangleF.Inflate(bounds, 60 * _scale, 60 * _scale);
+
+            // 1. Outer neon halo: five widening round pens, warm orange -> magenta.
+            var halo = new (float Width, int Alpha)[] { (40f, 20), (30f, 30), (22f, 45), (14f, 65), (7f, 90) };
+            foreach (var (width, alpha) in halo)
             {
-                g.FillPath(fill, path);
+                using var brush = NeonBrush(glowArea, alpha);
+                using var pen = new Pen(brush, width * _scale) { LineJoin = LineJoin.Round };
+                g.DrawPath(pen, path);
             }
 
-            // Thin bright rim so the glass edge stays crisp on any background.
-            using (var rim = new Pen(Color.FromArgb(235, 255, 255, 255), Math.Max(1.5f, 1.5f * _scale)))
+            // 2. Translucent jelly body: pink top -> violet middle -> blue-violet base.
+            using (var body = new LinearGradientBrush(bounds,
+                       Color.FromArgb(150, 255, 190, 245), Color.FromArgb(145, 160, 185, 255), 90f))
+            {
+                body.InterpolationColors = new ColorBlend
+                {
+                    Positions = new[] { 0f, 0.5f, 1f },
+                    Colors = new[]
+                    {
+                        Color.FromArgb(150, 255, 190, 245),
+                        Color.FromArgb(110, 210, 140, 255),
+                        Color.FromArgb(145, 160, 185, 255)
+                    }
+                };
+                g.FillPath(body, path);
+            }
+
+            // 3. Inner refraction: clip to the glyph, then stroke offset copies so
+            //    only the upper-left highlight and lower-right dark line show.
+            using (var clip = (GraphicsPath)path.Clone())
+            {
+                var state = g.Save();
+                g.SetClip(clip, CombineMode.Replace);
+
+                using (var highlight = (GraphicsPath)path.Clone())
+                using (var shift = new Matrix())
+                {
+                    shift.Translate(-3.2f * _scale, -3.2f * _scale);
+                    highlight.Transform(shift);
+                    using var pen = new Pen(Color.FromArgb(195, 255, 255, 255), Math.Max(4f, 8f * _scale))
+                    {
+                        LineJoin = LineJoin.Round
+                    };
+                    g.DrawPath(pen, highlight);
+                }
+
+                using (var shade = (GraphicsPath)path.Clone())
+                using (var shift = new Matrix())
+                {
+                    shift.Translate(3.2f * _scale, 3.2f * _scale);
+                    shade.Transform(shift);
+                    using var pen = new Pen(Color.FromArgb(85, 95, 20, 140), Math.Max(1.2f, 2.2f * _scale))
+                    {
+                        LineJoin = LineJoin.Round
+                    };
+                    g.DrawPath(pen, shade);
+                }
+
+                g.Restore(state);
+            }
+
+            // 4. Sharp neon tube rim: thin bright white-pink edge.
+            using (var rim = new Pen(Color.FromArgb(245, 255, 235, 255), Math.Max(2f, 2f * _scale)))
             {
                 rim.LineJoin = LineJoin.Round;
                 g.DrawPath(rim, path);
@@ -174,9 +223,27 @@ internal sealed class DelayCountdownForm : ToolWindow
         PushLayered(bitmap);
     }
 
-    private GraphicsPath GlyphPath(string digit, Graphics g)
+    /// <summary>Orange -> magenta -> violet diagonal gradient used by every halo pass.</summary>
+    private static LinearGradientBrush NeonBrush(RectangleF area, int alpha)
     {
-        using var family = new FontFamily("Segoe UI");
+        var brush = new LinearGradientBrush(area,
+            Color.FromArgb(alpha, 0xFF, 0x5E, 0x3A), Color.FromArgb(alpha, 0x8A, 0x2B, 0xE2), 45f);
+        brush.InterpolationColors = new ColorBlend
+        {
+            Positions = new[] { 0f, 0.55f, 1f },
+            Colors = new[]
+            {
+                Color.FromArgb(alpha, 0xFF, 0x5E, 0x3A),
+                Color.FromArgb(alpha, 0xE0, 0x26, 0xFF),
+                Color.FromArgb(alpha, 0x8A, 0x2B, 0xE2)
+            }
+        };
+        return brush;
+    }
+
+    private GraphicsPath GlyphPath(string digit)
+    {
+        using var family = RoundedFamily();
         var path = new GraphicsPath();
 
         var em = EmSize * _scale;
@@ -213,6 +280,17 @@ internal sealed class DelayCountdownForm : ToolWindow
             DeleteDC(memDc);
             ReleaseDC(IntPtr.Zero, screenDc);
         }
+    }
+
+    /// <summary>Rounded modern face when installed, otherwise the system UI face.</summary>
+    private static FontFamily RoundedFamily()
+    {
+        foreach (var name in new[] { "Arial Rounded MT Bold", "Nunito", "Segoe UI" })
+        {
+            try { return new FontFamily(name); }
+            catch (ArgumentException) { /* not installed */ }
+        }
+        return new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
     }
 
     [StructLayout(LayoutKind.Sequential)]
