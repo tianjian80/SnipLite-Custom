@@ -659,8 +659,8 @@ internal sealed class TrayContext : ApplicationContext
     private DelayCountdownForm? _countdown;
 
     /// <summary>
-    /// Shows the translucent countdown in the top-right corner, then opens the
-    /// normal capture overlay so transient UI (menus, tooltips) can be framed.
+    /// Shows the countdown badge then grabs the full screen and saves silently:
+    /// no selection overlay is opened.
     /// </summary>
     private void StartDelayedCapture(int seconds)
     {
@@ -668,9 +668,60 @@ internal sealed class TrayContext : ApplicationContext
         if (_countdown is { IsDisposed: false }) return;
         var form = new DelayCountdownForm(seconds);
         _countdown = form;
-        form.Finished += () => { _countdown = null; StartCapture(CaptureMode.Snip); };
+        form.Finished += () => { _countdown = null; DelayedFullScreenCapture(); };
         form.FormClosed += (_, _) => { if (ReferenceEquals(_countdown, form)) _countdown = null; };
         form.Show();
+    }
+
+    /// <summary>Full-screen grab honouring 智能排除任务栏, then save + history + toast.</summary>
+    private void DelayedFullScreenCapture()
+    {
+        try
+        {
+            var screen = Screen.FromPoint(Cursor.Position);
+            var bounds = _settings.SmartFullScreenCapture && !IsFullScreenForeground(screen)
+                ? screen.WorkingArea : screen.Bounds;
+            using var image = new Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(image))
+            {
+                g.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
+                if (_settings.CaptureCursor) Win32.DrawCursor(g, bounds.Location);
+            }
+
+            var path = Services.SaveCaptureFile(image, _settings, DefaultCaptureFolder());
+            _history.Add(image, bounds, _settings.HistoryImageLimit, path);
+            AppLog.Write($"延时截图：{bounds.Width}×{bounds.Height} → {path}");
+            if (_settings.QuickSaveToast) Toast.Show(UiText.T("已保存：") + Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("延时截图失败", ex);
+            Toast.Error(UiText.T("截图输出失败：") + ex.Message);
+        }
+    }
+
+    /// <summary>Configured output folder, otherwise 图片, otherwise 桌面.</summary>
+    private string DefaultCaptureFolder()
+    {
+        foreach (var candidate in new[] { _settings.SaveDirectory, _settings.QuickSaveDirectory })
+        {
+            if (string.IsNullOrWhiteSpace(candidate)) continue;
+            try { Directory.CreateDirectory(candidate); return candidate; }
+            catch { /* fall through to the user folders */ }
+        }
+
+        foreach (var folder in new[]
+                 {
+                     Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                     Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+                 })
+        {
+            if (string.IsNullOrWhiteSpace(folder)) continue;
+            try { Directory.CreateDirectory(folder); return folder; }
+            catch { }
+        }
+
+        return Path.GetTempPath();
     }
 
     private void StartCapture(CaptureMode mode, bool forceCopy = false, Rectangle? preset = null, bool longCapture = false)

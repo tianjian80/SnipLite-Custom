@@ -1,22 +1,27 @@
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 
 namespace SnipLite;
 
 /// <summary>
-/// Translucent rounded countdown card shown in the top-right corner before a
-/// delayed capture. It is a tool window, never appears in the taskbar, and does
-/// not take focus so the desktop state stays untouched.
+/// Tiny translucent countdown badge shown in the top-right corner before a
+/// delayed capture. Tool window, never in the taskbar, never takes focus, and
+/// Esc anywhere cancels it.
 /// </summary>
 internal sealed class DelayCountdownForm : ToolWindow
 {
-    private static Color Card => AppTheme.Current.Card;
-    private static Color Ink => AppTheme.Current.Text;
-    private static Color Accent => AppTheme.Current.Accent;
+    private static readonly Color CardFill = Color.FromArgb(0xF4, 0xF9, 0xFF);
+    private static readonly Color CardEdge = Color.FromArgb(0x00, 0x67, 0xC0);
+    private static readonly Color CardInk = Color.FromArgb(0x00, 0x67, 0xC0);
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private readonly int _total;
     private int _remaining;
     private float _scale = 1f;
+    private IntPtr _hook;
+
+    private delegate IntPtr HookProc(int code, IntPtr message, IntPtr data);
+    private readonly HookProc _callback;
 
     public event Action? Finished;
 
@@ -24,6 +29,7 @@ internal sealed class DelayCountdownForm : ToolWindow
     {
         _total = Math.Max(1, seconds);
         _remaining = _total;
+        _callback = Filter;
 
         ShowInTaskbar = false;
         FormBorderStyle = FormBorderStyle.None;
@@ -31,8 +37,8 @@ internal sealed class DelayCountdownForm : ToolWindow
         TopMost = true;
         DoubleBuffered = true;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = Card;
-        Opacity = 0.92;
+        BackColor = CardFill;
+        Opacity = 0.88;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
 
         _timer.Tick += (_, _) => Tick();
@@ -54,17 +60,20 @@ internal sealed class DelayCountdownForm : ToolWindow
     {
         base.OnLoad(e);
         _scale = DeviceDpi / 96f;
-        var size = (int)Math.Round(132 * _scale);
+        var size = (int)Math.Round(42 * _scale);
         Size = new Size(size, size);
         var area = Screen.PrimaryScreen?.WorkingArea ?? Screen.GetWorkingArea(Cursor.Position);
-        Location = new Point(area.Right - Width - (int)Math.Round(24 * _scale), area.Top + (int)Math.Round(24 * _scale));
-        using var path = Rounded(new Rectangle(0, 0, Width, Height), (int)Math.Round(26 * _scale));
+        Location = new Point(area.Right - Width - (int)Math.Round(16 * _scale),
+            area.Top + (int)Math.Round(16 * _scale));
+        using var path = Rounded(new Rectangle(0, 0, Width, Height), (int)Math.Round(12 * _scale));
         Region = new Region(path);
     }
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        // A global hook lets Esc cancel even though the badge is not activated.
+        _hook = SetWindowsHookEx(13, _callback, GetModuleHandle(null), 0);
         _timer.Start();
         Invalidate();
     }
@@ -73,7 +82,20 @@ internal sealed class DelayCountdownForm : ToolWindow
     {
         _timer.Stop();
         _timer.Dispose();
+        if (_hook != IntPtr.Zero) { UnhookWindowsHookEx(_hook); _hook = IntPtr.Zero; }
         base.OnFormClosed(e);
+    }
+
+    private IntPtr Filter(int code, IntPtr message, IntPtr data)
+    {
+        const int WmKeyDown = 0x0100;
+        const int VkEscape = 0x1B;
+        if (code >= 0 && message == WmKeyDown && Marshal.ReadInt32(data) == VkEscape)
+        {
+            BeginInvoke(new Action(Close));
+            return new IntPtr(1);
+        }
+        return CallNextHookEx(_hook, code, message, data);
     }
 
     private void Tick()
@@ -87,8 +109,8 @@ internal sealed class DelayCountdownForm : ToolWindow
 
         _timer.Stop();
         Hide();
-        // Give the compositor one frame to remove the card before freezing the screen.
-        var settle = new System.Windows.Forms.Timer { Interval = 120 };
+        // One compositor frame so the badge is gone before the screen is frozen.
+        var settle = new System.Windows.Forms.Timer { Interval = 90 };
         settle.Tick += (_, _) =>
         {
             settle.Stop();
@@ -104,32 +126,27 @@ internal sealed class DelayCountdownForm : ToolWindow
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-        g.Clear(Card);
+        g.Clear(CardFill);
 
-        var ring = (int)Math.Round(14 * _scale);
-        var pad = (int)Math.Round(10 * _scale);
-        using (var pen = new Pen(Color.FromArgb(52, Accent), ring))
-            g.DrawEllipse(pen, pad + ring / 2f, pad + ring / 2f, Width - pad * 2 - ring, Height - pad * 2 - ring);
+        using (var edge = new Pen(CardEdge, Math.Max(1f, _scale)))
+        {
+            var half = edge.Width / 2f;
+            g.DrawPath(edge, Rounded(new RectangleF(half, half, Width - edge.Width, Height - edge.Width),
+                (int)Math.Round(11.5f * _scale)));
+        }
 
-        var progress = 1f - (float)(_remaining - 1) / _total;
-        using (var arc = new Pen(Accent, ring) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            g.DrawArc(arc, pad + ring / 2f, pad + ring / 2f, Width - pad * 2 - ring, Height - pad * 2 - ring,
-                -90, Math.Max(1, progress * 360));
-
-        using var number = new Font("Microsoft YaHei UI", 44 * _scale, FontStyle.Bold, GraphicsUnit.Pixel);
-        using var caption = new Font("Microsoft YaHei UI", 11 * _scale, GraphicsUnit.Pixel);
-        var numberBounds = new RectangleF(0, Height / 2f - 44 * _scale, Width, 60 * _scale);
-        TextRenderer.DrawText(g, _remaining.ToString(), number, Rectangle.Round(numberBounds), Ink,
+        using var font = new Font("Segoe UI", 14f, FontStyle.Bold, GraphicsUnit.Point);
+        TextRenderer.DrawText(g, _remaining.ToString(), font, ClientRectangle, CardInk,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-        var captionBounds = new RectangleF(0, Height / 2f + 30 * _scale, Width, 22 * _scale);
-        TextRenderer.DrawText(g, UiText.T("秒后截屏"), caption, Rectangle.Round(captionBounds),
-            Color.FromArgb(170, Ink), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
     }
 
-    private static GraphicsPath Rounded(Rectangle bounds, int radius)
+    private static GraphicsPath Rounded(Rectangle bounds, int radius) =>
+        Rounded(new RectangleF(bounds.X, bounds.Y, bounds.Width, bounds.Height), radius);
+
+    private static GraphicsPath Rounded(RectangleF bounds, int radius)
     {
         var path = new GraphicsPath();
-        var d = radius * 2;
+        var d = Math.Min(radius * 2f, Math.Min(bounds.Width, bounds.Height));
         path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
         path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
         path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
@@ -137,4 +154,9 @@ internal sealed class DelayCountdownForm : ToolWindow
         path.CloseFigure();
         return path;
     }
+
+    [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int id, HookProc callback, IntPtr module, uint threadId);
+    [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string? name);
 }
