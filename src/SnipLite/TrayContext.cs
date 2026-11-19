@@ -183,6 +183,8 @@ internal sealed class TrayContext : ApplicationContext
         // The menu is shown manually so it can always open towards the right of
         // the cursor instead of letting WinForms flip it left in the right half.
         _tray.MouseUp += (_, e) => { if (e.Button == MouseButtons.Right) ShowTrayMenu(); };
+        // Double-click is the fallback entrance when the icon is not hidden.
+        _tray.MouseDoubleClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowPreferences(0); };
         ApplySettings();
         _languageMonitor = new Localization.LanguageMonitor(ApplySettings);
         _languageMonitor.Start();

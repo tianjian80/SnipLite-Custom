@@ -20,12 +20,11 @@ internal static class TrayIcons
         var iconSize = SystemInformation.SmallIconSize.Width;
         using var logo = AppIcon.Load(iconSize);
         using var bitmap = logo.ToBitmap();
-        var palette = AppTheme.Current;
+        // Strict priority: custom .ico > user-picked colour > pure white. The global
+        // skin deliberately has no say here, so switching skins never recolours it.
         var tint = recording ? Color.FromArgb(229, 57, 53)
             : settings.TrayIconStyle == "Color" ? settings.Accent
-            : palette.HighContrast ? SystemColors.WindowText
-            : palette.TaskbarDark ? Color.FromArgb(245, 245, 245) : Color.FromArgb(40, 40, 43);
-        // Auto follows the taskbar, which Windows can theme separately from application windows.
+            : Color.White;
         for (var y = 0; y < bitmap.Height; y++)
         {
             for (var x = 0; x < bitmap.Width; x++)
