@@ -1520,7 +1520,7 @@ internal sealed partial class CaptureForm : ToolWindow
 
     private void ShowOcrEnginePicker()
     {
-        var menu = SnipMenu.Create();
+        var menu = SnipMenu.CreateComboPopup(centeredRows: true);
         foreach (var choice in OcrEngines.Choices)
         {
             var engine = choice.Kind;

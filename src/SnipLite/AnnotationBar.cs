@@ -669,7 +669,8 @@ internal sealed class AnnotationBar
                 text.Width -= ResultButtonWidth() + Px(10);
             }
             TextRenderer.DrawText(g, Status.Replace("\r", " ").Replace("\n", " "), font, text, IconColor,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis |
+                TextFormatFlags.NoPrefix | (OcrMode ? TextFormatFlags.HorizontalCenter : 0));
         }
         foreach (var (rect, id) in _items)
         {
@@ -716,13 +717,20 @@ internal sealed class AnnotationBar
                 g.DrawPath(border, field);
                 using var font = new Font("Microsoft YaHei UI", 12 * Scale, GraphicsUnit.Pixel);
                 var textRect = Rectangle.Inflate(rect, -Px(6), 0);
-                textRect.Width -= Px(12);
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+                if (id == "ocrengine")
+                {
+                    // Engine captions read centred inside the field; the other small
+                    // editors stay left-aligned next to their value.
+                    flags |= TextFormatFlags.HorizontalCenter;
+                }
+                else textRect.Width -= Px(12);
                 if (id == "arrowstyle")
                 {
                     var arrow = new ArrowShape { Start = new Point(textRect.Left + Px(2), textRect.Top + textRect.Height / 2), End = new Point(textRect.Right - Px(2), textRect.Top + textRect.Height / 2), Width = 1.6f * Scale, Color = IconColor, Style = ArrowStyle };
                     using var dummy = new Bitmap(1, 1); arrow.Render(g, dummy);
                 }
-                else TextRenderer.DrawText(g, label, font, textRect, IconColor, TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+                else TextRenderer.DrawText(g, label, font, textRect, IconColor, flags);
                 FluentIcons.Draw(g, "chevron", new Rectangle(rect.Right - Px(17), rect.Top + (rect.Height - Px(14)) / 2, Px(14), Px(14)), IconColor);
                 continue;
             }

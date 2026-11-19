@@ -58,7 +58,7 @@ internal sealed class TranslationPanel : UserControl
         _tips.SetToolTip(_retry, UiText.T("重新翻译"));
         _providerButton = MakeDropdown("翻译服务", ShowProviders);
         _tips.SetToolTip(_providerButton, UiText.T("切换本次截图的翻译服务"));
-        _status = new Label { ForeColor = AppTheme.Current.Muted, Font = _smallFont, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+        _status = new Label { ForeColor = AppTheme.Current.Muted, Font = _smallFont, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleCenter };
         Controls.Add(_status);
         Width = Px(680); Height = Px(44);
         SetProvider(provider); SetBusy(() => UiText.T("正在识别…"));
@@ -128,8 +128,10 @@ internal sealed class TranslationPanel : UserControl
         var button = MakeButton(click);
         button.Tag = label;
         button.AccessibleName = UiText.T(label);
-        button.TextAlign = ContentAlignment.MiddleLeft;
-        button.Padding = new Padding(Px(8), 0, Px(24), 0);
+        // Centred caption; symmetric padding keeps the label on the button centre
+        // while leaving room for the chevron on the right.
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        button.Padding = new Padding(Px(22), 0, Px(22), 0);
         button.AutoEllipsis = true;
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.BorderColor = AppTheme.Current.Border;
@@ -263,11 +265,11 @@ internal sealed class TranslationPanel : UserControl
 
     internal void ShowLanguages(bool source)
     {
-        var menu = SnipMenu.Create();
+        var menu = SnipMenu.CreateComboPopup(centeredRows: true);
         foreach (var language in TranslationLanguages.All.Where(l => (source && AllowAutoSource) || l.Code != "auto"))
         {
             menu.Items.Add(SnipMenu.Item(language.Name, () => SelectLanguage(source, language.Code),
-                check: language.Code == (source ? SourceLanguage : TargetLanguage)));
+                check: language.Code == (source ? SourceLanguage : TargetLanguage), showIcon: false));
         }
         OpenDropdown(source ? _source : _target, menu);
     }
@@ -282,9 +284,9 @@ internal sealed class TranslationPanel : UserControl
 
     private void ShowProviders()
     {
-        var menu = SnipMenu.Create();
+        var menu = SnipMenu.CreateComboPopup(centeredRows: true);
         foreach (var (kind, label) in TranslationProviders.Choices)
-            menu.Items.Add(SnipMenu.Item(label, () => ProviderRequested?.Invoke(kind), check: Provider == kind));
+            menu.Items.Add(SnipMenu.Item(label, () => ProviderRequested?.Invoke(kind), check: Provider == kind, showIcon: false));
         OpenDropdown(_providerButton, menu);
     }
 
