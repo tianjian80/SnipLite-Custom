@@ -216,7 +216,6 @@ internal sealed class TrayContext : ApplicationContext
         Add(_settings.TrayItemLong, "长截图", () => StartCapture(CaptureMode.Snip, longCapture: true), Key(_settings.LongCaptureHotkey));
         Add(_settings.TrayItemRecord, "录屏", () => StartCapture(CaptureMode.Record), Key(_settings.RecordHotkey));
         Add(_settings.TrayItemGif, "录制 GIF", () => StartCapture(CaptureMode.Gif), Key(_settings.GifHotkey));
-        Add(_settings.TrayItemMouseThrough, "鼠标穿透", ToggleMouseThrough);
         Add(_settings.TrayItemPin, "贴图 / 恢复贴图", PasteFromClipboard, Key(_settings.PinHotkey));
         Add(_settings.TrayItemTogglePins, "隐藏 / 显示所有贴图", PinForm.ToggleAll, Key(_settings.TogglePinsHotkey));
         if (_settings.EnhancedTrayMenu)
@@ -353,7 +352,7 @@ internal sealed class TrayContext : ApplicationContext
             menu.Opening += (_, _) => disable.Checked = !_settings.HotkeysEnabled;
         }
         Add(_settings.TrayItemOcr, "文字识别", () => StartCapture(CaptureMode.Ocr), Key(_settings.OcrHotkey));
-        Add(_settings.TrayItemQr, "二维码识别", () => StartCapture(CaptureMode.Qr), Key(_settings.QrHotkey));
+        Add(_settings.TrayItemQr, "二维码识别", () => StartCapture(CaptureMode.Qr));
         menu.Items.Add(new ToolStripSeparator());
         // 退出 is permanent: hiding every entry must never lock the user out.
         Add(_settings.TrayItemPreferences, "首选项…", () => ShowPreferences(0), Key(_settings.PreferencesHotkey));
@@ -538,10 +537,8 @@ internal sealed class TrayContext : ApplicationContext
             [nameof(_settings.PinHotkey)] = PasteFromClipboard,
             [nameof(_settings.TogglePinsHotkey)] = PinForm.ToggleAll,
             [nameof(_settings.SwitchGroupHotkey)] = PinForm.SwitchGroup,
-            [nameof(_settings.MouseThroughHotkey)] = ToggleMouseThrough,
             [nameof(_settings.TranslationHotkey)] = () => StartCapture(CaptureMode.Translation),
             [nameof(_settings.OcrHotkey)] = () => StartCapture(CaptureMode.Ocr),
-            [nameof(_settings.QrHotkey)] = () => StartCapture(CaptureMode.Qr),
             [nameof(_settings.RedactHotkey)] = RedactHotkey,
             [nameof(_settings.DelayCaptureHotkey)] = StartDelayedCapture
         };
@@ -742,16 +739,6 @@ internal sealed class TrayContext : ApplicationContext
         }
 
         return Path.GetTempPath();
-    }
-
-    /// <summary>Flips mouse-through on every pin and persists it for the 按键 switch.</summary>
-    private void ToggleMouseThrough()
-    {
-        if (PinForm.OpenCount == 0) { PinForm.ToggleMouseThroughActive(); return; }
-        var on = !PinForm.MouseThroughActive;
-        PinForm.SetMouseThroughActive(on);
-        _settings.MouseThroughEnabled = on;
-        _settings.Save();
     }
 
     /// <summary>Redacts the current selection, or starts a capture that redacts once framed.</summary>

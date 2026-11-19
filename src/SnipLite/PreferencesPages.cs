@@ -1604,7 +1604,6 @@ internal sealed partial class PreferencesForm
             ("录制 GIF", nameof(_s.TrayItemGif), "gif"),
             ("文字识别", nameof(_s.TrayItemOcr), "ocr"),
 
-            ("鼠标穿透", nameof(_s.TrayItemMouseThrough), "mouse"),
             ("二维码识别", nameof(_s.TrayItemQr), "qr"),
             ("关闭全部贴图", nameof(_s.TrayItemClosePins), "close"),
 

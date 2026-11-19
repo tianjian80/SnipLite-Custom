@@ -26,7 +26,6 @@ internal sealed partial class AppSettings
     public bool TrayItemFullSave { get; set; } = true;
     public bool TrayItemRecord { get; set; } = true;
     public bool TrayItemGif { get; set; } = true;
-    public bool TrayItemMouseThrough { get; set; } = true;
     /// <summary>Global mouse-through state for pinned images, mirrored by the 按键 page switch.</summary>
     public bool MouseThroughEnabled { get; set; }
     public bool TrayItemPin { get; set; } = true;
@@ -164,11 +163,9 @@ internal sealed partial class AppSettings
     public Keys PinHotkey { get; set; } = Keys.F3;
     public Keys TogglePinsHotkey { get; set; } = Keys.None;
     public Keys SwitchGroupHotkey { get; set; } = Keys.None;
-    public Keys MouseThroughHotkey { get; set; } = Keys.None;
     public Keys CopyCoordinatesHotkey { get; set; } = Keys.Control | Keys.Shift | Keys.C;
     public Keys TranslationHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.T;
     public Keys OcrHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.O;
-    public Keys QrHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.Q;
     public Keys RedactHotkey { get; set; } = Keys.None;
     public Keys DelayCaptureHotkey { get; set; } = Keys.None;
     /// <summary>Toggles a screen recording at the configured preset resolution.</summary>
