@@ -394,14 +394,197 @@ internal sealed class FluentHintLabel : Label
         const TextFormatFlags flags = TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix;
         if (wallpaper)
         {
+            var size = TextRenderer.MeasureText(Text, Font, new Size(Width, int.MaxValue), flags);
+            var centered = size.Height <= Height - 2 ? flags | TextFormatFlags.VerticalCenter : flags;
             TextRenderer.DrawText(g, Text, Font,
                 new Rectangle(ClientRectangle.X + 1, ClientRectangle.Y + 1, Width, Height),
-                Color.FromArgb(150, 0, 0, 0), flags);
-            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Color.White, flags);
+                Color.FromArgb(150, 0, 0, 0), centered);
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Color.FromArgb(95, 185, 255), centered);
         }
         else
         {
-            TextRenderer.DrawText(g, Text, Font, ClientRectangle, AppTheme.Current.Muted, flags);
+            var size = TextRenderer.MeasureText(Text, Font, new Size(Width, int.MaxValue), flags);
+            var centered = size.Height <= Height - 2 ? flags | TextFormatFlags.VerticalCenter : flags;
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, AppTheme.Current.Muted, centered);
+        }
+    }
+}
+
+/// <summary>
+/// Fully self-drawn numeric field: a glass inset with − / + hit zones, direct
+/// typing, arrow keys and the mouse wheel. Native NumericUpDown cannot be made
+/// translucent, so this replaces it inside the preference cards.
+/// </summary>
+internal sealed class NumericStepper : Control
+{
+    private int _value;
+    private int _min;
+    private int _max = 100;
+    private bool _typing;
+    private bool _hover;
+    private string _entry = "";
+    private int _hoverStep;
+
+    public event EventHandler? ValueChanged;
+
+    public NumericStepper()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                 ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
+        BackColor = Color.Transparent;
+        TabStop = true;
+        Height = 30;
+        AccessibleRole = AccessibleRole.SpinButton;
+    }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Minimum { get => _min; set { _min = value; Invalidate(); } }
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Maximum { get => _max; set { _max = Math.Max(value, _min); Invalidate(); } }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Value
+    {
+        get => _value;
+        set
+        {
+            var clamped = Math.Clamp(value, _min, _max);
+            if (_value == clamped) { Invalidate(); return; }
+            _value = clamped;
+            Invalidate();
+            ValueChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private int Px(float value) => (int)Math.Round(value * DeviceDpi / 96f);
+
+    private Rectangle StepBounds(int step) => new(
+        step < 0 ? Px(2) : Width - Px(2) - Px(24), Px(2), Px(24), Math.Max(Px(6), Height - Px(4)));
+
+    private void Step(int delta) => Value = _value + delta;
+
+    private void CommitEntry(bool cancel)
+    {
+        if (!_typing) return;
+        _typing = false;
+        if (!cancel && int.TryParse(_entry, out var typed)) Value = typed;
+        _entry = "";
+        Invalidate();
+    }
+
+    protected override bool IsInputKey(Keys keyData) => true;
+
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _hover = true; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hover = false; _hoverStep = 0; Invalidate(); }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var step = StepBounds(-1).Contains(e.Location) ? -1 : StepBounds(1).Contains(e.Location) ? 1 : 0;
+        if (_hoverStep != step) { _hoverStep = step; Invalidate(); }
+        Cursor = step == 0 ? Cursors.IBeam : Cursors.Hand;
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Left) return;
+        Focus();
+        CommitEntry(false);
+        if (StepBounds(-1).Contains(e.Location)) Step(-1);
+        else if (StepBounds(1).Contains(e.Location)) Step(1);
+        else { _typing = true; _entry = ""; Invalidate(); }
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        if (!Focused) Focus();
+        CommitEntry(false);
+        Step(e.Delta > 0 ? 1 : -1);
+    }
+
+    protected override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (!char.IsDigit(e.KeyChar)) return;
+        if (!_typing) { _typing = true; _entry = ""; }
+        if (_entry.Length < 7) { _entry += e.KeyChar; Invalidate(); }
+        e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        switch (e.KeyCode)
+        {
+            case Keys.Back:
+                if (_typing && _entry.Length > 0) { _entry = _entry[..^1]; Invalidate(); }
+                e.Handled = e.SuppressKeyPress = true;
+                break;
+            case Keys.Up: CommitEntry(false); Step(1); e.Handled = e.SuppressKeyPress = true; break;
+            case Keys.Down: CommitEntry(false); Step(-1); e.Handled = e.SuppressKeyPress = true; break;
+            case Keys.Enter: CommitEntry(false); e.Handled = e.SuppressKeyPress = true; break;
+            case Keys.Escape: CommitEntry(true); e.Handled = e.SuppressKeyPress = true; break;
+        }
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        CommitEntry(false);
+        _hover = false;
+        _hoverStep = 0;
+        Invalidate();
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        var p = AppTheme.Current;
+        var g = e.Graphics;
+        var glass = GlassPaint.UnderWallpaper(this);
+        if (glass) GlassPaint.PaintBackdrop(this, g, ClientRectangle);
+        else g.Clear(Parent?.BackColor ?? p.Card);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using var path = FluentDrawing.Rounded(new RectangleF(1f, 1f, Width - 2, Height - 2), Px(5));
+        using var fill = new SolidBrush(glass ? ThemeManager.GlassTint : p.Field);
+        g.FillPath(fill, path);
+        var edge = Focused || _hover ? p.Accent : glass ? ThemeManager.GlassEdge : p.Border;
+        using var pen = new Pen(edge);
+        g.DrawPath(pen, path);
+        if (Focused)
+        {
+            using var accent = new Pen(p.Accent, Math.Max(1, Px(2)));
+            g.DrawLine(accent, Px(5), Height - Px(1), Width - Px(5), Height - Px(1));
+        }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var p = AppTheme.Current;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        var text = _typing ? _entry + "|" : _value.ToString();
+        var body = new Rectangle(StepBounds(-1).Right, 0, Math.Max(Px(10), StepBounds(1).Left - StepBounds(-1).Right), Height);
+        TextRenderer.DrawText(g, text, Font, body, p.Text,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+
+        foreach (var step in new[] { -1, 1 })
+        {
+            var bounds = StepBounds(step);
+            var enabled = Enabled && (step < 0 ? _value > _min : _value < _max);
+            if (_hoverStep == step && enabled)
+            {
+                using var hoverPath = FluentDrawing.Rounded(bounds, Px(3));
+                using var hover = new SolidBrush(p.Hover);
+                g.FillPath(hover, hoverPath);
+            }
+            using var pen = new Pen(enabled ? p.Text : p.Disabled, Math.Max(1, DeviceDpi / 96f));
+            var x = bounds.Left + bounds.Width / 2; var y = bounds.Top + bounds.Height / 2;
+            var arm = Px(4);
+            g.DrawLine(pen, x - arm, y, x + arm, y);
+            if (step > 0) g.DrawLine(pen, x, y - arm, x, y + arm);
         }
     }
 }

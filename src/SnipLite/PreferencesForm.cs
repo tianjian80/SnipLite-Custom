@@ -854,14 +854,11 @@ internal sealed partial class PreferencesForm : ToolWindow
         if (_captions)
         {
             var height = TextRenderer.MeasureText(title, Font).Height + Px(12);
-            _page.Controls.Add(new Label
+            _page.Controls.Add(new FluentHintLabel
             {
                 Text = title,
-                AutoSize = false,
                 Bounds = new Rectangle(_labelX, _y, ContentWidth(), height),
-                ForeColor = Muted,
-                BackColor = Page,
-                TextAlign = ContentAlignment.MiddleLeft
+                ForeColor = Muted
             });
 
             _y += height;
@@ -1399,20 +1396,17 @@ internal sealed partial class PreferencesForm : ToolWindow
         return button;
     }
 
-    private NumericUpDown MakeNumber(int min, int max, int value, int width, Action<int> onChange)
+    private NumericStepper MakeNumber(int min, int max, int value, int width, Action<int> onChange)
     {
-        var number = new NumericUpDown
+        var number = new NumericStepper
         {
             Minimum = min,
             Maximum = max,
-            Value = Math.Clamp(value, min, max),
             Width = Px(width),
-            BackColor = ThemeManager.GlassField,
-            ForeColor = Ink,
-            TextAlign = HorizontalAlignment.Right
+            Height = FieldHeight
         };
-
-        number.ValueChanged += (_, _) => onChange((int)number.Value);
+        number.Value = Math.Clamp(value, min, max);
+        number.ValueChanged += (_, _) => onChange(number.Value);
 
         return number;
     }
